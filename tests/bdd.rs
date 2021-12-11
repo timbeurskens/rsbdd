@@ -1,4 +1,4 @@
-use rsbdd::bdd::{BDD, var, and, not, or, implies, exists, all, fp, xor, eq};
+use rsbdd::bdd::*;
 
 #[test]
 fn test_equivalence() {
@@ -13,6 +13,8 @@ fn test_equivalence() {
     assert_eq!(&and(&BDD::True, &BDD::True), &BDD::True);
     assert_ne!(and(&var(0), &var(1)), and(&var(1), &var(2)));
     assert_eq!(and(&var(0), &var(1)), and(&var(1), &var(0)));
+
+    assert_eq!(not(&var(0)), BDD::Choice(Box::new(BDD::False), 0, Box::new(BDD::True)))
 }
 
 #[test]
