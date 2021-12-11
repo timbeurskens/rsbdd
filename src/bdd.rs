@@ -42,12 +42,20 @@ pub fn implies(a: &BDD, b: &BDD) -> BDD {
     }
 }
 
+pub fn eq(a: &BDD, b: &BDD) -> BDD {
+    and(&implies(a, b), &implies(b, a))
+}
+
 pub fn not(a: &BDD) -> BDD {
     implies(a, &BDD::False)
 }
 
 pub fn or(a: &BDD, b: &BDD) -> BDD {
     not(&and(&not(a), &not(b)))
+}
+
+pub fn xor(a: &BDD, b: &BDD) -> BDD {
+    or(&and(&not(a), b), &and(a, &not(b)))
 }
 
 /// var constructs a new BDD for a given variable.
@@ -58,8 +66,7 @@ pub fn var(s: Symbol) -> BDD {
 /// existential quantification
 pub fn exists(s: Symbol, b: &BDD) -> BDD {
     match b {
-        &BDD::False => BDD::False,
-        &BDD::True => BDD::True,
+        &BDD::False | &BDD::True => b.clone(),
         &BDD::Choice(ref t, v, ref f) if v == s => or(t, f),
         &BDD::Choice(ref t, v, ref f) => BDD::Choice(Box::new(exists(s, t)), v, Box::new(exists(s, f))).simplify(),
     }
@@ -67,4 +74,17 @@ pub fn exists(s: Symbol, b: &BDD) -> BDD {
 
 pub fn all(s: Symbol, b: &BDD) -> BDD {
     not(&exists(s, &not(b)))
+}
+
+/// fp computes the fixed point starting from the initial state a, by iteratively applying the transformer t.
+pub fn fp<F>(a: &BDD, t: F) -> BDD where F: Fn(&BDD) -> BDD {
+    let mut s = a.clone();
+    loop {
+        let snew = t(&s);
+        if snew == s {
+            break;
+        }
+        s = snew;
+    }
+    s.clone()
 }
