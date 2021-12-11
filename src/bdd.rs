@@ -50,11 +50,21 @@ pub fn or(a: &BDD, b: &BDD) -> BDD {
     not(&and(&not(a), &not(b)))
 }
 
-/// Var constructs a new BDD for a given variable.
+/// var constructs a new BDD for a given variable.
 pub fn var(s: Symbol) -> BDD {
     BDD::Choice(Box::new(BDD::True), s, Box::new(BDD::False))
 }
 
+/// existential quantification
 pub fn exists(s: Symbol, b: &BDD) -> BDD {
-    unimplemented!()
+    match b {
+        &BDD::False => BDD::False,
+        &BDD::True => BDD::True,
+        &BDD::Choice(ref t, v, ref f) if v == s => or(t, f),
+        &BDD::Choice(ref t, v, ref f) => BDD::Choice(Box::new(exists(s, t)), v, Box::new(exists(s, f))).simplify(),
+    }
+}
+
+pub fn all(s: Symbol, b: &BDD) -> BDD {
+    not(&exists(s, &not(b)))
 }

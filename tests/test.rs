@@ -1,4 +1,4 @@
-use rsbdd::bdd::{BDD, var, and, not, or, implies};
+use rsbdd::bdd::{BDD, var, and, not, or, implies, exists, all};
 
 #[test]
 fn test_x() {
@@ -20,4 +20,16 @@ fn trivial_bdd() {
 #[test]
 fn test_combined() {
     assert_eq!(and(&or(&var(0), &not(&var(0))), &or(&var(1), &not(&var(1)))), BDD::True);
+
+}
+
+#[test]
+fn test_quantifiers() {
+    assert_eq!(exists(0, &or(&var(0), &var(1))), BDD::True);
+
+    assert_eq!(all(0, &var(0)), BDD::False);
+
+    assert_eq!(all(0, &BDD::True), BDD::True);
+
+    assert_eq!(exists(0, &BDD::False), BDD::False);
 }
