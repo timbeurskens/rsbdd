@@ -37,10 +37,11 @@ impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<'a, S>, GraphEdge<'a, S>> for
         }
     }
 
-    fn edge_label(&'a self, e: &GraphEdge<'a, S>) -> dot::LabelText<'a> {
-        match e {
-            &(_, true, _) => dot::LabelText::LabelStr(Cow::Borrowed("T")),
-            &(_, false, _) => dot::LabelText::LabelStr(Cow::Borrowed("F")),
+    fn edge_label(&'a self, (_, e, _): &GraphEdge<'a, S>) -> dot::LabelText<'a> {
+        if *e {
+            dot::LabelText::LabelStr(Cow::Borrowed("T"))
+        } else {
+            dot::LabelText::LabelStr(Cow::Borrowed("F"))
         }
     }
 }
@@ -62,11 +63,11 @@ impl<'a, S: BDDSymbol> dot::GraphWalk<'a, GraphNode<'a, S>, GraphEdge<'a, S>> fo
         }
     }
 
-    fn source(&self, e: &GraphEdge<'a, S>) -> GraphNode<'a, S> {
-        e.0
+    fn source(&self, (a, _, _): &GraphEdge<'a, S>) -> GraphNode<'a, S> {
+        a
     }
 
-    fn target(&self, e: &GraphEdge<'a, S>) -> GraphNode<'a, S> {
-        e.2
+    fn target(&self, (_, _, b): &GraphEdge<'a, S>) -> GraphNode<'a, S> {
+        b
     }
 }

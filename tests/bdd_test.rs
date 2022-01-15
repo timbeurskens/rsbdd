@@ -93,7 +93,7 @@ fn test_amn() {
 
 #[test]
 fn test_queens() {
-    let n = 4;
+    let n = 3;
 
     // every row must contain at least one queen
     let row_expr = (0..n).map(|i| (0..n)
