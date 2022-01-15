@@ -1,9 +1,20 @@
 use crate::bdd::*;
+use std::ops::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BDDSet {
-    bdd: BDD,
+    pub bdd: BDD<usize>,
     bits: usize,
+}
+
+pub trait BDDCategorizable {
+    fn categorize(&self, c: usize) -> bool;
+}
+
+impl BDDCategorizable for usize {
+    fn categorize(&self, c: usize) -> bool {
+        (self >> c) & 1 == 0
+    }
 }
 
 impl BDDSet {
@@ -14,7 +25,7 @@ impl BDDSet {
         }
     }
 
-    pub fn from_bdd(bdd: &BDD, bits: usize) -> BDDSet {
+    pub fn from_bdd(bdd: &BDD<usize>, bits: usize) -> BDDSet {
         BDDSet {
             bdd: bdd.clone(),
             bits: bits,
@@ -35,17 +46,17 @@ impl BDDSet {
         }
     }
 
-    pub fn from_element(e: usize, bits: usize) -> Self {
+    pub fn from_element<T: BDDCategorizable>(e: T, bits: usize) -> Self {
         BDDSet {
             bdd: (0..bits).map(|i| {
-                if (e >> i) & 1 == 0 {
-                    not(&var(i))
-                } else {                
+                if e.categorize(i) {
                     var(i)
+                } else {
+                    not(&var(i))
                 }
-            }).reduce(|a, e| {
+            }).fold(BDD::True, |a, e| {
                 and(&a, &e)
-            }).unwrap(),
+            }),
             bits: bits,
         }
     }
@@ -75,7 +86,7 @@ impl BDDSet {
         }
     }
 
-    pub fn contains(&self, e: usize) -> bool {
+    pub fn contains<T: BDDCategorizable>(&self, e: T) -> bool {
         let singleton = BDDSet::from_element(e, self.bits);
         self.intersect(&singleton) == singleton
     }
