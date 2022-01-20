@@ -126,6 +126,47 @@ fn test_exn_model() {
 }
 
 #[test]
+fn test_exn_interference_model() {
+    // semi-exhaustive test for exactly n
+    for n in 1..8 {
+        for o in 0..n {
+            for c in 0..=n {
+                println!("n: {}, o: {}, c: {}", n, o, c);
+
+                let vars : Vec<usize> = (0..n).collect();
+                let vars_interference : Vec<usize> = (n-o..(2*n)).collect();
+    
+                let expr = exn(&vars, c);
+                let expr_interference = exn(&vars_interference, c);
+    
+                let expr_comb = and(&expr, &expr_interference);
+    
+                let model = model(&expr_comb);
+    
+                let mut count = 0;
+                for i in vars {
+                    if implies(&model, &var(i)) == BDD::True {
+                        count += 1;
+                    }
+                }
+    
+                assert_eq!(count, c);
+    
+                count = 0;
+                for i in vars_interference {
+                    if implies(&model, &var(i)) == BDD::True {
+                        count += 1;
+                    }
+                }
+    
+                assert_eq!(count, c);
+            }    
+        }
+    }
+    
+}
+
+#[test]
 fn test_amn_model() {
     // non-exhaustive test for at most n
     for n in 0..15 {
