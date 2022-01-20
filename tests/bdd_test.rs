@@ -104,16 +104,78 @@ fn test_model() {
 }
 
 #[test]
-fn test_queens() {
-    let n = 6;
+fn test_exn_model() {
+    // semi-exhaustive test for exactly n
+    for n in 0..15 {
+        for c in 0..=n {
+            let vars : Vec<usize> = (0..n).collect();
+            let expr = exn(&vars, c);
+            let model = model(&expr);
 
-    // every row must contain at least one queen
+            let mut count = 0;
+            for i in vars {
+                if implies(&model, &var(i)) == BDD::True {
+                    count += 1;
+                }
+            }
+
+            assert_eq!(count, c);
+        }    
+    }
+    
+}
+
+#[test]
+fn test_amn_model() {
+    // non-exhaustive test for at most n
+    for n in 0..15 {
+        for c in 0..=n {
+            let vars : Vec<usize> = (0..n).collect();
+            let expr = amn(&vars, c);
+            let model = model(&expr);
+
+            let mut count = 0;
+            for i in vars {
+                if implies(&model, &var(i)) == BDD::True {
+                    count += 1;
+                }
+            }
+            assert!(count <= c);
+        }    
+    }
+}
+
+#[test]
+fn test_aln_model() {
+    // non-exhaustive test for at least n
+    for n in 0..15 {
+        for c in 0..=n {
+            let vars : Vec<usize> = (0..n).collect();
+            let expr = aln(&vars, c);
+            let model = model(&expr);
+
+            let mut count = 0;
+            for i in vars {
+                if implies(&model, &var(i)) == BDD::True {
+                    count += 1;
+                }
+            }
+            assert!(count >= c);
+        }    
+    }
+}
+
+#[test]
+fn test_queens() {
+    let n = 4;
+
+    // every row must contain exactly one queen
     let row_expr = (0..n)
         .map(|i| (0..n).map(|j| j + i * n).collect::<Vec<_>>())
         .map(|ref c| exn(c, 1))
         .reduce(|ref acc, ref k| and(acc, k)).unwrap();
 
-    // every column must contain at least one queen
+    // every column must contain exactly one queen
     let col_expr = (0..n)
         .map(|i| (0..n).map(|j| j * n + i).collect::<Vec<_>>())
         .map(|ref c| exn(c, 1))
@@ -154,11 +216,23 @@ fn test_queens() {
 
     let model = model(&expr_comb);
 
-    dbg!(&model);
+    let queens : Vec<(usize, bool)> = (0..(n*n))
+        .enumerate()
+        .map(|(i, j)| (i, implies(&model, &var(j)) == BDD::True))
+        .filter(|&(_, j)| j)
+        .collect();
+
+    dbg!(&queens);
 
     let mut f = File::create("n_queens.dot").unwrap();
 
     model.render_dot(&mut f)
 
+    /*
+x  x  x  3
+4  x  6  7
+8  x  10 11
+12 13 14 x
+    */
 
 }
