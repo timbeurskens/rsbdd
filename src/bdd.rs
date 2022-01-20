@@ -1,11 +1,11 @@
 use std::fmt::{Display, Debug};
 // pub type Symbol = usize;
 
-pub trait BDDSymbol : PartialOrd + Ord + Display + Debug + Clone + Copy {
+pub trait BDDSymbol : PartialOrd + Display + Debug + Clone + Copy {
 
 }
 
-impl<T> BDDSymbol for T where T: PartialOrd + Ord + Display + Debug + Clone + Copy {
+impl<T> BDDSymbol for T where T: PartialOrd + Display + Debug + Clone + Copy {
 
 }
 
@@ -50,10 +50,12 @@ pub fn implies<S: BDDSymbol>(a: &BDD<S>, b: &BDD<S>) -> BDD<S> {
     }
 }
 
+/// ite computes if a then b else c
 pub fn ite<S: BDDSymbol>(a: &BDD<S>, b: &BDD<S>, c: &BDD<S>) -> BDD<S> {
     and(&implies(a, b), &implies(&not(a), c))
 }
 
+/// eq computes a iff b
 pub fn eq<S: BDDSymbol>(a: &BDD<S>, b: &BDD<S>) -> BDD<S> {
     and(&implies(a, b), &implies(b, a))
 }
@@ -157,4 +159,22 @@ pub fn fp<S: BDDSymbol, F>(a: &BDD<S>, t: F) -> BDD<S> where F: Fn(&BDD<S>) -> B
         s = snew;
     }
     s.clone()
+}
+
+pub fn model<S: BDDSymbol>(a: &BDD<S>) -> BDD<S> {
+    match a {
+        &BDD::Choice(ref t, v, ref f) => {
+            let lhs = model(t);
+            let rhs = model(f);
+            if lhs != BDD::False {
+                and(&lhs, &var(v))
+            } else if rhs != BDD::False {
+                and(&not(&var(v)), &rhs)
+            } else {
+                BDD::False
+            }
+        }
+        &BDD::True => BDD::True,
+        &BDD::False => BDD::False,
+    }
 }

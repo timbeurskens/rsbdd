@@ -1,5 +1,5 @@
 use rsbdd::bdd;
-use rsbdd::bdd::{var, and, or, not, xor, exists, all, fp, eq, amn, aln, exn, ite};
+use rsbdd::bdd::{BDDSymbol, var, and, or, not, implies, xor, exists, all, fp, eq, amn, aln, exn, ite, model};
 
 type BDD = bdd::BDD<usize>;
 
@@ -92,46 +92,73 @@ fn test_amn() {
 }
 
 #[test]
+fn test_model() {
+    let bdd = and(&var(0), &var(1));
+    let model = model(&bdd);
+    
+    dbg!(&model);
+
+    assert_eq!(implies(&model, &var(0)), BDD::True);
+    assert_eq!(implies(&model, &var(1)), BDD::True);
+    assert_ne!(implies(&model, &var(2)), BDD::True);
+}
+
+#[test]
 fn test_queens() {
-    let n = 3;
+    let n = 6;
 
     // every row must contain at least one queen
-    let row_expr = (0..n).map(|i| (0..n)
-        .map(|j| var(j + i * n))
-        .reduce(|ref acc, ref k| or(acc, k)).unwrap())
+    let row_expr = (0..n)
+        .map(|i| (0..n).map(|j| j + i * n).collect::<Vec<_>>())
+        .map(|ref c| exn(c, 1))
         .reduce(|ref acc, ref k| and(acc, k)).unwrap();
 
     // every column must contain at least one queen
     let col_expr = (0..n)
-        .map(|i| (0..n).map(|j| var(j * n + i))
-        .reduce(|ref acc, ref k| or(acc, k)).unwrap())
+        .map(|i| (0..n).map(|j| j * n + i).collect::<Vec<_>>())
+        .map(|ref c| exn(c, 1))
         .reduce(|ref acc, ref k| and(acc, k)).unwrap();
 
-    /*
-a b c
-0 0 0 | 0
-0 0 1 | 1
-0 1 0 | 1
-0 1 1 | 1
-1 0 0 | 1
-1 0 1 | 1
-1 1 0 | 1
-1 1 1 | 1
+    let diag_expr_hl = (0..n)
+        .map(|i| (0..=(n-i)).map(|j| i + (j * (n+1))).collect::<Vec<_>>())
+        .map(|ref c| amn(c, 1))
+        .reduce(|ref acc, ref k| and(acc, k)).unwrap();
 
-a b c
-1 1 1 | 1
-1 1 0 | 1
-1 0 1 | 1
-1 0 0 | 0
-0 1 1 | 1
-0 1 0 | 0
-0 0 1 | 0
-0 0 0 | 0
-    */
+    // skip the first, as this is already covered by the previous expression
+    let diag_expr_vl = (1..n)
+        .map(|i| (0..=(n-i)).map(|j| (i * n) + (j * (n+1))).collect::<Vec<_>>())
+        .map(|ref c| amn(c, 1))
+        .reduce(|ref acc, ref k| and(acc, k)).unwrap();
 
-    let expr_comb = and(&row_expr, &col_expr);
+    let diag_expr_hr = (0..n)
+        .map(|i| (0..=i).map(|j| i + (j * (n-1))).collect::<Vec<_>>())
+        .map(|ref c| amn(c, 1))
+        .reduce(|ref acc, ref k| and(acc, k)).unwrap();
+
+    // skip the first, as this is already covered by the previous expression
+    let diag_expr_vr = (1..n)
+        .map(|i| (0..=i).map(|j| (i * n) + (j * (n-1))).collect::<Vec<_>>())
+        .map(|ref c| amn(c, 1))
+        .reduce(|ref acc, ref k| and(acc, k)).unwrap();
+
+    let expr_list : Vec<BDD> = vec![
+        row_expr,
+        col_expr,
+        diag_expr_hl,
+        diag_expr_vl,
+        diag_expr_hr,
+        diag_expr_vr,
+    ];
+
+    let expr_comb = expr_list.iter().fold(BDD::True, |ref acc, ref k| and(acc, k));
+
+    let model = model(&expr_comb);
+
+    dbg!(&model);
 
     let mut f = File::create("n_queens.dot").unwrap();
 
-    expr_comb.render_dot(&mut f)
+    model.render_dot(&mut f)
+
+
 }
