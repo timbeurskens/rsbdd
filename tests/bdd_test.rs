@@ -1,5 +1,5 @@
 use rsbdd::bdd;
-use rsbdd::bdd::{BDDSymbol, var, and, or, not, implies, xor, exists, all, fp, eq, amn, aln, exn, ite, model};
+use rsbdd::bdd::*;
 
 type BDD = bdd::BDD<usize>;
 
@@ -162,8 +162,7 @@ fn test_exn_interference_model() {
                 assert_eq!(count, c);
             }    
         }
-    }
-    
+    }    
 }
 
 #[test]
@@ -208,7 +207,7 @@ fn test_aln_model() {
 
 #[test]
 fn test_queens() {
-    let n = 4;
+    let n = 5;
 
     // every row must contain exactly one queen
     let row_expr = (0..n)
@@ -257,23 +256,27 @@ fn test_queens() {
 
     let model = model(&expr_comb);
 
-    let queens : Vec<(usize, bool)> = (0..(n*n))
-        .enumerate()
-        .map(|(i, j)| (i, implies(&model, &var(j)) == BDD::True))
-        .filter(|&(_, j)| j)
+    // only retain the queens
+    let queens : Vec<usize> = (0..(n*n))
+        .filter(|&i| infer(&model, i).1)
         .collect();
 
     dbg!(&queens);
 
     let mut f = File::create("n_queens.dot").unwrap();
 
-    model.render_dot(&mut f)
+    model.render_dot(&mut f);
+
+    let mut f = File::create("n_queens_full.dot").unwrap();
+
+    expr_comb.render_dot(&mut f);
 
     /*
-x  x  x  3
-4  x  6  7
-8  x  10 11
-12 13 14 x
+x  1  2  3  4
+5  6  x  8  9
+10 11 12 13 x
+15 x  17 18 19
+20 21 22 x  24
     */
 
 }
