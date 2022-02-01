@@ -207,7 +207,7 @@ fn test_aln_model() {
 
 #[test]
 fn test_queens() {
-    let n = 5;
+    let n = 6;
 
     // every row must contain exactly one queen
     let row_expr = (0..n)
@@ -263,13 +263,13 @@ fn test_queens() {
 
     dbg!(&queens);
 
-    let mut f = File::create("n_queens.dot").unwrap();
+    // let mut f = File::create("n_queens.dot").unwrap();
 
-    model.render_dot(&mut f);
+    // model.render_dot(&mut f);
 
-    let mut f = File::create("n_queens_full.dot").unwrap();
+    // let mut f = File::create("n_queens_full.dot").unwrap();
 
-    expr_comb.render_dot(&mut f);
+    // expr_comb.render_dot(&mut f);
 
     /*
 x  1  2  3  4

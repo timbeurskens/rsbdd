@@ -13,6 +13,10 @@ pub enum BDD<Symbol: BDDSymbol> {
 }
 
 impl<S: BDDSymbol> BDD<S> {
+    pub fn mk_choice(true_subtree: Box<BDD<S>>, symbol: S, false_subtree: Box<BDD<S>>) -> BDD<S> {
+        BDD::Choice(true_subtree, symbol, false_subtree).simplify()
+    }
+
     fn simplify(&self) -> Self {
         match self {
             // if lhs equals rhs, then remove the choice from the subtree
@@ -27,13 +31,13 @@ pub fn and<'a, S: BDDSymbol>(a: &'a BDD<S>, b: &'a BDD<S>) -> BDD<S> {
         (&BDD::False, _) | (_, &BDD::False) => BDD::False,
         (&BDD::True, ref f) | (ref f, &BDD::True) => (*f).clone(),
         (&BDD::Choice(ref at, va, ref af), &BDD::Choice(_, vb, _)) if va < vb => {
-            BDD::Choice(Box::new(and(at, b)), va, Box::new(and(af, b))).simplify()
+            BDD::mk_choice(Box::new(and(at, b)), va, Box::new(and(af, b)))
         }
         (&BDD::Choice(_, va, _), &BDD::Choice(ref bt, vb, ref bf)) if vb < va => {
-            BDD::Choice(Box::new(and(bt, a)), vb, Box::new(and(bf, a))).simplify()
+            BDD::mk_choice(Box::new(and(bt, a)), vb, Box::new(and(bf, a)))
         }
         (&BDD::Choice(ref at, va, ref af), &BDD::Choice(ref bt, vb, ref bf)) if va == vb => {
-            BDD::Choice(Box::new(and(at, bt)), va, Box::new(and(af, bf))).simplify()
+            BDD::mk_choice(Box::new(and(at, bt)), va, Box::new(and(af, bf)))
         }
         _ => panic!("unsupported match: {:?} {:?}", a, b),
     }
@@ -43,20 +47,19 @@ pub fn implies<S: BDDSymbol>(a: &BDD<S>, b: &BDD<S>) -> BDD<S> {
     match (a, b) {
         (&BDD::False, _) | (_, &BDD::True) => BDD::True,
         (&BDD::True, f) => f.clone(),
-        (&BDD::Choice(ref t, v, ref f), &BDD::False) => BDD::Choice(
+        (&BDD::Choice(ref t, v, ref f), &BDD::False) => BDD::mk_choice(
             Box::new(implies(t, &BDD::False)),
             v,
             Box::new(implies(f, &BDD::False)),
-        )
-        .simplify(),
+        ),
         (&BDD::Choice(ref at, va, ref af), &BDD::Choice(_, vb, _)) if va < vb => {
-            BDD::Choice(Box::new(implies(at, b)), va, Box::new(implies(af, b))).simplify()
+            BDD::mk_choice(Box::new(implies(at, b)), va, Box::new(implies(af, b)))
         }
         (&BDD::Choice(_, va, _), &BDD::Choice(ref bt, vb, ref bf)) if vb < va => {
-            BDD::Choice(Box::new(implies(bt, a)), vb, Box::new(implies(bf, a))).simplify()
+            BDD::mk_choice(Box::new(implies(bt, a)), vb, Box::new(implies(bf, a)))
         }
         (&BDD::Choice(ref at, va, ref af), &BDD::Choice(ref bt, vb, ref bf)) if va == vb => {
-            BDD::Choice(Box::new(implies(at, bt)), va, Box::new(implies(af, bf))).simplify()
+            BDD::mk_choice(Box::new(implies(at, bt)), va, Box::new(implies(af, bf)))
         }
         _ => panic!("unsupported match: {:?} {:?}", a, b),
     }
@@ -86,7 +89,7 @@ pub fn xor<S: BDDSymbol>(a: &BDD<S>, b: &BDD<S>) -> BDD<S> {
 
 /// var constructs a new BDD for a given variable.
 pub fn var<S: BDDSymbol>(s: S) -> BDD<S> {
-    BDD::Choice(Box::new(BDD::True), s, Box::new(BDD::False))
+    BDD::mk_choice(Box::new(BDD::True), s, Box::new(BDD::False))
 }
 
 // for all variables in vars at least n must be true
@@ -108,11 +111,11 @@ fn aln_recursive<S: BDDSymbol>(vars: &Vec<S>, n: i64) -> BDD<S> {
         let first = vars[0];
         let remainder = vars[1..].to_vec();
 
-        BDD::Choice(
+        BDD::mk_choice(
             Box::new(aln_recursive(&remainder, n - 1)),
             first,
             Box::new(aln_recursive(&remainder, n)),
-        ).simplify()
+        )
     }
 }
 
@@ -135,11 +138,11 @@ fn amn_recursive<S: BDDSymbol>(vars: &Vec<S>, n: i64) -> BDD<S> {
         let first = vars[0];
         let remainder = vars[1..].to_vec();
 
-        BDD::Choice(
+        BDD::mk_choice(
             Box::new(amn_recursive(&remainder, n - 1)),
             first,
             Box::new(amn_recursive(&remainder, n)),
-        ).simplify()
+        )
     }
 }
 
@@ -154,7 +157,7 @@ pub fn exists<S: BDDSymbol>(s: S, b: &BDD<S>) -> BDD<S> {
         &BDD::False | &BDD::True => b.clone(),
         &BDD::Choice(ref t, v, ref f) if v == s => or(t, f),
         &BDD::Choice(ref t, v, ref f) => {
-            BDD::Choice(Box::new(exists(s, t)), v, Box::new(exists(s, f))).simplify()
+            BDD::mk_choice(Box::new(exists(s, t)), v, Box::new(exists(s, f)))
         }
     }
 }
