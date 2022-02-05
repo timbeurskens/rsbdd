@@ -1,5 +1,5 @@
 use rsbdd::bdd;
-use rsbdd::bdd::{var, and, or, not, xor, exists, all, fp, eq, amn, aln, exn, ite};
+use rsbdd::bdd::*;
 
 type BDD = bdd::BDD<usize>;
 
@@ -92,46 +92,191 @@ fn test_amn() {
 }
 
 #[test]
+fn test_model() {
+    let bdd = and(&var(0), &var(1));
+    let model = model(&bdd);
+    
+    dbg!(&model);
+
+    assert_eq!(implies(&model, &var(0)), BDD::True);
+    assert_eq!(implies(&model, &var(1)), BDD::True);
+    assert_ne!(implies(&model, &var(2)), BDD::True);
+}
+
+#[test]
+fn test_exn_model() {
+    // semi-exhaustive test for exactly n
+    for n in 0..15 {
+        for c in 0..=n {
+            let vars : Vec<usize> = (0..n).collect();
+            let expr = exn(&vars, c);
+            let model = model(&expr);
+
+            let mut count = 0;
+            for i in vars {
+                if implies(&model, &var(i)) == BDD::True {
+                    count += 1;
+                }
+            }
+
+            assert_eq!(count, c);
+        }    
+    }
+    
+}
+
+#[test]
+fn test_exn_interference_model() {
+    // semi-exhaustive test for exactly n
+    for n in 1..8 {
+        for o in 0..n {
+            for c in 0..=n {
+                println!("n: {}, o: {}, c: {}", n, o, c);
+
+                let vars : Vec<usize> = (0..n).collect();
+                let vars_interference : Vec<usize> = (n-o..(2*n)).collect();
+    
+                let expr = exn(&vars, c);
+                let expr_interference = exn(&vars_interference, c);
+    
+                let expr_comb = and(&expr, &expr_interference);
+    
+                let model = model(&expr_comb);
+    
+                let mut count = 0;
+                for i in vars {
+                    if implies(&model, &var(i)) == BDD::True {
+                        count += 1;
+                    }
+                }
+    
+                assert_eq!(count, c);
+    
+                count = 0;
+                for i in vars_interference {
+                    if implies(&model, &var(i)) == BDD::True {
+                        count += 1;
+                    }
+                }
+    
+                assert_eq!(count, c);
+            }    
+        }
+    }    
+}
+
+#[test]
+fn test_amn_model() {
+    // non-exhaustive test for at most n
+    for n in 0..15 {
+        for c in 0..=n {
+            let vars : Vec<usize> = (0..n).collect();
+            let expr = amn(&vars, c);
+            let model = model(&expr);
+
+            let mut count = 0;
+            for i in vars {
+                if implies(&model, &var(i)) == BDD::True {
+                    count += 1;
+                }
+            }
+            assert!(count <= c);
+        }    
+    }
+}
+
+#[test]
+fn test_aln_model() {
+    // non-exhaustive test for at least n
+    for n in 0..15 {
+        for c in 0..=n {
+            let vars : Vec<usize> = (0..n).collect();
+            let expr = aln(&vars, c);
+            let model = model(&expr);
+
+            let mut count = 0;
+            for i in vars {
+                if implies(&model, &var(i)) == BDD::True {
+                    count += 1;
+                }
+            }
+            assert!(count >= c);
+        }    
+    }
+}
+
+#[test]
 fn test_queens() {
-    let n = 3;
+    let n = 6;
 
-    // every row must contain at least one queen
-    let row_expr = (0..n).map(|i| (0..n)
-        .map(|j| var(j + i * n))
-        .reduce(|ref acc, ref k| or(acc, k)).unwrap())
+    // every row must contain exactly one queen
+    let row_expr = (0..n)
+        .map(|i| (0..n).map(|j| j + i * n).collect::<Vec<_>>())
+        .map(|ref c| exn(c, 1))
         .reduce(|ref acc, ref k| and(acc, k)).unwrap();
 
-    // every column must contain at least one queen
+    // every column must contain exactly one queen
     let col_expr = (0..n)
-        .map(|i| (0..n).map(|j| var(j * n + i))
-        .reduce(|ref acc, ref k| or(acc, k)).unwrap())
+        .map(|i| (0..n).map(|j| j * n + i).collect::<Vec<_>>())
+        .map(|ref c| exn(c, 1))
         .reduce(|ref acc, ref k| and(acc, k)).unwrap();
+
+    let diag_expr_hl = (0..n)
+        .map(|i| (0..=(n-i)).map(|j| i + (j * (n+1))).collect::<Vec<_>>())
+        .map(|ref c| amn(c, 1))
+        .reduce(|ref acc, ref k| and(acc, k)).unwrap();
+
+    // skip the first, as this is already covered by the previous expression
+    let diag_expr_vl = (1..n)
+        .map(|i| (0..=(n-i)).map(|j| (i * n) + (j * (n+1))).collect::<Vec<_>>())
+        .map(|ref c| amn(c, 1))
+        .reduce(|ref acc, ref k| and(acc, k)).unwrap();
+
+    let diag_expr_hr = (0..n)
+        .map(|i| (0..=i).map(|j| i + (j * (n-1))).collect::<Vec<_>>())
+        .map(|ref c| amn(c, 1))
+        .reduce(|ref acc, ref k| and(acc, k)).unwrap();
+
+    // skip the first, as this is already covered by the previous expression
+    let diag_expr_vr = (1..n)
+        .map(|i| (0..=i).map(|j| (i * n) + (j * (n-1))).collect::<Vec<_>>())
+        .map(|ref c| amn(c, 1))
+        .reduce(|ref acc, ref k| and(acc, k)).unwrap();
+
+    let expr_list : Vec<BDD> = vec![
+        row_expr,
+        col_expr,
+        diag_expr_hl,
+        diag_expr_vl,
+        diag_expr_hr,
+        diag_expr_vr,
+    ];
+
+    let expr_comb = expr_list.iter().fold(BDD::True, |ref acc, ref k| and(acc, k));
+
+    let model = model(&expr_comb);
+
+    // only retain the queens
+    let queens : Vec<usize> = (0..(n*n))
+        .filter(|&i| infer(&model, i).1)
+        .collect();
+
+    dbg!(&queens);
+
+    // let mut f = File::create("n_queens.dot").unwrap();
+
+    // model.render_dot(&mut f);
+
+    // let mut f = File::create("n_queens_full.dot").unwrap();
+
+    // expr_comb.render_dot(&mut f);
 
     /*
-a b c
-0 0 0 | 0
-0 0 1 | 1
-0 1 0 | 1
-0 1 1 | 1
-1 0 0 | 1
-1 0 1 | 1
-1 1 0 | 1
-1 1 1 | 1
-
-a b c
-1 1 1 | 1
-1 1 0 | 1
-1 0 1 | 1
-1 0 0 | 0
-0 1 1 | 1
-0 1 0 | 0
-0 0 1 | 0
-0 0 0 | 0
+x  1  2  3  4
+5  6  x  8  9
+10 11 12 13 x
+15 x  17 18 19
+20 21 22 x  24
     */
 
-    let expr_comb = and(&row_expr, &col_expr);
-
-    let mut f = File::create("n_queens.dot").unwrap();
-
-    expr_comb.render_dot(&mut f)
 }
