@@ -263,6 +263,8 @@ fn test_queens() {
 
     dbg!(&queens);
 
+    assert_eq!(queens.len(), n);
+
     // let mut f = File::create("n_queens.dot").unwrap();
 
     // model.render_dot(&mut f);
