@@ -15,8 +15,6 @@ type GraphNode<'a, S> = &'a BDD<S>;
 
 
 impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<'a, S>, GraphEdge<'a, S>> for BDD<S> {
-    
-
     fn graph_id(&'a self) -> dot::Id<'a> {
         dot::Id::new("bdd_graph").unwrap()
     }
@@ -57,7 +55,11 @@ impl<'a, S: BDDSymbol> dot::GraphWalk<'a, GraphNode<'a, S>, GraphEdge<'a, S>> fo
 
     fn edges(&'a self) -> dot::Edges<'a, GraphEdge<'a, S>> {
         match self {
-            &BDD::Choice(ref l, _, ref r) => l.edges().iter().chain(r.edges().iter()).chain(&[(self, true, l.as_ref()), (self, false, r.as_ref())]).cloned().collect(),
+            &BDD::Choice(ref l, _, ref r) => 
+                l.edges().iter()
+                    .chain(r.edges().iter())
+                    .chain(&[(self, true, l.as_ref()), (self, false, r.as_ref())])
+                    .cloned().collect(),
             &BDD::True => Cow::Owned(vec![]),
             &BDD::False => Cow::Owned(vec![]),
         }
