@@ -1,213 +1,249 @@
 use std::fmt::{Debug, Display};
+use std::collections::{HashSet, HashMap};
+use std::hash::Hash;
+use std::rc::Rc;
+use std::cell::RefCell;
 
-pub trait BDDSymbol: Ord + Display + Debug + Clone + Copy {}
+pub trait BDDSymbol: Ord + Display + Debug + Clone + Copy + Hash {}
 
-impl<T> BDDSymbol for T where T: Ord + Display + Debug + Clone + Copy {}
+impl<T> BDDSymbol for T where T: Ord + Display + Debug + Clone + Copy + Hash {}
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+// todo: place bdd items in a collection (hashmap?)
+// when constructing a new bdd, check if it already exists in the collection.
+// if it does, return a reference to the existing bdd.
+// otherwise, create a new bdd and return a reference to it.
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BDD<Symbol: BDDSymbol> {
     True,
     False,
     // Choice (true-subtree, symbol, false-subtree)
-    Choice(Box<BDD<Symbol>>, Symbol, Box<BDD<Symbol>>),
+    Choice(Rc<BDD<Symbol>>, Symbol, Rc<BDD<Symbol>>),
 }
 
-impl<S: BDDSymbol> BDD<S> {
-    pub fn mk_choice(true_subtree: Box<BDD<S>>, symbol: S, false_subtree: Box<BDD<S>>) -> BDD<S> {
-        BDD::Choice(true_subtree, symbol, false_subtree).simplify()
+pub struct BDDEnv<Symbol: BDDSymbol> {
+    nodes: RefCell<HashMap<BDD<Symbol>, Rc<BDD<Symbol>>>>,
+}
+
+impl<S: BDDSymbol> BDDEnv<S> {
+    pub fn size(&self) -> usize {
+        self.nodes.borrow().len()
     }
 
-    fn simplify(&self) -> Self {
-        match self {
-            // if lhs equals rhs, then remove the choice from the subtree
-            &Self::Choice(ref t, _, ref f) if t == f => t.as_ref().clone(),
-            _ => self.clone(),
-        }
+    pub fn mk_choice(&self, true_subtree: Rc<BDD<S>>, symbol: S, false_subtree: Rc<BDD<S>>) -> Rc<BDD<S>> {
+        let ins = BDD::Choice(true_subtree, symbol, false_subtree);
+
+        self.nodes.borrow_mut().insert(ins.clone(), Rc::new(ins.clone()));
+        Self::simplify(self.nodes.borrow().get(&ins).unwrap())
     }
-}
 
-pub fn and<'a, S: BDDSymbol>(a: &'a BDD<S>, b: &'a BDD<S>) -> BDD<S> {
-    match (a, b) {
-        (&BDD::False, _) | (_, &BDD::False) => BDD::False,
-        (&BDD::True, ref f) | (ref f, &BDD::True) => (*f).clone(),
-        (&BDD::Choice(ref at, va, ref af), &BDD::Choice(_, vb, _)) if va < vb => {
-            BDD::mk_choice(Box::new(and(at, b)), va, Box::new(and(af, b)))
-        }
-        (&BDD::Choice(_, va, _), &BDD::Choice(ref bt, vb, ref bf)) if vb < va => {
-            BDD::mk_choice(Box::new(and(bt, a)), vb, Box::new(and(bf, a)))
-        }
-        (&BDD::Choice(ref at, va, ref af), &BDD::Choice(ref bt, vb, ref bf)) if va == vb => {
-            BDD::mk_choice(Box::new(and(at, bt)), va, Box::new(and(af, bf)))
-        }
-        _ => panic!("unsupported match: {:?} {:?}", a, b),
-    }
-}
-
-pub fn implies<S: BDDSymbol>(a: &BDD<S>, b: &BDD<S>) -> BDD<S> {
-    match (a, b) {
-        (&BDD::False, _) | (_, &BDD::True) => BDD::True,
-        (&BDD::True, f) => f.clone(),
-        (&BDD::Choice(ref t, v, ref f), &BDD::False) => BDD::mk_choice(
-            Box::new(implies(t, &BDD::False)),
-            v,
-            Box::new(implies(f, &BDD::False)),
-        ),
-        (&BDD::Choice(ref at, va, ref af), &BDD::Choice(_, vb, _)) if va < vb => {
-            BDD::mk_choice(Box::new(implies(at, b)), va, Box::new(implies(af, b)))
-        }
-        (&BDD::Choice(_, va, _), &BDD::Choice(ref bt, vb, ref bf)) if vb < va => {
-            BDD::mk_choice(Box::new(implies(bt, a)), vb, Box::new(implies(bf, a)))
-        }
-        (&BDD::Choice(ref at, va, ref af), &BDD::Choice(ref bt, vb, ref bf)) if va == vb => {
-            BDD::mk_choice(Box::new(implies(at, bt)), va, Box::new(implies(af, bf)))
-        }
-        _ => panic!("unsupported match: {:?} {:?}", a, b),
-    }
-}
-
-/// ite computes if a then b else c
-pub fn ite<S: BDDSymbol>(a: &BDD<S>, b: &BDD<S>, c: &BDD<S>) -> BDD<S> {
-    and(&implies(a, b), &implies(&not(a), c))
-}
-
-/// eq computes a iff b
-pub fn eq<S: BDDSymbol>(a: &BDD<S>, b: &BDD<S>) -> BDD<S> {
-    and(&implies(a, b), &implies(b, a))
-}
-
-pub fn not<S: BDDSymbol>(a: &BDD<S>) -> BDD<S> {
-    implies(a, &BDD::False)
-}
-
-pub fn or<S: BDDSymbol>(a: &BDD<S>, b: &BDD<S>) -> BDD<S> {
-    not(&and(&not(a), &not(b)))
-}
-
-pub fn xor<S: BDDSymbol>(a: &BDD<S>, b: &BDD<S>) -> BDD<S> {
-    or(&and(&not(a), b), &and(a, &not(b)))
-}
-
-/// var constructs a new BDD for a given variable.
-pub fn var<S: BDDSymbol>(s: S) -> BDD<S> {
-    BDD::mk_choice(Box::new(BDD::True), s, Box::new(BDD::False))
-}
-
-// for all variables in vars at least n must be true
-pub fn aln<S: BDDSymbol>(vars: &Vec<S>, n: usize) -> BDD<S> {
-    let mut vars = vars.clone();
-    vars.sort();
-
-    aln_recursive(&vars, n as i64)
-}
-
-fn aln_recursive<S: BDDSymbol>(vars: &Vec<S>, n: i64) -> BDD<S> {
-    if vars.len() == 0 {
-        if n > 0 {
-            BDD::False
+    pub fn mk_const(&self, v: bool) -> Rc<BDD<S>> {
+        if v {
+            self.nodes.borrow().get(&BDD::True).unwrap().clone()
         } else {
-            BDD::True
-        }
-    } else {
-        let first = vars[0];
-        let remainder = vars[1..].to_vec();
-
-        BDD::mk_choice(
-            Box::new(aln_recursive(&remainder, n - 1)),
-            first,
-            Box::new(aln_recursive(&remainder, n)),
-        )
-    }
-}
-
-// for all variables in vars at most n must be true
-pub fn amn<S: BDDSymbol>(vars: &Vec<S>, n: usize) -> BDD<S> {
-    let mut vars = vars.clone();
-    vars.sort();
-
-    amn_recursive(&vars, n as i64)
-}
-
-fn amn_recursive<S: BDDSymbol>(vars: &Vec<S>, n: i64) -> BDD<S> {
-    if vars.len() == 0 {
-        if n >= 0 {
-            BDD::True
-        } else {
-            BDD::False
-        }
-    } else {
-        let first = vars[0];
-        let remainder = vars[1..].to_vec();
-
-        BDD::mk_choice(
-            Box::new(amn_recursive(&remainder, n - 1)),
-            first,
-            Box::new(amn_recursive(&remainder, n)),
-        )
-    }
-}
-
-/// exn constructs a bdd such that exactly n variables in vars are true
-pub fn exn<S: BDDSymbol>(vars: &Vec<S>, n: usize) -> BDD<S> {
-    and(&amn(vars, n), &aln(vars, n))
-}
-
-/// existential quantification
-pub fn exists<S: BDDSymbol>(s: S, b: &BDD<S>) -> BDD<S> {
-    match b {
-        &BDD::False | &BDD::True => b.clone(),
-        &BDD::Choice(ref t, v, ref f) if v == s => or(t, f),
-        &BDD::Choice(ref t, v, ref f) => {
-            BDD::mk_choice(Box::new(exists(s, t)), v, Box::new(exists(s, f)))
+            self.nodes.borrow().get(&BDD::False).unwrap().clone()
         }
     }
-}
 
-pub fn all<S: BDDSymbol>(s: S, b: &BDD<S>) -> BDD<S> {
-    not(&exists(s, &not(b)))
-}
+    pub fn new() -> Self {
+        let mut nodes = HashMap::new();
 
-/// fp computes the fixed point starting from the initial state a, by iteratively applying the transformer t.
-pub fn fp<S: BDDSymbol, F>(a: &BDD<S>, t: F) -> BDD<S>
-where
-    F: Fn(&BDD<S>) -> BDD<S>,
-{
-    let mut s = a.clone();
-    loop {
-        let snew = t(&s);
-        if snew == s {
-            break;
+        nodes.insert(BDD::True, Rc::new(BDD::True));
+        nodes.insert(BDD::False, Rc::new(BDD::<S>::False));
+
+        BDDEnv {
+            nodes: RefCell::new(nodes),
         }
-        s = snew;
     }
-    s.clone()
-}
 
-pub fn model<S: BDDSymbol>(a: &BDD<S>) -> BDD<S> {
-    match a {
-        &BDD::Choice(ref t, v, ref f) => {
-            let lhs = model(t);
-            let rhs = model(f);
-            if lhs != BDD::False {
-                and(&lhs, &var(v))
-            } else if rhs != BDD::False {
-                and(&not(&var(v)), &rhs)
-            } else {
-                BDD::False
+    pub fn and(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
+        match (a.as_ref(), b.as_ref()) {
+            (&BDD::False, _) | (_, &BDD::False) => self.mk_const(false),
+            (&BDD::True, _) => b.clone(),
+            (_, &BDD::True) => a.clone(),
+            (&BDD::Choice(ref at, va, ref af), &BDD::Choice(_, vb, _)) if va < vb => {
+                self.mk_choice(self.and(at.clone(), b.clone()), va, self.and(af.clone(), b.clone()))
             }
+            (&BDD::Choice(_, va, _), &BDD::Choice(ref bt, vb, ref bf)) if vb < va => {
+                self.mk_choice(self.and(bt.clone(), a.clone()), vb, self.and(bf.clone(), a.clone()))
+            }
+            (&BDD::Choice(ref at, va, ref af), &BDD::Choice(ref bt, vb, ref bf)) if va == vb => {
+                self.mk_choice(self.and(at.clone(), bt.clone()), va, self.and(af.clone(), bf.clone()))
+            }
+            _ => panic!("unsupported match: {:?} {:?}", a, b),
         }
-        &BDD::True => BDD::True,
-        &BDD::False => BDD::False,
     }
-}
+    
+    pub fn implies(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
+        match (a.as_ref(), b.as_ref()) {
+            (&BDD::False, _) | (_, &BDD::True) => self.mk_const(true),
+            (&BDD::True, _) => b.clone(),
+            (&BDD::Choice(ref t, v, ref f), &BDD::False) => self.mk_choice(
+                self.implies(t.clone(), self.mk_const(false)),
+                v,
+                self.implies(f.clone(), self.mk_const(false)),
+            ),
+            (&BDD::Choice(ref at, va, ref af), &BDD::Choice(_, vb, _)) if va < vb => {
+                self.mk_choice(self.implies(at.clone(), b.clone()), va, self.implies(af.clone(), b.clone()))
+            }
+            (&BDD::Choice(_, va, _), &BDD::Choice(ref bt, vb, ref bf)) if vb < va => {
+                self.mk_choice(self.implies(bt.clone(), a.clone()), vb, self.implies(bf.clone(), a.clone()))
+            }
+            (&BDD::Choice(ref at, va, ref af), &BDD::Choice(ref bt, vb, ref bf)) if va == vb => {
+                self.mk_choice(self.implies(at.clone(), bt.clone()), va, self.implies(af.clone(), bf.clone()))
+            }
+            _ => panic!("unsupported match: {:?} {:?}", a, b),
+        }
+    }
+    
+    /// ite computes if a then b else c
+    pub fn ite(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>, c: Rc<BDD<S>>) -> Rc<BDD<S>> {
+        self.and(self.implies(a.clone(), b.clone()), self.implies(self.not(a.clone()), c.clone()))
+    }
+    
+    /// eq computes a iff b
+    pub fn eq(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
+        self.and(self.implies(a.clone(), b.clone()), self.implies(b.clone(), a.clone()))
+    }
+    
+    pub fn not(&self, a: Rc<BDD<S>>) -> Rc<BDD<S>> {
+        self.implies(a, self.mk_const(false))
+    }
+    
+    pub fn or(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
+        self.not(self.and(self.not(a), self.not(b)))
+    }
 
-// determine whether variable b is always true or false for a given bdd a
-// returns a tuple (bool, bool) where the first item determines whether b is bound
-// the second item determines the truth value for b
-pub fn infer<S: BDDSymbol>(a: &BDD<S>, b: S) -> (bool, bool) {
-    let ff = implies(a, &var(b));
-    match ff {
-        BDD::Choice(_, _, _) => (false, false),
-        BDD::True => (true, true),
-        BDD::False => (true, false),
+    pub fn xor(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
+        self.or(self.and(self.not(a.clone()), b.clone()), self.and(a.clone(), self.not(b.clone())))
+    }
+    
+    /// var constructs a new BDD for a given variable.
+    pub fn var(&self, s: S) -> Rc<BDD<S>> {
+        self.mk_choice(self.mk_const(true), s, self.mk_const(false))
+    }
+    
+    // for all variables in vars at least n must be true
+    pub fn aln(&self, vars: &Vec<S>, n: usize) -> Rc<BDD<S>> {
+        let mut vars = vars.clone();
+        vars.sort();
+    
+        self.aln_recursive(&vars, n as i64)
+    }
+    
+    fn aln_recursive(&self, vars: &Vec<S>, n: i64) -> Rc<BDD<S>> {
+        if vars.len() == 0 {
+            if n > 0 {
+                self.mk_const(false)
+            } else {
+                self.mk_const(true)
+            }
+        } else {
+            let first = vars[0];
+            let remainder = vars[1..].to_vec();
+    
+            self.mk_choice(
+                self.aln_recursive(&remainder, n - 1),
+                first,
+                self.aln_recursive(&remainder, n),
+            )
+        }
+    }
+    
+    // for all variables in vars at most n must be true
+    pub fn amn(&self, vars: &Vec<S>, n: usize) -> Rc<BDD<S>> {
+        let mut vars = vars.clone();
+        vars.sort();
+    
+        self.amn_recursive(&vars, n as i64)
+    }
+    
+    fn amn_recursive(&self, vars: &Vec<S>, n: i64) -> Rc<BDD<S>> {
+        if vars.len() == 0 {
+            if n >= 0 {
+                self.mk_const(true)
+            } else {
+                self.mk_const(false)
+            }
+        } else {
+            let first = vars[0];
+            let remainder = vars[1..].to_vec();
+    
+            self.mk_choice(
+                self.amn_recursive(&remainder, n - 1),
+                first,
+                self.amn_recursive(&remainder, n),
+            )
+        }
+    }
+    
+    /// exn constructs a bdd such that exactly n variables in vars are true
+    pub fn exn(&self, vars: &Vec<S>, n: usize) -> Rc<BDD<S>> {
+        self.and(self.amn(vars, n), self.aln(vars, n))
+    }
+    
+    /// existential quantification
+    pub fn exists(&self, s: S, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
+        match b.as_ref() {
+            &BDD::False | &BDD::True => b,
+            &BDD::Choice(ref t, v, ref f) if v == s => self.or(t.clone(), f.clone()),
+            &BDD::Choice(ref t, v, ref f) => self.mk_choice(self.exists(s, t.clone()), v, self.exists(s, f.clone()))
+        }
+    }
+    
+    pub fn all(&self, s: S, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
+        self.not(self.exists(s, self.not(b)))
+    }
+    
+    /// fp computes the fixed point starting from the initial state a, by iteratively applying the transformer t.
+    pub fn fp<F>(&self, a: Rc<BDD<S>>, t: F) -> Rc<BDD<S>>
+    where
+        F: Fn(Rc<BDD<S>>) -> Rc<BDD<S>>,
+    {
+        let mut s = a.clone();
+        loop {
+            let snew = t(s.clone());
+            if snew == s {
+                break;
+            }
+            s = snew;
+        }
+        s
+    }
+    
+    pub fn model(&self, a: Rc<BDD<S>>) -> Rc<BDD<S>> {
+        match a.as_ref() {
+            &BDD::Choice(ref t, v, ref f) => {
+                let lhs = self.model(t.clone());
+                let rhs = self.model(f.clone());
+                if lhs != self.mk_const(false) {
+                    self.and(lhs, self.var(v))
+                } else if rhs != self.mk_const(false) {
+                    self.and(self.not(self.var(v)), rhs)
+                } else {
+                    self.mk_const(false)
+                }
+            }
+            &BDD::True | &BDD::False => a,
+        }
+    }
+    
+    // determine whether variable b is always true or false for a given bdd a
+    // returns a tuple (bool, bool) where the first item determines whether b is bound
+    // the second item determines the truth value for b
+    pub fn infer(&self, a: Rc<BDD<S>>, b: S) -> (bool, bool) {
+        let ff = self.implies(a, self.var(b));
+        match ff.as_ref() {
+            BDD::Choice(_, _, _) => (false, false),
+            BDD::True => (true, true),
+            BDD::False => (true, false),
+        }
+    }
+
+    pub fn simplify(a: &Rc<BDD<S>>) -> Rc<BDD<S>> {
+        match a.as_ref() {
+            &BDD::Choice(ref t, _, ref f) if t == f => t.clone(),
+            _ => a.clone()
+        }
     }
 }
