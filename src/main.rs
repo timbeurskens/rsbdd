@@ -1,6 +1,8 @@
 use rsbdd::bdd::*;
-// use rsbdd::set::BDDSet;
+use rsbdd::set::BDDSet;
+use rsbdd::bdd_io::*;
 use std::fs::File;
+use std::rc::Rc;
 
 fn main() {
     println!("Hello, world!");
@@ -21,7 +23,9 @@ fn main() {
 
     let b = env.amn(&vars, 2);
 
-    // b.render_dot(&mut f);
+    let graph = BDDGraph::new(&Rc::new(env), &b);
+
+    graph.render_dot(&mut f);
 
     dbg!(b);
 }
