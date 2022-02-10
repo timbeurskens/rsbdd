@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 dot = "0.1.4"
+itertools = "0.10.3"

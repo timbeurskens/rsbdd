@@ -1,41 +1,55 @@
 extern crate dot;
 
-use std::io::Write;
-use std::borrow::Cow;
 use crate::bdd::*;
+use std::borrow::Cow;
+use std::io::Write;
+use std::rc::Rc;
+use itertools::Itertools;
 
-impl<S: BDDSymbol> BDD<S> {
+type GraphEdge<S> = (Rc<BDD<S>>, bool, Rc<BDD<S>>);
+type GraphNode<S> = Rc<BDD<S>>;
+
+pub struct BDDGraph<S: BDDSymbol> {
+    env: Rc<BDDEnv<S>>,
+    root: Rc<BDD<S>>,
+}
+
+impl<S: BDDSymbol> BDDGraph<S> {
     pub fn render_dot<W: Write>(&self, writer: &mut W) {
         dot::render(self, writer).unwrap()
     }
+
+    pub fn new(env: &Rc<BDDEnv<S>>, root: &Rc<BDD<S>>) -> Self {
+        BDDGraph {
+            env: env.clone(),
+            root: root.clone(),
+        }
+    }
 }
 
-type GraphEdge<'a, S> = (&'a BDD<S>, bool, &'a BDD<S>);
-type GraphNode<'a, S> = &'a BDD<S>;
-
-
-impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<'a, S>, GraphEdge<'a, S>> for BDD<S> {
-    fn graph_id(&'a self) -> dot::Id<'a> {
+impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<S>, GraphEdge<S>> for BDDGraph<S> {
+    fn graph_id(&self) -> dot::Id<'a> {
         dot::Id::new("bdd_graph").unwrap()
     }
 
-    fn node_id(&'a self, n: &GraphNode<'a, S>) -> dot::Id<'a> {
-        match n {
-            &BDD::True => dot::Id::new("n_true").unwrap(),
-            &BDD::False => dot::Id::new("n_false").unwrap(),
-            &BDD::Choice(_, _, _) => dot::Id::new(format!("n_{:p}", *n)).unwrap(),
+    fn node_id(&self, n: &GraphNode<S>) -> dot::Id<'a> {
+        match n.as_ref() {
+            // use grep -v n_true or grep -v n_false to filter nodes adjacent to true or false
+            &BDD::True => dot::Id::new(format!("n_true")).unwrap(),
+            &BDD::False => dot::Id::new(format!("n_false")).unwrap(),
+            _ => dot::Id::new(format!("n_{:p}", n.as_ref())).unwrap()
         }
     }
 
-    fn node_label(&'a self, n: &GraphNode<'a, S>) -> dot::LabelText<'a> {
-        match n {
+    fn node_label(&self, n: &GraphNode<S>) -> dot::LabelText<'a> {
+        match n.as_ref() {
             &BDD::True => dot::LabelText::label("true"),
             &BDD::False => dot::LabelText::label("false"),
             &BDD::Choice(_, v, _) => dot::LabelText::label(format!("{}", v)),
         }
     }
 
-    fn edge_label(&'a self, (_, e, _): &GraphEdge<'a, S>) -> dot::LabelText<'a> {
+    fn edge_label(&self, (_, e, _): &GraphEdge<S>) -> dot::LabelText<'a> {
         if *e {
             dot::LabelText::LabelStr(Cow::Borrowed("T"))
         } else {
@@ -44,32 +58,67 @@ impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<'a, S>, GraphEdge<'a, S>> for
     }
 }
 
-impl<'a, S: BDDSymbol> dot::GraphWalk<'a, GraphNode<'a, S>, GraphEdge<'a, S>> for BDD<S> {
-    fn nodes(&'a self) -> dot::Nodes<'a, GraphNode<'a, S>> {
-        match self {
-            &BDD::Choice(ref l, _, ref r) => l.nodes().iter().chain(&[self]).chain(r.nodes().iter()).cloned().collect(),
-            &BDD::True => Cow::Owned(vec![self]),
-            &BDD::False => Cow::Owned(vec![self]),
+impl<'a, S: BDDSymbol> dot::GraphWalk<'a, GraphNode<S>, GraphEdge<S>> for BDDGraph<S> {
+    fn nodes(&self) -> dot::Nodes<'a, GraphNode<S>> {
+        self.nodes_recursive(&self.root)
+    }
+
+    fn edges(&self) -> dot::Edges<'a, GraphEdge<S>> {
+        self.edges_recursive(&self.root)
+    }
+
+    fn source(&self, (a, _, _): &GraphEdge<S>) -> GraphNode<S> {
+        a.clone()
+    }
+
+    fn target(&self, (_, _, b): &GraphEdge<S>) -> GraphNode<S> {
+        b.clone()
+    }
+}
+
+impl<'a, S: BDDSymbol> BDDGraph<S> {
+    fn nodes_recursive(&self, root: &Rc<BDD<S>>) -> dot::Nodes<'a, GraphNode<S>> {
+        let _root = self.env.find(root);
+
+        match _root.as_ref() {
+            &BDD::Choice(ref l, _, ref r) => {
+                let l_nodes = self.nodes_recursive(l);
+                let r_nodes = self.nodes_recursive(r);
+
+                l_nodes
+                    .iter()
+                    .chain(&vec![_root.clone()])
+                    .chain(r_nodes.iter())
+                    .unique()
+                    .cloned()
+                    .collect()
+            }
+            &BDD::True | &BDD::False => vec![_root.clone()].into(),
         }
     }
 
-    fn edges(&'a self) -> dot::Edges<'a, GraphEdge<'a, S>> {
-        match self {
-            &BDD::Choice(ref l, _, ref r) => 
-                l.edges().iter()
-                    .chain(r.edges().iter())
-                    .chain(&[(self, true, l.as_ref()), (self, false, r.as_ref())])
-                    .cloned().collect(),
-            &BDD::True => Cow::Owned(vec![]),
-            &BDD::False => Cow::Owned(vec![]),
+    fn edges_recursive(&self, root: &Rc<BDD<S>>) -> dot::Edges<'a, GraphEdge<S>> {
+        match root.as_ref() {
+            &BDD::Choice(ref l, _, ref r) => {
+                let _root = self.env.find(root);
+                let _l = self.env.find(l);
+                let _r = self.env.find(r);
+
+                let l_edges = self.edges_recursive(l);
+                let r_edges = self.edges_recursive(r);
+
+                l_edges
+                    .iter()
+                    .chain(r_edges.iter())
+                    .chain(&vec![
+                        (_root.clone(), true, _l.clone()),
+                        (_root.clone(), false, _r.clone()),
+                    ])
+                    .unique()
+                    .cloned()
+                    .collect()
+            }
+            &BDD::True | &BDD::False => vec![].into(),
         }
-    }
-
-    fn source(&self, (a, _, _): &GraphEdge<'a, S>) -> GraphNode<'a, S> {
-        a
-    }
-
-    fn target(&self, (_, _, b): &GraphEdge<'a, S>) -> GraphNode<'a, S> {
-        b
     }
 }
