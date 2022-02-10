@@ -1,7 +1,7 @@
 use crate::bdd::*;
+use std::cell::{Ref, RefCell, RefMut};
 use std::ops::*;
 use std::rc::Rc;
-use std::cell::{RefCell, Ref, RefMut};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BDDSet {
@@ -55,20 +55,20 @@ impl<'a> BDDSet {
     pub fn from_element<T: BDDCategorizable>(e: T, bits: usize, env: &Rc<BDDEnv<usize>>) -> Self {
         let new_set = Self::with_env(bits, env);
         new_set.insert(e);
-        
+
         new_set
     }
 
     pub fn insert<T: BDDCategorizable>(&self, e: T) -> &Self {
-        let new_item = (0..self.bits).map(|i| {
-            if e.categorize(i) {
-                self.env.var(i)
-            } else {
-                self.env.not(self.env.var(i))
-            }
-        }).fold(self.env.mk_const(true), |a, e| {
-            self.env.and(a, e)
-        });
+        let new_item = (0..self.bits)
+            .map(|i| {
+                if e.categorize(i) {
+                    self.env.var(i)
+                } else {
+                    self.env.not(self.env.var(i))
+                }
+            })
+            .fold(self.env.mk_const(true), |a, e| self.env.and(a, e));
 
         let _self = self.bdd.borrow().clone();
 
@@ -78,23 +78,26 @@ impl<'a> BDDSet {
 
     pub fn union(&self, other: &BDDSet) -> &Self {
         let _self = self.bdd.borrow().clone();
-        self.bdd.replace(self.env.or(_self.clone(), other.bdd.borrow().clone()));
+        self.bdd
+            .replace(self.env.or(_self.clone(), other.bdd.borrow().clone()));
         self
     }
 
     pub fn intersect(&self, other: &BDDSet) -> &Self {
         let _self = self.bdd.borrow().clone();
 
-        self.bdd.replace(self.env.and(_self.clone(), other.bdd.borrow().clone()));
+        self.bdd
+            .replace(self.env.and(_self.clone(), other.bdd.borrow().clone()));
         self
     }
 
     pub fn complement(&self, other: &BDDSet) -> &Self {
-        let new : Rc<BDD<usize>>;
+        let new: Rc<BDD<usize>>;
         {
             new = self.bdd.borrow().clone();
         }
-        self.bdd.replace(self.env.and(new, self.env.not(other.bdd.borrow().clone())));
+        self.bdd
+            .replace(self.env.and(new, self.env.not(other.bdd.borrow().clone())));
         self
     }
 

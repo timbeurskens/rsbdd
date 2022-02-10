@@ -1,5 +1,5 @@
-use rsbdd::set::BDDSet;
 use rsbdd::bdd::BDDEnv;
+use rsbdd::set::BDDSet;
 use std::rc::Rc;
 
 #[test]
@@ -8,13 +8,19 @@ fn test_set_ops() {
 
     let env = Rc::new(BDDEnv::new());
 
-    assert_eq!(BDDSet::from_element(2, bits, &env.clone()), BDDSet::from_element(2, bits, &env.clone()));
+    assert_eq!(
+        BDDSet::from_element(2, bits, &env.clone()),
+        BDDSet::from_element(2, bits, &env.clone())
+    );
 
     dbg!(BDDSet::from_element(2, bits, &env.clone()));
     dbg!(BDDSet::from_element(3, bits, &env.clone()));
     dbg!(BDDSet::from_element(4, bits, &env.clone()));
 
-    assert_eq!(BDDSet::from_element(2, bits, &env.clone()).contains(2), true);
+    assert_eq!(
+        BDDSet::from_element(2, bits, &env.clone()).contains(2),
+        true
+    );
 
     assert_eq!(
         BDDSet::from_element(2, bits, &env.clone())

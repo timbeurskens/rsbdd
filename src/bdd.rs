@@ -1,8 +1,8 @@
 use std::cell::RefCell;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::hash::{Hash, Hasher};
-use std::collections::hash_map::DefaultHasher;
 use std::rc::Rc;
 
 pub trait BDDSymbol: Ord + Display + Debug + Clone + Copy + Hash {}
@@ -14,7 +14,7 @@ impl<T> BDDSymbol for T where T: Ord + Display + Debug + Clone + Copy + Hash {}
 // if it does, return a reference to the existing bdd.
 // otherwise, create a new bdd and return a reference to it.
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum BDD<Symbol: BDDSymbol> {
     True,
     False,
@@ -22,40 +22,40 @@ pub enum BDD<Symbol: BDDSymbol> {
     Choice(Rc<BDD<Symbol>>, Symbol, Rc<BDD<Symbol>>),
 }
 
-impl<S: BDDSymbol> Hash for BDD<S> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        match self {
-            &BDD::Choice(ref l, s, ref r) => {
-                l.short_hash(state);
-                s.hash(state);
-                r.short_hash(state);
-            },
-            &BDD::True | &BDD::False => self.short_hash(state)
-        }
-    }
-}
+// impl<S: BDDSymbol> Hash for BDD<S> {
+//     fn hash<H: Hasher>(&self, state: &mut H) {
+//         match self {
+//             &BDD::Choice(ref l, s, ref r) => {
+//                 l.short_hash(state);
+//                 s.hash(state);
+//                 r.short_hash(state);
+//             },
+//             &BDD::True | &BDD::False => self.short_hash(state)
+//         }
+//     }
+// }
 
-impl<S: BDDSymbol> BDD<S> {
-    fn short_hash<H: Hasher>(&self, state: &mut H) {
-        match self {
-            &BDD::Choice(_, s, _) => {
-                s.hash(state);
-            },
-            &BDD::True => {
-                true.hash(state);
-            },
-            &BDD::False => {
-                false.hash(state);
-            }
-        }
-    }
+// impl<S: BDDSymbol> BDD<S> {
+//     fn short_hash<H: Hasher>(&self, state: &mut H) {
+//         match self {
+//             &BDD::Choice(_, s, _) => {
+//                 s.hash(state);
+//             },
+//             &BDD::True => {
+//                 true.hash(state);
+//             },
+//             &BDD::False => {
+//                 false.hash(state);
+//             }
+//         }
+//     }
 
-    pub fn get_hash(&self) -> u64 {
-        let mut s = DefaultHasher::new();
-        self.hash(&mut s);
-        s.finish()
-    }
-}
+//     pub fn get_hash(&self) -> u64 {
+//         let mut s = DefaultHasher::new();
+//         self.hash(&mut s);
+//         s.finish()
+//     }
+// }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BDDEnv<Symbol: BDDSymbol> {

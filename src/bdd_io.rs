@@ -1,10 +1,13 @@
 extern crate dot;
 
 use crate::bdd::*;
+use itertools::Itertools;
 use std::borrow::Cow;
 use std::io::Write;
 use std::rc::Rc;
-use itertools::Itertools;
+
+// todo: currently the filter step: find a similar node in the environment, and filter duplicates reduces the graph significantly
+// this should be done during the bdd computation instead (but how?)
 
 type GraphEdge<S> = (Rc<BDD<S>>, bool, Rc<BDD<S>>);
 type GraphNode<S> = Rc<BDD<S>>;
@@ -37,7 +40,7 @@ impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<S>, GraphEdge<S>> for BDDGrap
             // use grep -v n_true or grep -v n_false to filter nodes adjacent to true or false
             &BDD::True => dot::Id::new(format!("n_true")).unwrap(),
             &BDD::False => dot::Id::new(format!("n_false")).unwrap(),
-            _ => dot::Id::new(format!("n_{:p}", n.as_ref())).unwrap()
+            _ => dot::Id::new(format!("n_{:p}", n.as_ref())).unwrap(),
         }
     }
 

@@ -1,6 +1,6 @@
 use rsbdd::bdd::*;
-use rsbdd::set::BDDSet;
 use rsbdd::bdd_io::*;
+use rsbdd::set::BDDSet;
 use std::fs::File;
 use std::rc::Rc;
 
