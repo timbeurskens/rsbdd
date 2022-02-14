@@ -1,9 +1,12 @@
 use crate::bdd::*;
+use std::cell::{Ref, RefCell, RefMut};
 use std::ops::*;
+use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BDDSet {
-    pub bdd: BDD<usize>,
+    env: Rc<BDDEnv<usize>>,
+    pub bdd: RefCell<Rc<BDD<usize>>>,
     bits: usize,
 }
 
@@ -17,77 +20,89 @@ impl BDDCategorizable for usize {
     }
 }
 
-impl BDDSet {
+impl<'a> BDDSet {
     pub fn new(bits: usize) -> BDDSet {
+        let env = BDDEnv::new();
+        Self::with_env(bits, &Rc::new(env))
+    }
+
+    pub fn with_env(bits: usize, env: &Rc<BDDEnv<usize>>) -> BDDSet {
         BDDSet {
-            bdd: BDD::False,
+            env: env.clone(),
+            bdd: RefCell::new(env.mk_const(false)),
             bits: bits,
         }
     }
 
-    pub fn from_bdd(bdd: &BDD<usize>, bits: usize) -> BDDSet {
+    pub fn from_bdd(bdd: &Rc<BDD<usize>>, bits: usize, env: &Rc<BDDEnv<usize>>) -> BDDSet {
         BDDSet {
-            bdd: bdd.clone(),
+            env: env.clone(),
+            bdd: RefCell::new(bdd.clone()),
             bits: bits,
         }
     }
 
-    pub fn empty(&self) -> Self {
-        BDDSet {
-            bdd: BDD::False,
-            bits: self.bits,
-        }
+    pub fn empty(&self) -> &Self {
+        self.bdd.replace(self.env.mk_const(false));
+        self
     }
 
-    pub fn universe(&self) -> Self {
-        BDDSet {
-            bdd: BDD::True,
-            bits: self.bits,
-        }
+    pub fn universe(&self) -> &Self {
+        self.bdd.replace(self.env.mk_const(true));
+        self
     }
 
-    pub fn from_element<T: BDDCategorizable>(e: T, bits: usize) -> Self {
-        BDDSet {
-            bdd: (0..bits).map(|i| {
+    pub fn from_element<T: BDDCategorizable>(e: T, bits: usize, env: &Rc<BDDEnv<usize>>) -> Self {
+        let new_set = Self::with_env(bits, env);
+        new_set.insert(e);
+
+        new_set
+    }
+
+    pub fn insert<T: BDDCategorizable>(&self, e: T) -> &Self {
+        let new_item = (0..self.bits)
+            .map(|i| {
                 if e.categorize(i) {
-                    var(i)
+                    self.env.var(i)
                 } else {
-                    not(&var(i))
+                    self.env.not(self.env.var(i))
                 }
-            }).fold(BDD::True, |a, e| {
-                and(&a, &e)
-            }),
-            bits: bits,
-        }
+            })
+            .fold(self.env.mk_const(true), |a, e| self.env.and(a, e));
+
+        let _self = self.bdd.borrow().clone();
+
+        self.bdd.replace(self.env.or(_self.clone(), new_item));
+        self
     }
 
-    pub fn insert(&self, e: usize) -> Self {
-        self.union(&BDDSet::from_element(e, self.bits))
+    pub fn union(&self, other: &BDDSet) -> &Self {
+        let _self = self.bdd.borrow().clone();
+        self.bdd
+            .replace(self.env.or(_self.clone(), other.bdd.borrow().clone()));
+        self
     }
 
-    pub fn union(&self, other: &BDDSet) -> Self {
-        BDDSet {
-            bdd: or(&self.bdd, &other.bdd),
-            bits: self.bits,
-        }
+    pub fn intersect(&self, other: &BDDSet) -> &Self {
+        let _self = self.bdd.borrow().clone();
+
+        self.bdd
+            .replace(self.env.and(_self.clone(), other.bdd.borrow().clone()));
+        self
     }
 
-    pub fn intersect(&self, other: &BDDSet) -> Self {
-        BDDSet {
-            bdd: and(&self.bdd, &other.bdd),
-            bits: self.bits,
+    pub fn complement(&self, other: &BDDSet) -> &Self {
+        let new: Rc<BDD<usize>>;
+        {
+            new = self.bdd.borrow().clone();
         }
-    }
-
-    pub fn complement(&self, other: &BDDSet) -> Self {
-        BDDSet {
-            bdd: and(&self.bdd, &not(&other.bdd)),
-            bits: self.bits,
-        }
+        self.bdd
+            .replace(self.env.and(new, self.env.not(other.bdd.borrow().clone())));
+        self
     }
 
     pub fn contains<T: BDDCategorizable>(&self, e: T) -> bool {
-        let singleton = BDDSet::from_element(e, self.bits);
-        self.intersect(&singleton) == singleton
+        let singleton = BDDSet::from_element(e, self.bits, &self.env);
+        self.intersect(&singleton) == &singleton
     }
 }
