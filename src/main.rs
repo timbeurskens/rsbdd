@@ -7,7 +7,8 @@ use std::rc::Rc;
 fn main() {
     println!("Hello, world!");
 
-    let mut f = File::create("output.dot").unwrap();
+    let mut f1 = File::create("output1.dot").unwrap();
+    // let mut f2 = File::create("output2.dot").unwrap();
 
     // let mut set = BDDSet::new(8);
 
@@ -23,9 +24,21 @@ fn main() {
 
     let b = env.amn(&vars, 2);
 
-    let graph = BDDGraph::new(&Rc::new(env), &b);
+    println!("dups: {:?}", env.duplicates(b.clone()));
 
-    graph.render_dot(&mut f);
+    // let c = env.clean(b.clone());
 
-    dbg!(b);
+    // println!("dups: {:?}", env.duplicates(c.clone()));
+
+    // dbg!(&env.nodes);
+
+    let env_ptr = Rc::new(env);
+
+    let graph1 = BDDGraph::new(&env_ptr, &b);
+    graph1.render_dot(&mut f1);
+
+    // let graph2 = BDDGraph::new(&env_ptr, &c);
+    // graph2.render_dot(&mut f2);
+
+    // dbg!(b);
 }

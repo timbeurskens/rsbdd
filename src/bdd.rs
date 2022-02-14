@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::cell::RefCell;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -35,27 +36,27 @@ pub enum BDD<Symbol: BDDSymbol> {
 //     }
 // }
 
-// impl<S: BDDSymbol> BDD<S> {
-//     fn short_hash<H: Hasher>(&self, state: &mut H) {
-//         match self {
-//             &BDD::Choice(_, s, _) => {
-//                 s.hash(state);
-//             },
-//             &BDD::True => {
-//                 true.hash(state);
-//             },
-//             &BDD::False => {
-//                 false.hash(state);
-//             }
-//         }
-//     }
+impl<S: BDDSymbol> BDD<S> {
+    // fn short_hash<H: Hasher>(&self, state: &mut H) {
+    //     match self {
+    //         &BDD::Choice(_, s, _) => {
+    //             s.hash(state);
+    //         },
+    //         &BDD::True => {
+    //             true.hash(state);
+    //         },
+    //         &BDD::False => {
+    //             false.hash(state);
+    //         }
+    //     }
+    // }
 
-//     pub fn get_hash(&self) -> u64 {
-//         let mut s = DefaultHasher::new();
-//         self.hash(&mut s);
-//         s.finish()
-//     }
-// }
+    pub fn get_hash(&self) -> u64 {
+        let mut s = DefaultHasher::new();
+        self.hash(&mut s);
+        s.finish()
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BDDEnv<Symbol: BDDSymbol> {
@@ -67,37 +68,89 @@ impl<S: BDDSymbol> BDDEnv<S> {
         self.nodes.borrow().len()
     }
 
+    pub fn clean(&self, root: Rc<BDD<S>>) -> Rc<BDD<S>> {
+        match root.as_ref() {
+            &BDD::Choice(ref l, s, ref r) => {
+                let _l = self.find(l);
+                let _r = self.find(r);
+
+                self.mk_choice(_l, s, _r)
+            }
+            _ => self.find(&root),
+        }
+    }
+
+    pub fn duplicates(&self, root: Rc<BDD<S>>) -> usize {
+        let all_nodes: Vec<Rc<BDD<S>>> = self.node_list(root);
+
+        // todo: conclusion: hashes are stricter than pointers
+        // try to rephrase the equivalence check, such hash a == hash b <=> a == b
+
+        let unique_hashes: Vec<Rc<BDD<S>>> = all_nodes
+            .clone()
+            .iter()
+            .map(|n| self.find(n))
+            .unique_by(|n| n.get_hash())
+            .collect();
+        let unique_pointers: Vec<Rc<BDD<S>>> = all_nodes
+            .clone()
+            .iter()
+            .unique_by(|&n| Rc::into_raw(Rc::clone(n)) as u32)
+            .cloned()
+            .collect();
+
+        unique_pointers.len() - unique_hashes.len()
+    }
+
+    pub fn node_list(&self, root: Rc<BDD<S>>) -> Vec<Rc<BDD<S>>> {
+        match root.as_ref() {
+            &BDD::Choice(ref l, _, ref r) => {
+                let l_nodes = self.node_list(Rc::clone(l));
+                let r_nodes = self.node_list(Rc::clone(r));
+
+                l_nodes
+                    .iter()
+                    .chain(&vec![Rc::clone(&root)])
+                    .chain(r_nodes.iter())
+                    .cloned()
+                    .collect()
+            }
+            &BDD::True | &BDD::False => vec![Rc::clone(&root)].into(),
+        }
+    }
+
     pub fn mk_choice(
         &self,
         true_subtree: Rc<BDD<S>>,
         symbol: S,
         false_subtree: Rc<BDD<S>>,
     ) -> Rc<BDD<S>> {
-        let ins = BDD::Choice(true_subtree, symbol, false_subtree);
+        let ins = Rc::new(BDD::Choice(true_subtree, symbol, false_subtree));
 
         self.nodes
             .borrow_mut()
-            .insert(ins.clone(), Rc::new(ins.clone()));
-        Self::simplify(&self.find(&Rc::new(ins)))
+            .insert(ins.as_ref().clone(), Rc::clone(&ins));
+
+        self.simplify(&self.find(&ins))
     }
 
     pub fn mk_const(&self, v: bool) -> Rc<BDD<S>> {
         if v {
-            self.nodes.borrow().get(&BDD::True).unwrap().clone()
+            Rc::clone(self.nodes.borrow().get(&BDD::True).unwrap())
         } else {
-            self.nodes.borrow().get(&BDD::False).unwrap().clone()
+            Rc::clone(self.nodes.borrow().get(&BDD::False).unwrap())
         }
     }
 
     pub fn find(&self, r: &Rc<BDD<S>>) -> Rc<BDD<S>> {
-        self.nodes.borrow().get(r.as_ref()).unwrap().clone()
+        Rc::clone(self.nodes.borrow().get(r.as_ref()).unwrap())
     }
 
     pub fn new() -> Self {
         let mut nodes = HashMap::new();
 
         nodes.insert(BDD::True, Rc::new(BDD::True));
-        nodes.insert(BDD::False, Rc::new(BDD::<S>::False));
+        nodes.insert(BDD::False, Rc::new(BDD::False));
 
         BDDEnv {
             nodes: RefCell::new(nodes),
@@ -107,25 +160,25 @@ impl<S: BDDSymbol> BDDEnv<S> {
     pub fn and(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match (a.as_ref(), b.as_ref()) {
             (&BDD::False, _) | (_, &BDD::False) => self.mk_const(false),
-            (&BDD::True, _) => b.clone(),
-            (_, &BDD::True) => a.clone(),
+            (&BDD::True, _) => Rc::clone(&b),
+            (_, &BDD::True) => Rc::clone(&a),
             (&BDD::Choice(ref at, va, ref af), &BDD::Choice(_, vb, _)) if va < vb => self
                 .mk_choice(
-                    self.and(at.clone(), b.clone()),
+                    self.and(Rc::clone(at), Rc::clone(&b)),
                     va,
-                    self.and(af.clone(), b.clone()),
+                    self.and(Rc::clone(af), Rc::clone(&b)),
                 ),
             (&BDD::Choice(_, va, _), &BDD::Choice(ref bt, vb, ref bf)) if vb < va => self
                 .mk_choice(
-                    self.and(bt.clone(), a.clone()),
+                    self.and(Rc::clone(bt), Rc::clone(&a)),
                     vb,
-                    self.and(bf.clone(), a.clone()),
+                    self.and(Rc::clone(bf), Rc::clone(&a)),
                 ),
             (&BDD::Choice(ref at, va, ref af), &BDD::Choice(ref bt, vb, ref bf)) if va == vb => {
                 self.mk_choice(
-                    self.and(at.clone(), bt.clone()),
+                    self.and(Rc::clone(at), Rc::clone(bt)),
                     va,
-                    self.and(af.clone(), bf.clone()),
+                    self.and(Rc::clone(af), Rc::clone(bf)),
                 )
             }
             _ => panic!("unsupported match: {:?} {:?}", a, b),
@@ -135,29 +188,29 @@ impl<S: BDDSymbol> BDDEnv<S> {
     pub fn implies(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match (a.as_ref(), b.as_ref()) {
             (&BDD::False, _) | (_, &BDD::True) => self.mk_const(true),
-            (&BDD::True, _) => b.clone(),
+            (&BDD::True, _) => Rc::clone(&b),
             (&BDD::Choice(ref t, v, ref f), &BDD::False) => self.mk_choice(
-                self.implies(t.clone(), self.mk_const(false)),
+                self.implies(Rc::clone(t), self.mk_const(false)),
                 v,
-                self.implies(f.clone(), self.mk_const(false)),
+                self.implies(Rc::clone(f), self.mk_const(false)),
             ),
             (&BDD::Choice(ref at, va, ref af), &BDD::Choice(_, vb, _)) if va < vb => self
                 .mk_choice(
-                    self.implies(at.clone(), b.clone()),
+                    self.implies(Rc::clone(at), Rc::clone(&b)),
                     va,
-                    self.implies(af.clone(), b.clone()),
+                    self.implies(Rc::clone(af), Rc::clone(&b)),
                 ),
             (&BDD::Choice(_, va, _), &BDD::Choice(ref bt, vb, ref bf)) if vb < va => self
                 .mk_choice(
-                    self.implies(bt.clone(), a.clone()),
+                    self.implies(Rc::clone(bt), Rc::clone(&a)),
                     vb,
-                    self.implies(bf.clone(), a.clone()),
+                    self.implies(Rc::clone(bf), Rc::clone(&a)),
                 ),
             (&BDD::Choice(ref at, va, ref af), &BDD::Choice(ref bt, vb, ref bf)) if va == vb => {
                 self.mk_choice(
-                    self.implies(at.clone(), bt.clone()),
+                    self.implies(Rc::clone(at), Rc::clone(bt)),
                     va,
-                    self.implies(af.clone(), bf.clone()),
+                    self.implies(Rc::clone(af), Rc::clone(bf)),
                 )
             }
             _ => panic!("unsupported match: {:?} {:?}", a, b),
@@ -167,16 +220,16 @@ impl<S: BDDSymbol> BDDEnv<S> {
     /// ite computes if a then b else c
     pub fn ite(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>, c: Rc<BDD<S>>) -> Rc<BDD<S>> {
         self.and(
-            self.implies(a.clone(), b.clone()),
-            self.implies(self.not(a.clone()), c.clone()),
+            self.implies(Rc::clone(&a), Rc::clone(&b)),
+            self.implies(self.not(Rc::clone(&a)), Rc::clone(&c)),
         )
     }
 
     /// eq computes a iff b
     pub fn eq(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         self.and(
-            self.implies(a.clone(), b.clone()),
-            self.implies(b.clone(), a.clone()),
+            self.implies(Rc::clone(&a), Rc::clone(&b)),
+            self.implies(Rc::clone(&b), Rc::clone(&a)),
         )
     }
 
@@ -190,8 +243,8 @@ impl<S: BDDSymbol> BDDEnv<S> {
 
     pub fn xor(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         self.or(
-            self.and(self.not(a.clone()), b.clone()),
-            self.and(a.clone(), self.not(b.clone())),
+            self.and(self.not(Rc::clone(&a)), Rc::clone(&b)),
+            self.and(Rc::clone(&a), self.not(Rc::clone(&b))),
         )
     }
 
@@ -263,10 +316,12 @@ impl<S: BDDSymbol> BDDEnv<S> {
     pub fn exists(&self, s: S, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match b.as_ref() {
             &BDD::False | &BDD::True => b,
-            &BDD::Choice(ref t, v, ref f) if v == s => self.or(t.clone(), f.clone()),
-            &BDD::Choice(ref t, v, ref f) => {
-                self.mk_choice(self.exists(s, t.clone()), v, self.exists(s, f.clone()))
-            }
+            &BDD::Choice(ref t, v, ref f) if v == s => self.or(Rc::clone(t), Rc::clone(f)),
+            &BDD::Choice(ref t, v, ref f) => self.mk_choice(
+                self.exists(s, Rc::clone(t)),
+                v,
+                self.exists(s, Rc::clone(f)),
+            ),
         }
     }
 
@@ -279,9 +334,9 @@ impl<S: BDDSymbol> BDDEnv<S> {
     where
         F: Fn(Rc<BDD<S>>) -> Rc<BDD<S>>,
     {
-        let mut s = a.clone();
+        let mut s = Rc::clone(&a);
         loop {
-            let snew = t(s.clone());
+            let snew = t(Rc::clone(&s));
             if snew == s {
                 break;
             }
@@ -293,8 +348,8 @@ impl<S: BDDSymbol> BDDEnv<S> {
     pub fn model(&self, a: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match a.as_ref() {
             &BDD::Choice(ref t, v, ref f) => {
-                let lhs = self.model(t.clone());
-                let rhs = self.model(f.clone());
+                let lhs = self.model(Rc::clone(t));
+                let rhs = self.model(Rc::clone(f));
                 if lhs != self.mk_const(false) {
                     self.and(lhs, self.var(v))
                 } else if rhs != self.mk_const(false) {
@@ -319,10 +374,16 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    pub fn simplify(a: &Rc<BDD<S>>) -> Rc<BDD<S>> {
-        match a.as_ref() {
-            &BDD::Choice(ref t, _, ref f) if t == f => t.clone(),
-            _ => a.clone(),
-        }
+    pub fn simplify(&self, a: &Rc<BDD<S>>) -> Rc<BDD<S>> {
+        let result = match a.as_ref() {
+            &BDD::Choice(ref t, _, ref f) if t.as_ref() == f.as_ref() => t,
+            _ => a,
+        };
+
+        // let dups = self.duplicates(result.clone());
+
+        // assert_eq!(dups.len(), 0);
+
+        Rc::clone(result)
     }
 }

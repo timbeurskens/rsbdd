@@ -53,6 +53,23 @@ fn test_simplifications() {
 }
 
 #[test]
+fn test_simple_duplicates() {
+    let e = BDDEnv::new();
+
+    assert_eq!(e.duplicates(e.var(0)), 0);
+
+    assert_eq!(e.duplicates(e.mk_const(true)), 0);
+
+    assert_eq!(e.duplicates(e.and(e.mk_const(true), e.mk_const(false))), 0);
+
+    assert_eq!(e.duplicates(e.and(e.mk_const(false), e.var(0))), 0);
+
+    assert_eq!(e.duplicates(e.and(e.mk_const(true), e.var(0))), 0);
+
+    assert_eq!(e.duplicates(e.amn(&vec![1, 2], 1)), 0);
+}
+
+#[test]
 fn trivial_bdd() {
     let e = BDDEnv::new();
 
@@ -305,21 +322,24 @@ fn test_queens() {
     let row_expr = (0..n)
         .map(|i| (0..n).map(|j| j + i * n).collect::<Vec<_>>())
         .map(|ref c| e.exn(c, 1))
-        .reduce(|ref acc, ref k| e.and(acc.clone(), k.clone()))
-        .unwrap();
+        .fold(e.mk_const(true), |ref acc, ref k| {
+            e.and(Rc::clone(acc), Rc::clone(k))
+        });
 
     // every column must contain exactly one queen
     let col_expr = (0..n)
         .map(|i| (0..n).map(|j| j * n + i).collect::<Vec<_>>())
         .map(|ref c| e.exn(c, 1))
-        .reduce(|ref acc, ref k| e.and(acc.clone(), k.clone()))
-        .unwrap();
+        .fold(e.mk_const(true), |ref acc, ref k| {
+            e.and(Rc::clone(acc), Rc::clone(k))
+        });
 
     let diag_expr_hl = (0..n)
         .map(|i| (0..=(n - i)).map(|j| i + (j * (n + 1))).collect::<Vec<_>>())
         .map(|ref c| e.amn(c, 1))
-        .reduce(|ref acc, ref k| e.and(acc.clone(), k.clone()))
-        .unwrap();
+        .fold(e.mk_const(true), |ref acc, ref k| {
+            e.and(Rc::clone(acc), Rc::clone(k))
+        });
 
     // skip the first, as this is already covered by the previous expression
     let diag_expr_vl = (1..n)
@@ -329,34 +349,40 @@ fn test_queens() {
                 .collect::<Vec<_>>()
         })
         .map(|ref c| e.amn(c, 1))
-        .reduce(|ref acc, ref k| e.and(acc.clone(), k.clone()))
-        .unwrap();
+        .fold(e.mk_const(true), |ref acc, ref k| {
+            e.and(Rc::clone(acc), Rc::clone(k))
+        });
 
     let diag_expr_hr = (0..n)
         .map(|i| (0..=i).map(|j| i + (j * (n - 1))).collect::<Vec<_>>())
         .map(|ref c| e.amn(c, 1))
-        .reduce(|ref acc, ref k| e.and(acc.clone(), k.clone()))
-        .unwrap();
+        .fold(e.mk_const(true), |ref acc, ref k| {
+            e.and(Rc::clone(acc), Rc::clone(k))
+        });
 
     // skip the first, as this is already covered by the previous expression
     let diag_expr_vr = (1..n)
         .map(|i| (0..=i).map(|j| (i * n) + (j * (n - 1))).collect::<Vec<_>>())
         .map(|ref c| e.amn(c, 1))
-        .reduce(|ref acc, ref k| e.and(acc.clone(), k.clone()))
-        .unwrap();
+        .fold(e.mk_const(true), |ref acc, ref k| {
+            e.and(Rc::clone(acc), Rc::clone(k))
+        });
 
     let expr_list: Vec<Rc<BDD>> = vec![
-        row_expr.clone(),
-        col_expr.clone(),
-        diag_expr_hl.clone(),
-        diag_expr_vl.clone(),
-        diag_expr_hr.clone(),
-        diag_expr_vr.clone(),
+        row_expr,
+        col_expr,
+        diag_expr_hl,
+        diag_expr_vl,
+        diag_expr_hr,
+        diag_expr_vr,
     ];
 
-    let expr_comb = expr_list
-        .iter()
-        .fold(e.mk_const(true), |acc, k| e.and(acc.clone(), k.clone()));
+    let expr_comb = expr_list.iter().fold(e.mk_const(true), |ref acc, ref k| {
+        e.and(Rc::clone(acc), Rc::clone(k))
+    });
+
+    // duplicates tested in hash.rs
+    // assert_eq!(e.duplicates(expr_comb.clone()), 0);
 
     let model = e.model(expr_comb.clone());
 

@@ -40,7 +40,8 @@ impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<S>, GraphEdge<S>> for BDDGrap
             // use grep -v n_true or grep -v n_false to filter nodes adjacent to true or false
             &BDD::True => dot::Id::new(format!("n_true")).unwrap(),
             &BDD::False => dot::Id::new(format!("n_false")).unwrap(),
-            _ => dot::Id::new(format!("n_{:p}", n.as_ref())).unwrap(),
+            // _ => dot::Id::new(format!("n_{:p}", Rc::into_raw(n.clone()))).unwrap(),
+            _ => dot::Id::new(format!("n_{}", n.get_hash())).unwrap(), // use the hash for optimal sharing, use (above) pointers to test issue with duplicates
         }
     }
 
@@ -63,11 +64,11 @@ impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<S>, GraphEdge<S>> for BDDGrap
 
 impl<'a, S: BDDSymbol> dot::GraphWalk<'a, GraphNode<S>, GraphEdge<S>> for BDDGraph<S> {
     fn nodes(&self) -> dot::Nodes<'a, GraphNode<S>> {
-        self.nodes_recursive(&self.root)
+        self.nodes_recursive(self.root.clone())
     }
 
     fn edges(&self) -> dot::Edges<'a, GraphEdge<S>> {
-        self.edges_recursive(&self.root)
+        self.edges_recursive(self.root.clone())
     }
 
     fn source(&self, (a, _, _): &GraphEdge<S>) -> GraphNode<S> {
@@ -80,44 +81,38 @@ impl<'a, S: BDDSymbol> dot::GraphWalk<'a, GraphNode<S>, GraphEdge<S>> for BDDGra
 }
 
 impl<'a, S: BDDSymbol> BDDGraph<S> {
-    fn nodes_recursive(&self, root: &Rc<BDD<S>>) -> dot::Nodes<'a, GraphNode<S>> {
-        let _root = self.env.find(root);
-
-        match _root.as_ref() {
+    fn nodes_recursive(&self, root: Rc<BDD<S>>) -> dot::Nodes<'a, GraphNode<S>> {
+        match root.as_ref() {
             &BDD::Choice(ref l, _, ref r) => {
-                let l_nodes = self.nodes_recursive(l);
-                let r_nodes = self.nodes_recursive(r);
+                let l_nodes = self.nodes_recursive(l.clone());
+                let r_nodes = self.nodes_recursive(r.clone());
 
                 l_nodes
                     .iter()
-                    .chain(&vec![_root.clone()])
+                    .chain(&vec![root.clone()])
                     .chain(r_nodes.iter())
                     .unique()
                     .cloned()
                     .collect()
             }
-            &BDD::True | &BDD::False => vec![_root.clone()].into(),
+            &BDD::True | &BDD::False => vec![root.clone()].into(),
         }
     }
 
-    fn edges_recursive(&self, root: &Rc<BDD<S>>) -> dot::Edges<'a, GraphEdge<S>> {
+    fn edges_recursive(&self, root: Rc<BDD<S>>) -> dot::Edges<'a, GraphEdge<S>> {
         match root.as_ref() {
             &BDD::Choice(ref l, _, ref r) => {
-                let _root = self.env.find(root);
-                let _l = self.env.find(l);
-                let _r = self.env.find(r);
-
-                let l_edges = self.edges_recursive(l);
-                let r_edges = self.edges_recursive(r);
+                let l_edges = self.edges_recursive(l.clone());
+                let r_edges = self.edges_recursive(r.clone());
 
                 l_edges
                     .iter()
                     .chain(r_edges.iter())
                     .chain(&vec![
-                        (_root.clone(), true, _l.clone()),
-                        (_root.clone(), false, _r.clone()),
+                        (root.clone(), true, l.clone()),
+                        (root.clone(), false, r.clone()),
                     ])
-                    .unique()
+                    .unique() // disable unique edges when testing for duplicates
                     .cloned()
                     .collect()
             }
