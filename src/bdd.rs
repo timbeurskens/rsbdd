@@ -279,63 +279,44 @@ impl<S: BDDSymbol> BDDEnv<S> {
         self.mk_choice(self.mk_const(true), s, self.mk_const(false))
     }
 
-    // for all variables in vars at least n must be true
-    pub fn aln(&self, vars: &Vec<S>, n: usize) -> Rc<BDD<S>> {
-        let mut vars = vars.clone();
-        vars.sort();
-
-        self.aln_recursive(&vars, n as i64)
-    }
-
-    fn aln_recursive(&self, vars: &Vec<S>, n: i64) -> Rc<BDD<S>> {
-        if vars.len() == 0 {
+    pub fn aln(&self, branches: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
+        if branches.len() == 0 {
             if n > 0 {
                 self.mk_const(false)
             } else {
                 self.mk_const(true)
             }
         } else {
-            let first = vars[0];
-            let remainder = vars[1..].to_vec();
+            let first = &branches[0];
+            let remainder = branches[1..].to_vec();
 
-            self.mk_choice(
-                self.aln_recursive(&remainder, n - 1),
-                first,
-                self.aln_recursive(&remainder, n),
+            self.and(
+                self.implies(Rc::clone(&first), self.aln(&remainder, n-1)),
+                self.implies(self.not(Rc::clone(&first)), self.aln(&remainder, n))
             )
         }
     }
 
-    // for all variables in vars at most n must be true
-    pub fn amn(&self, vars: &Vec<S>, n: usize) -> Rc<BDD<S>> {
-        let mut vars = vars.clone();
-        vars.sort();
-
-        self.amn_recursive(&vars, n as i64)
-    }
-
-    fn amn_recursive(&self, vars: &Vec<S>, n: i64) -> Rc<BDD<S>> {
-        if vars.len() == 0 {
+    pub fn amn(&self,  branches: &Vec<Rc<BDD<S>>>, n: i64)-> Rc<BDD<S>> {
+        if branches.len() == 0 {
             if n >= 0 {
                 self.mk_const(true)
             } else {
                 self.mk_const(false)
             }
         } else {
-            let first = vars[0];
-            let remainder = vars[1..].to_vec();
+            let first = &branches[0];
+            let remainder = branches[1..].to_vec();
 
-            self.mk_choice(
-                self.amn_recursive(&remainder, n - 1),
-                first,
-                self.amn_recursive(&remainder, n),
+            self.and(
+                self.implies(Rc::clone(&first), self.amn(&remainder, n-1)),
+                self.implies(self.not(Rc::clone(&first)), self.amn(&remainder, n))
             )
         }
     }
 
-    /// exn constructs a bdd such that exactly n variables in vars are true
-    pub fn exn(&self, vars: &Vec<S>, n: usize) -> Rc<BDD<S>> {
-        self.and(self.amn(vars, n), self.aln(vars, n))
+    pub fn exn(&self, branches: &Vec<Rc<BDD<S>>>, n: i64)-> Rc<BDD<S>> {
+        self.and(self.amn(branches, n), self.aln(branches, n))
     }
 
     /// existential quantification

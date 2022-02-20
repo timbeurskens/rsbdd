@@ -2,6 +2,7 @@ use rsbdd::bdd::BDDEnv;
 use rsbdd::set::BDDSet;
 use std::rc::Rc;
 
+#[ignore]
 #[test]
 fn test_set_ops() {
     let bits = 8;
