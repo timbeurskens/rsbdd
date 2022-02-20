@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 dot = "0.1.4"
 itertools = "0.10.3"
+clap = "2.33.3"
+lazy_static = "1.4.0"
+regex = "1"

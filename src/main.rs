@@ -1,44 +1,63 @@
 use rsbdd::bdd::*;
 use rsbdd::bdd_io::*;
+use rsbdd::parser::*;
 use rsbdd::set::BDDSet;
 use std::fs::File;
 use std::rc::Rc;
+use std::io::BufReader;
+
+#[macro_use]
+extern crate clap;
+
+
 
 fn main() {
-    println!("Hello, world!");
+    let args = clap_app!(Solver =>
+        (version: "0.1")
+        (author: "Tim Beurskens")
+        (about: "A BDD-based SAT solver")
+        (@arg input: -i --input +takes_value "logic input file")
+        (@arg show_parsetree: -p --parsetree +takes_value "write the parse tree in dot format to this file")
+        (@arg show_truth_table: -t --truthtable !takes_value "print the truth-table to stdout")
+    )
+    .get_matches();
 
-    let mut f1 = File::create("output1.dot").unwrap();
-    // let mut f2 = File::create("output2.dot").unwrap();
+    if let Some(input_filename) = args.value_of("input") {
+        let input_file = File::open(input_filename).expect("Could not open input file");
 
-    // let mut set = BDDSet::new(8);
+        let input_parsed = ParsedFormula::new(&mut BufReader::new(input_file)).expect("Could not parse input file");
+    
+        let result = input_parsed.eval();
+    
+        if args.is_present("show_truth_table") {
+            println!("{:?}", input_parsed.vars);
+            print_truth_table_recursive(&result, input_parsed.vars.iter().map(|_| TruthTableEntry::Any).collect(), &input_parsed);
+        }
+    } else {
+        println!("No input file specified");
+    }
+}
 
-    // for i in 0..0x1000 {
-    //     set = set.insert(i);
-    // }
+#[derive(Debug, Clone)]
+enum TruthTableEntry {
+    True,
+    False,
+    Any,
+}
 
-    // set.bdd.render_dot(&mut f);
+fn print_truth_table_recursive(root: &Rc<BDD<usize>>, vars: Vec<TruthTableEntry>, e: &ParsedFormula) {
+    match root.as_ref() {
+        BDD::Choice(ref l, s, ref r) => {
+            // first visit the false subtree
+            let mut r_vars = vars.clone();
+            r_vars[*s] = TruthTableEntry::False;
+            print_truth_table_recursive(r, r_vars, e);
 
-    let vars: Vec<usize> = (0..4).collect();
-
-    let env = BDDEnv::new();
-
-    let b = env.amn(&vars, 2);
-
-    println!("dups: {:?}", env.duplicates(b.clone()));
-
-    // let c = env.clean(b.clone());
-
-    // println!("dups: {:?}", env.duplicates(c.clone()));
-
-    // dbg!(&env.nodes);
-
-    let env_ptr = Rc::new(env);
-
-    let graph1 = BDDGraph::new(&env_ptr, &b);
-    graph1.render_dot(&mut f1);
-
-    // let graph2 = BDDGraph::new(&env_ptr, &c);
-    // graph2.render_dot(&mut f2);
-
-    // dbg!(b);
+            // then visit the true subtree
+            let mut l_vars = vars.clone();
+            l_vars[*s] = TruthTableEntry::True;
+            print_truth_table_recursive(l, l_vars, e);
+        },
+        c => println!("{:?} {:?}", vars, c)
+    }
 }
