@@ -12,12 +12,13 @@ use std::string::String;
 use std::vec::Vec;
 
 lazy_static! {
-    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+)|(?P<identifier>[\w\d]+)|(?P<open>\()|(?P<close>\))|(?P<eof>$)"#).unwrap();
+    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+|>=|=|>|<|\[|\]|,|\(|\))|(?P<countable>\d+)|(?P<identifier>\w+)|(?P<eof>$)"#).unwrap();
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SymbolicBDDToken {
     Var(String),
+    Countable(usize),
     And,
     Or,
     Not,
@@ -29,8 +30,15 @@ pub enum SymbolicBDDToken {
     Iff,
     Exists,
     Forall,
+    Eq,
+    Geq,
+    Gt,
+    Lt,
     OpenParen,
     CloseParen,
+    OpenSquare,
+    CloseSquare,
+    Comma,
     False,
     True,
     Hash,
@@ -50,6 +58,15 @@ pub enum BinaryOperator {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum CountableOperator {
+    AtMost,
+    LessThan,
+    AtLeast,
+    MoreThan,
+    Exactly,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum SymbolicBDD {
     False,
     True,
@@ -57,6 +74,7 @@ pub enum SymbolicBDD {
     Not(Box<SymbolicBDD>),
     Exists(String, Box<SymbolicBDD>),
     Forall(String, Box<SymbolicBDD>),
+    Countable(CountableOperator, usize, Vec<SymbolicBDD>),
     BinaryOp(BinaryOperator, Box<SymbolicBDD>, Box<SymbolicBDD>),
 }
 
@@ -109,6 +127,17 @@ impl ParsedFormula {
                 .env
                 .borrow()
                 .all(self.var2usize(v), self.eval_recursive(b)),
+            SymbolicBDD::Countable(op, n, bs) => {
+                let branches = bs.iter().map(|b| self.eval_recursive(b)).collect();
+
+                match op {
+                    CountableOperator::AtMost => self.env.borrow().amn(&branches, *n as i64),
+                    CountableOperator::AtLeast => self.env.borrow().aln(&branches, *n as i64),
+                    CountableOperator::Exactly => self.env.borrow().exn(&branches, *n as i64),
+                    CountableOperator::LessThan => self.env.borrow().amn(&branches, *n as i64 - 1),
+                    CountableOperator::MoreThan => self.env.borrow().aln(&branches, *n as i64 + 1),
+                }
+            }
             SymbolicBDD::BinaryOp(op, l, r) => {
                 let l = self.eval_recursive(l);
                 let r = self.eval_recursive(r);
@@ -148,6 +177,7 @@ impl SymbolicBDD {
     fn parse_sub_formula(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
         let left = match tokens.peek() {
             Some(SymbolicBDDToken::OpenParen) => SymbolicBDD::parse_parentized_formula(tokens)?,
+            Some(SymbolicBDDToken::OpenSquare) => SymbolicBDD::parse_countable_formula(tokens)?,
             Some(SymbolicBDDToken::False) => {
                 expect(SymbolicBDDToken::False, tokens)?;
                 SymbolicBDD::False
@@ -190,6 +220,55 @@ impl SymbolicBDD {
             }
             _ => Ok(left),
         }
+    }
+
+    fn parse_countable_formula(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
+        expect(SymbolicBDDToken::OpenSquare, tokens)?;
+        let mut subforms = Vec::new();
+
+        loop {
+            if check(SymbolicBDDToken::CloseSquare, tokens).is_err() {
+                subforms.push(SymbolicBDD::parse_sub_formula(tokens)?);
+
+                // if no comma is found after the sub-formula, the formula should end with a closing square bracket
+                if check(SymbolicBDDToken::Comma, tokens).is_err() {
+                    break;
+                } else {
+                    // otherwise expect a comma
+                    expect(SymbolicBDDToken::Comma, tokens)?;
+                }
+            } else {
+                break;
+            }
+        }
+
+        expect(SymbolicBDDToken::CloseSquare, tokens)?;
+
+        let operator = match tokens.next() {
+            Some(SymbolicBDDToken::Eq) => CountableOperator::Exactly,
+            Some(SymbolicBDDToken::ImpliesInv) => CountableOperator::AtMost,
+            Some(SymbolicBDDToken::Geq) => CountableOperator::AtLeast,
+            Some(SymbolicBDDToken::Lt) => CountableOperator::LessThan,
+            Some(SymbolicBDDToken::Gt) => CountableOperator::MoreThan,
+            other => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Expected countable operator, got {:?}", other),
+                ))
+            }
+        };
+
+        let count = match tokens.next() {
+            Some(SymbolicBDDToken::Countable(n)) => n,
+            other => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Expected number, got {:?}", other),
+                ))
+            }
+        };
+
+        Ok(SymbolicBDD::Countable(operator, *count, subforms))
     }
 
     fn parse_existence_quantifier(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
@@ -290,7 +369,7 @@ impl SymbolicBDD {
         for c in TOKENIZER.captures_iter(src.as_str()) {
             if let Some(symbol) = c.name("symbol") {
                 match symbol.as_str() {
-                    "&" | "*"=> result.push(SymbolicBDDToken::And),
+                    "&" | "*" => result.push(SymbolicBDDToken::And),
                     "|" | "+" => result.push(SymbolicBDDToken::Or),
                     "^" => result.push(SymbolicBDDToken::Xor),
                     "-" | "!" => result.push(SymbolicBDDToken::Not),
@@ -298,6 +377,15 @@ impl SymbolicBDD {
                     "<=" => result.push(SymbolicBDDToken::ImpliesInv),
                     "<=>" => result.push(SymbolicBDDToken::Iff),
                     "#" => result.push(SymbolicBDDToken::Hash),
+                    "=" => result.push(SymbolicBDDToken::Eq),
+                    "<" => result.push(SymbolicBDDToken::Lt),
+                    ">" => result.push(SymbolicBDDToken::Gt),
+                    ">=" => result.push(SymbolicBDDToken::Geq),
+                    "(" => result.push(SymbolicBDDToken::OpenParen),
+                    ")" => result.push(SymbolicBDDToken::CloseParen),
+                    "[" => result.push(SymbolicBDDToken::OpenSquare),
+                    "]" => result.push(SymbolicBDDToken::CloseSquare),
+                    "," => result.push(SymbolicBDDToken::Comma),
                     _ => {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidData,
@@ -323,15 +411,19 @@ impl SymbolicBDD {
                     "all" => result.push(SymbolicBDDToken::Forall),
                     var => result.push(SymbolicBDDToken::Var(var.to_string())),
                 }
-            } else if let Some(_) = c.name("open") {
-                result.push(SymbolicBDDToken::OpenParen);
-            } else if let Some(_) = c.name("close") {
-                result.push(SymbolicBDDToken::CloseParen);
+            } else if let Some(number) = c.name("countable") {
+                let parsed_number = number.as_str().parse().expect("Failed to parse number");
+                result.push(SymbolicBDDToken::Countable(parsed_number));
             } else if let Some(_) = c.name("eof") {
                 result.push(SymbolicBDDToken::Eof);
             } else {
                 return Err(io::Error::new(io::ErrorKind::InvalidData, "Unknown token"));
             }
+        }
+
+        // force-insert EOF if not exists
+        if result.last() != Some(&SymbolicBDDToken::Eof) {
+            result.push(SymbolicBDDToken::Eof);
         }
 
         Ok(result)
@@ -341,18 +433,25 @@ impl SymbolicBDD {
 fn expect(token: SymbolicBDDToken, tokens: &mut TokenReader) -> io::Result<()> {
     match &tokens.next() {
         &Some(t) if *t == token => return Ok(()),
-        &Some(t) => {
+        t => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!("Expected {:?}, got {:?}", token, t),
             ))
         }
-        &None => {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Expected {:?}, but got None", token),
-            ))
-        }
+    }
+}
+
+fn check(token: SymbolicBDDToken, tokens: &mut TokenReader) -> io::Result<()> {
+    match tokens.peek() {
+        Some(&t) if *t == token => Ok(()),
+        t => Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "Checked for {:?}, got {:?}; No capture condition available",
+                token, t
+            ),
+        )),
     }
 }
 
@@ -381,3 +480,11 @@ fn expect(token: SymbolicBDDToken, tokens: &mut TokenReader) -> io::Result<()> {
 // exists a # a & b & all c # c & b
 // all a # true
 // forall a # true
+//
+// countable:
+// at least 2 from a, b, c:
+// [a, b, c] > 2
+// at most 1 from a, b, c:
+// [a, b, c] < 1
+// exactly 2 from a, b, c:
+// [a, b, c] = 2
