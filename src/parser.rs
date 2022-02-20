@@ -135,7 +135,7 @@ impl SymbolicBDD {
             }
             Some(SymbolicBDDToken::True) => {
                 expect(SymbolicBDDToken::True, tokens)?;
-                SymbolicBDD::False
+                SymbolicBDD::True
             }
             Some(SymbolicBDDToken::Var(var)) => {
                 expect(SymbolicBDDToken::Var(var.clone()), tokens)?;
@@ -306,3 +306,6 @@ fn expect(token: SymbolicBDDToken, tokens: &mut TokenReader) -> io::Result<()> {
 // a => b => c == (a => (b => c))
 // ((a)) == a
 //
+// quantifiers:
+// exists a # a & b & all c # c & b
+// all a # true
