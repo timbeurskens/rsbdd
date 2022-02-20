@@ -7,7 +7,6 @@ type BDD = bdd::BDD<usize>;
 use rsbdd::bdd_io::*;
 use std::env;
 use std::fs::File;
-use std::result::Result;
 
 #[test]
 fn test_equivalence() {
