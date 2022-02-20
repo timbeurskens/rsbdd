@@ -1,6 +1,5 @@
 use crate::bdd::*;
-use std::cell::{Ref, RefCell, RefMut};
-use std::ops::*;
+use std::cell::RefCell;
 use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,12 +91,11 @@ impl<'a> BDDSet {
     }
 
     pub fn complement(&self, other: &BDDSet) -> &Self {
-        let new: Rc<BDD<usize>>;
-        {
-            new = self.bdd.borrow().clone();
-        }
+        let new: Rc<BDD<usize>> = self.bdd.borrow().clone();
+
         self.bdd
-            .replace(self.env.and(new, self.env.not(other.bdd.borrow().clone())));
+            .replace(self.env.and(new, other.bdd.borrow().clone()));
+
         self
     }
 

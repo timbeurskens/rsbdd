@@ -22,7 +22,7 @@ fn test_duplicates() {
 
     // every row must contain exactly one queen
     let row_expr = (0..n)
-        .map(|i| (0..n).map(|j| j + i * n).collect::<Vec<_>>())
+        .map(|i| (0..n).map(|j| e.var(j + i * n)).collect::<Vec<_>>())
         .map(|ref c| e.exn(c, 1))
         .fold(e.mk_const(true), |ref acc, ref k| {
             e.and(Rc::clone(acc), Rc::clone(k))
@@ -30,14 +30,14 @@ fn test_duplicates() {
 
     // every column must contain exactly one queen
     let col_expr = (0..n)
-        .map(|i| (0..n).map(|j| j * n + i).collect::<Vec<_>>())
+        .map(|i| (0..n).map(|j| e.var(j * n + i)).collect::<Vec<_>>())
         .map(|ref c| e.exn(c, 1))
         .fold(e.mk_const(true), |ref acc, ref k| {
             e.and(Rc::clone(acc), Rc::clone(k))
         });
 
     let diag_expr_hl = (0..n)
-        .map(|i| (0..=(n - i)).map(|j| i + (j * (n + 1))).collect::<Vec<_>>())
+        .map(|i| (0..=(n - i)).map(|j| e.var(i + (j * (n + 1)))).collect::<Vec<_>>())
         .map(|ref c| e.amn(c, 1))
         .fold(e.mk_const(true), |ref acc, ref k| {
             e.and(Rc::clone(acc), Rc::clone(k))
@@ -47,7 +47,7 @@ fn test_duplicates() {
     let diag_expr_vl = (1..n)
         .map(|i| {
             (0..=(n - i))
-                .map(|j| (i * n) + (j * (n + 1)))
+                .map(|j| e.var((i * n) + (j * (n + 1))))
                 .collect::<Vec<_>>()
         })
         .map(|ref c| e.amn(c, 1))
@@ -56,7 +56,7 @@ fn test_duplicates() {
         });
 
     let diag_expr_hr = (0..n)
-        .map(|i| (0..=i).map(|j| i + (j * (n - 1))).collect::<Vec<_>>())
+        .map(|i| (0..=i).map(|j| e.var(i + (j * (n - 1)))).collect::<Vec<_>>())
         .map(|ref c| e.amn(c, 1))
         .fold(e.mk_const(true), |ref acc, ref k| {
             e.and(Rc::clone(acc), Rc::clone(k))
@@ -64,7 +64,7 @@ fn test_duplicates() {
 
     // skip the first, as this is already covered by the previous expression
     let diag_expr_vr = (1..n)
-        .map(|i| (0..=i).map(|j| (i * n) + (j * (n - 1))).collect::<Vec<_>>())
+        .map(|i| (0..=i).map(|j| e.var((i * n) + (j * (n - 1)))).collect::<Vec<_>>())
         .map(|ref c| e.amn(c, 1))
         .fold(e.mk_const(true), |ref acc, ref k| {
             e.and(Rc::clone(acc), Rc::clone(k))
