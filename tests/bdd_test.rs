@@ -68,7 +68,10 @@ fn test_simple_duplicates() {
 
     assert_eq!(e.duplicates(e.and(e.mk_const(true), e.var(0))), 0);
 
-    assert_eq!(e.duplicates(e.amn(&vec![1, 2].iter().map(|&i| e.var(i)).collect(), 1)), 0);
+    assert_eq!(
+        e.duplicates(e.amn(&vec![1, 2].iter().map(|&i| e.var(i)).collect(), 1)),
+        0
+    );
 }
 
 #[test]
@@ -146,7 +149,10 @@ fn test_exn() {
 
     assert_eq!(e.exn(&vec![], 0), e.mk_const(true));
     assert_eq!(e.exn(&vec![], 1), e.mk_const(false));
-    assert_eq!(e.exn(&vec![0].iter().map(|&i| e.var(i)).collect(), 1), e.var(0));
+    assert_eq!(
+        e.exn(&vec![0].iter().map(|&i| e.var(i)).collect(), 1),
+        e.var(0)
+    );
     assert_eq!(
         e.exn(&vec![0, 1].iter().map(|&i| e.var(i)).collect(), 1),
         e.or(
@@ -161,9 +167,18 @@ fn test_aln() {
     let e = BDDEnv::new();
 
     assert_eq!(e.aln(&vec![], 0), e.mk_const(true));
-    assert_eq!(e.aln(&vec![0].iter().map(|&i| e.var(i)).collect(), 0), e.mk_const(true));
-    assert_eq!(e.aln(&vec![0].iter().map(|&i| e.var(i)).collect(), 1), e.var(0));
-    assert_eq!(e.aln(&vec![0, 1].iter().map(|&i| e.var(i)).collect(), 1), e.or(e.var(0), e.var(1)));
+    assert_eq!(
+        e.aln(&vec![0].iter().map(|&i| e.var(i)).collect(), 0),
+        e.mk_const(true)
+    );
+    assert_eq!(
+        e.aln(&vec![0].iter().map(|&i| e.var(i)).collect(), 1),
+        e.var(0)
+    );
+    assert_eq!(
+        e.aln(&vec![0, 1].iter().map(|&i| e.var(i)).collect(), 1),
+        e.or(e.var(0), e.var(1))
+    );
     assert_eq!(
         e.aln(&vec![0, 1, 2].iter().map(|&i| e.var(i)).collect(), 1),
         e.or(e.or(e.var(0), e.var(1)), e.var(2))
@@ -176,8 +191,14 @@ fn test_amn() {
 
     assert_eq!(e.amn(&vec![], 1), e.mk_const(true));
     assert_eq!(e.amn(&vec![], 0), e.mk_const(true));
-    assert_eq!(e.amn(&vec![0].iter().map(|&i| e.var(i)).collect(), 0), e.not(e.var(0)));
-    assert_eq!(e.amn(&vec![0].iter().map(|&i| e.var(i)).collect(), 1), e.mk_const(true));
+    assert_eq!(
+        e.amn(&vec![0].iter().map(|&i| e.var(i)).collect(), 0),
+        e.not(e.var(0))
+    );
+    assert_eq!(
+        e.amn(&vec![0].iter().map(|&i| e.var(i)).collect(), 1),
+        e.mk_const(true)
+    );
     assert_eq!(
         e.amn(&vec![0, 1].iter().map(|&i| e.var(i)).collect(), 1),
         e.or(
@@ -188,7 +209,10 @@ fn test_amn() {
             )
         )
     );
-    assert_ne!(e.amn(&vec![0, 1, 2].iter().map(|&i| e.var(i)).collect(), 1), e.mk_const(false));
+    assert_ne!(
+        e.amn(&vec![0, 1, 2].iter().map(|&i| e.var(i)).collect(), 1),
+        e.mk_const(false)
+    );
 }
 
 #[test]
@@ -203,7 +227,10 @@ fn test_amn_quantifiers() {
     // assert_eq!(e.var(1), e.exists(2, e.and(e.eq(e.var(1), e.var(2)), e.var(2))));
 
     // amn([0, 1, 2], 2) != amn([3, 4, 5], 2)
-    assert_ne!(e.amn(&vec![0, 1, 2].iter().map(|&i| e.var(i)).collect(), 2), e.amn(&vec![3, 4, 5].iter().map(|&i| e.var(i)).collect(), 2));
+    assert_ne!(
+        e.amn(&vec![0, 1, 2].iter().map(|&i| e.var(i)).collect(), 2),
+        e.amn(&vec![3, 4, 5].iter().map(|&i| e.var(i)).collect(), 2)
+    );
 
     // amn([0, 1, 2], 2) == exists([3, 4, 5], 0 == 3 && 1 == 4 && 2 == 5 && amn([3, 4, 5], 2))
     assert_eq!(
@@ -218,7 +245,10 @@ fn test_amn_quantifiers() {
                         e.eq(e.var(0), e.var(3)),
                         e.and(
                             e.eq(e.var(1), e.var(4)),
-                            e.and(e.eq(e.var(2), e.var(5)), e.amn(&vec![3, 4, 5].iter().map(|&i| e.var(i)).collect(), 2))
+                            e.and(
+                                e.eq(e.var(2), e.var(5)),
+                                e.amn(&vec![3, 4, 5].iter().map(|&i| e.var(i)).collect(), 2)
+                            )
                         )
                     )
                 )
@@ -375,7 +405,11 @@ fn test_queens() {
         });
 
     let diag_expr_hl = (0..n)
-        .map(|i| (0..=(n - i)).map(|j| e.var(i + (j * (n + 1)))).collect::<Vec<_>>())
+        .map(|i| {
+            (0..=(n - i))
+                .map(|j| e.var(i + (j * (n + 1))))
+                .collect::<Vec<_>>()
+        })
         .map(|ref c| e.amn(c, 1))
         .fold(e.mk_const(true), |ref acc, ref k| {
             e.and(Rc::clone(acc), Rc::clone(k))
@@ -394,7 +428,11 @@ fn test_queens() {
         });
 
     let diag_expr_hr = (0..n)
-        .map(|i| (0..=i).map(|j| e.var(i + (j * (n - 1)))).collect::<Vec<_>>())
+        .map(|i| {
+            (0..=i)
+                .map(|j| e.var(i + (j * (n - 1))))
+                .collect::<Vec<_>>()
+        })
         .map(|ref c| e.amn(c, 1))
         .fold(e.mk_const(true), |ref acc, ref k| {
             e.and(Rc::clone(acc), Rc::clone(k))
@@ -402,7 +440,11 @@ fn test_queens() {
 
     // skip the first, as this is already covered by the previous expression
     let diag_expr_vr = (1..n)
-        .map(|i| (0..=i).map(|j| e.var((i * n) + (j * (n - 1)))).collect::<Vec<_>>())
+        .map(|i| {
+            (0..=i)
+                .map(|j| e.var((i * n) + (j * (n - 1))))
+                .collect::<Vec<_>>()
+        })
         .map(|ref c| e.amn(c, 1))
         .fold(e.mk_const(true), |ref acc, ref k| {
             e.and(Rc::clone(acc), Rc::clone(k))

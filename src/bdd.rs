@@ -291,13 +291,13 @@ impl<S: BDDSymbol> BDDEnv<S> {
             let remainder = branches[1..].to_vec();
 
             self.and(
-                self.implies(Rc::clone(&first), self.aln(&remainder, n-1)),
-                self.implies(self.not(Rc::clone(&first)), self.aln(&remainder, n))
+                self.implies(Rc::clone(&first), self.aln(&remainder, n - 1)),
+                self.implies(self.not(Rc::clone(&first)), self.aln(&remainder, n)),
             )
         }
     }
 
-    pub fn amn(&self,  branches: &Vec<Rc<BDD<S>>>, n: i64)-> Rc<BDD<S>> {
+    pub fn amn(&self, branches: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
         if branches.len() == 0 {
             if n >= 0 {
                 self.mk_const(true)
@@ -309,13 +309,13 @@ impl<S: BDDSymbol> BDDEnv<S> {
             let remainder = branches[1..].to_vec();
 
             self.and(
-                self.implies(Rc::clone(&first), self.amn(&remainder, n-1)),
-                self.implies(self.not(Rc::clone(&first)), self.amn(&remainder, n))
+                self.implies(Rc::clone(&first), self.amn(&remainder, n - 1)),
+                self.implies(self.not(Rc::clone(&first)), self.amn(&remainder, n)),
             )
         }
     }
 
-    pub fn exn(&self, branches: &Vec<Rc<BDD<S>>>, n: i64)-> Rc<BDD<S>> {
+    pub fn exn(&self, branches: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
         self.and(self.amn(branches, n), self.aln(branches, n))
     }
 

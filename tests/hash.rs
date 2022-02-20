@@ -32,7 +32,11 @@ fn test_duplicates() {
         });
 
     let diag_expr_hl = (0..n)
-        .map(|i| (0..=(n - i)).map(|j| e.var(i + (j * (n + 1)))).collect::<Vec<_>>())
+        .map(|i| {
+            (0..=(n - i))
+                .map(|j| e.var(i + (j * (n + 1))))
+                .collect::<Vec<_>>()
+        })
         .map(|ref c| e.amn(c, 1))
         .fold(e.mk_const(true), |ref acc, ref k| {
             e.and(Rc::clone(acc), Rc::clone(k))
@@ -51,7 +55,11 @@ fn test_duplicates() {
         });
 
     let diag_expr_hr = (0..n)
-        .map(|i| (0..=i).map(|j| e.var(i + (j * (n - 1)))).collect::<Vec<_>>())
+        .map(|i| {
+            (0..=i)
+                .map(|j| e.var(i + (j * (n - 1))))
+                .collect::<Vec<_>>()
+        })
         .map(|ref c| e.amn(c, 1))
         .fold(e.mk_const(true), |ref acc, ref k| {
             e.and(Rc::clone(acc), Rc::clone(k))
@@ -59,7 +67,11 @@ fn test_duplicates() {
 
     // skip the first, as this is already covered by the previous expression
     let diag_expr_vr = (1..n)
-        .map(|i| (0..=i).map(|j| e.var((i * n) + (j * (n - 1)))).collect::<Vec<_>>())
+        .map(|i| {
+            (0..=i)
+                .map(|j| e.var((i * n) + (j * (n - 1))))
+                .collect::<Vec<_>>()
+        })
         .map(|ref c| e.amn(c, 1))
         .fold(e.mk_const(true), |ref acc, ref k| {
             e.and(Rc::clone(acc), Rc::clone(k))
