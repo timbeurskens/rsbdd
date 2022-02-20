@@ -441,5 +441,5 @@ fn test_queens() {
 
     let graph = BDDGraph::new(&Rc::new(e), &expr_comb);
 
-    graph.render_dot(&mut f);
+    graph.render_dot(&mut f).expect("failed to render dot");
 }
