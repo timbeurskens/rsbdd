@@ -3,9 +3,9 @@ extern crate dot;
 use crate::bdd::*;
 use itertools::Itertools;
 use std::borrow::Cow;
+use std::io;
 use std::io::Write;
 use std::rc::Rc;
-use std::io;
 
 // todo: currently the filter step: find a similar node in the environment, and filter duplicates reduces the graph significantly
 // this should be done during the bdd computation instead (but how?)

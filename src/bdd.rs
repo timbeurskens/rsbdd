@@ -82,7 +82,6 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-
     pub fn duplicates(&self, root: Rc<BDD<S>>) -> usize {
         let all_nodes: Vec<Rc<BDD<S>>> = self.node_list(root);
 
@@ -137,7 +136,9 @@ impl<S: BDDSymbol> BDDEnv<S> {
             self.find(&ins)
         } else {
             // only insert if it is not already in the lookup table
-            self.nodes.borrow_mut().insert(ins.as_ref().clone(), Rc::clone(&ins));
+            self.nodes
+                .borrow_mut()
+                .insert(ins.as_ref().clone(), Rc::clone(&ins));
             Rc::clone(&ins)
         }
     }

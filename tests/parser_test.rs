@@ -20,7 +20,7 @@ fn test_basic_tokens() -> io::Result<()> {
         "mand\0",
         "m and\0",
         "true",
-        "false"
+        "false",
     ];
 
     for test_str in test_strs {

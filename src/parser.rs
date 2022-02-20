@@ -2,16 +2,14 @@ use crate::bdd::{BDDEnv, BDD};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::collections::HashMap;
+use std::cell::RefCell;
 use std::io;
 use std::io::BufRead;
 use std::iter::Peekable;
-use std::result::Result;
+use std::rc::Rc;
 use std::slice::Iter;
 use std::string::String;
 use std::vec::Vec;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 lazy_static! {
     static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^)|(?P<identifier>[\w\d]+)|(?P<open>\()|(?P<close>\))|(?P<eof>$)"#).unwrap();
@@ -77,7 +75,11 @@ impl ParsedFormula {
 
         let formula = SymbolicBDD::parse_formula(&mut tokens.iter().peekable())?;
 
-        Ok(ParsedFormula { vars, bdd: formula, env: RefCell::new(BDDEnv::new()) })
+        Ok(ParsedFormula {
+            vars,
+            bdd: formula,
+            env: RefCell::new(BDDEnv::new()),
+        })
     }
 
     pub fn eval(&self) -> Rc<BDD<usize>> {
@@ -247,7 +249,7 @@ impl SymbolicBDD {
                     "xor" => result.push(SymbolicBDDToken::Xor),
                     "implies" => result.push(SymbolicBDDToken::Implies),
                     "iff" => result.push(SymbolicBDDToken::Iff),
-                    "eq"=> result.push(SymbolicBDDToken::Iff),
+                    "eq" => result.push(SymbolicBDDToken::Iff),
                     var => result.push(SymbolicBDDToken::Var(var.to_string())),
                 }
             } else if let Some(_) = c.name("open") {
