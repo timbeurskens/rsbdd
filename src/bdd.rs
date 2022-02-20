@@ -264,6 +264,16 @@ impl<S: BDDSymbol> BDDEnv<S> {
         )
     }
 
+    // joint denial (nor)
+    pub fn nor(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
+        self.not(self.or(Rc::clone(&a), Rc::clone(&b)))
+    }
+
+    // alternative denial (nand)
+    pub fn nand(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
+        self.not(self.and(Rc::clone(&a), Rc::clone(&b)))
+    }
+
     /// var constructs a new BDD for a given variable.
     pub fn var(&self, s: S) -> Rc<BDD<S>> {
         self.mk_choice(self.mk_const(true), s, self.mk_const(false))

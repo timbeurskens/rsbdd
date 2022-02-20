@@ -22,6 +22,8 @@ pub enum SymbolicBDDToken {
     Or,
     Not,
     Xor,
+    Nor,
+    Nand,
     Implies,
     ImpliesInv,
     Iff,
@@ -40,6 +42,8 @@ pub enum BinaryOperator {
     And,
     Or,
     Xor,
+    Nor,
+    Nand,
     Implies,
     ImpliesInv,
     Iff,
@@ -113,6 +117,8 @@ impl ParsedFormula {
                     BinaryOperator::And => self.env.borrow().and(l, r),
                     BinaryOperator::Or => self.env.borrow().or(l, r),
                     BinaryOperator::Xor => self.env.borrow().xor(l, r),
+                    BinaryOperator::Nor => self.env.borrow().nor(l, r),
+                    BinaryOperator::Nand => self.env.borrow().nand(l, r),
                     BinaryOperator::Implies => self.env.borrow().implies(l, r),
                     BinaryOperator::ImpliesInv => self.env.borrow().implies(r, l),
                     BinaryOperator::Iff => self.env.borrow().eq(l, r),
@@ -173,6 +179,8 @@ impl SymbolicBDD {
             Some(SymbolicBDDToken::And)
             | Some(SymbolicBDDToken::Or)
             | Some(SymbolicBDDToken::Xor)
+            | Some(SymbolicBDDToken::Nor)
+            | Some(SymbolicBDDToken::Nand)
             | Some(SymbolicBDDToken::Implies)
             | Some(SymbolicBDDToken::ImpliesInv)
             | Some(SymbolicBDDToken::Iff) => {
@@ -231,6 +239,14 @@ impl SymbolicBDD {
             Some(SymbolicBDDToken::Xor) => {
                 expect(SymbolicBDDToken::Xor, tokens)?;
                 Ok(BinaryOperator::Xor)
+            }
+            Some(SymbolicBDDToken::Nor) => {
+                expect(SymbolicBDDToken::Nor, tokens)?;
+                Ok(BinaryOperator::Nor)
+            }
+            Some(SymbolicBDDToken::Nand) => {
+                expect(SymbolicBDDToken::Nand, tokens)?;
+                Ok(BinaryOperator::Nand)
             }
             Some(SymbolicBDDToken::Implies) => {
                 expect(SymbolicBDDToken::Implies, tokens)?;
@@ -298,6 +314,8 @@ impl SymbolicBDD {
                     "and" => result.push(SymbolicBDDToken::And),
                     "or" => result.push(SymbolicBDDToken::Or),
                     "xor" => result.push(SymbolicBDDToken::Xor),
+                    "nor" => result.push(SymbolicBDDToken::Nor),
+                    "nand" => result.push(SymbolicBDDToken::Nand),
                     "implies" => result.push(SymbolicBDDToken::Implies),
                     "iff" => result.push(SymbolicBDDToken::Iff),
                     "eq" => result.push(SymbolicBDDToken::Iff),
