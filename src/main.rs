@@ -17,6 +17,7 @@ fn main() {
         (@arg show_parsetree: -p --parsetree +takes_value "write the parse tree in dot format to this file")
         (@arg show_truth_table: -t --truthtable !takes_value "print the truth-table to stdout")
         (@arg show_dot: -d --dot +takes_value "write the bdd to a dot graphviz file")
+        (@arg model: -m --model !takes_value "use a model of the bdd as output (instead of the satisfying assignment)")
     )
     .get_matches();
 
@@ -26,7 +27,11 @@ fn main() {
         let input_parsed = ParsedFormula::new(&mut BufReader::new(input_file))
             .expect("Could not parse input file");
 
-        let result = input_parsed.eval();
+        let mut result = input_parsed.eval();
+
+        if args.is_present("model") {
+            result = input_parsed.env.borrow().model(result);
+        }
 
         if args.is_present("show_truth_table") {
             println!("{:?}", input_parsed.vars);
