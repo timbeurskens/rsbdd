@@ -12,7 +12,7 @@ use std::string::String;
 use std::vec::Vec;
 
 lazy_static! {
-    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#)|(?P<identifier>[\w\d]+)|(?P<open>\()|(?P<close>\))|(?P<eof>$)"#).unwrap();
+    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+)|(?P<identifier>[\w\d]+)|(?P<open>\()|(?P<close>\))|(?P<eof>$)"#).unwrap();
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -290,11 +290,10 @@ impl SymbolicBDD {
         for c in TOKENIZER.captures_iter(src.as_str()) {
             if let Some(symbol) = c.name("symbol") {
                 match symbol.as_str() {
-                    "&" => result.push(SymbolicBDDToken::And),
-                    "|" => result.push(SymbolicBDDToken::Or),
+                    "&" | "*"=> result.push(SymbolicBDDToken::And),
+                    "|" | "+" => result.push(SymbolicBDDToken::Or),
                     "^" => result.push(SymbolicBDDToken::Xor),
-                    "-" => result.push(SymbolicBDDToken::Not),
-                    "!" => result.push(SymbolicBDDToken::Not),
+                    "-" | "!" => result.push(SymbolicBDDToken::Not),
                     "=>" => result.push(SymbolicBDDToken::Implies),
                     "<=" => result.push(SymbolicBDDToken::ImpliesInv),
                     "<=>" => result.push(SymbolicBDDToken::Iff),
