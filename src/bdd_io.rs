@@ -40,8 +40,8 @@ impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<S>, GraphEdge<S>> for BDDGrap
             // use grep -v n_true or grep -v n_false to filter nodes adjacent to true or false
             &BDD::True => dot::Id::new(format!("n_true")).unwrap(),
             &BDD::False => dot::Id::new(format!("n_false")).unwrap(),
-            // _ => dot::Id::new(format!("n_{:p}", Rc::into_raw(n.clone()))).unwrap(),
-            _ => dot::Id::new(format!("n_{}", n.get_hash())).unwrap(), // use the hash for optimal sharing, use (above) pointers to test issue with duplicates
+            _ => dot::Id::new(format!("n_{:p}", Rc::into_raw(n.clone()))).unwrap(),
+            // _ => dot::Id::new(format!("n_{}", n.get_hash())).unwrap(), // use the hash for optimal sharing, use (above) pointers to test issue with duplicates
         }
     }
 

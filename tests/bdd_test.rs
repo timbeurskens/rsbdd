@@ -5,7 +5,9 @@ use std::rc::Rc;
 type BDD = bdd::BDD<usize>;
 
 use rsbdd::bdd_io::*;
+use std::env;
 use std::fs::File;
+use std::result::Result;
 
 #[test]
 fn test_equivalence() {
@@ -190,6 +192,42 @@ fn test_amn() {
 }
 
 #[test]
+fn test_amn_quantifiers() {
+    // try remapping variables using existential quantifiers
+    let e = BDDEnv::new();
+
+    // // simple case: 1 != 2
+    // assert_ne!(e.var(1), e.var(2));
+
+    // // 1 == exists(2, 1 == 2 && 2)
+    // assert_eq!(e.var(1), e.exists(2, e.and(e.eq(e.var(1), e.var(2)), e.var(2))));
+
+    // amn([0, 1, 2], 2) != amn([3, 4, 5], 2)
+    assert_ne!(e.amn(&vec![0, 1, 2], 2), e.amn(&vec![3, 4, 5], 2));
+
+    // amn([0, 1, 2], 2) == exists([3, 4, 5], 0 == 3 && 1 == 4 && 2 == 5 && amn([3, 4, 5], 2))
+    assert_eq!(
+        e.amn(&vec![0, 1, 2], 2),
+        e.exists(
+            3,
+            e.exists(
+                4,
+                e.exists(
+                    5,
+                    e.and(
+                        e.eq(e.var(0), e.var(3)),
+                        e.and(
+                            e.eq(e.var(1), e.var(4)),
+                            e.and(e.eq(e.var(2), e.var(5)), e.amn(&vec![3, 4, 5], 2))
+                        )
+                    )
+                )
+            )
+        )
+    );
+}
+
+#[test]
 fn test_model() {
     let e = BDDEnv::new();
 
@@ -316,7 +354,9 @@ fn test_aln_model() {
 fn test_queens() {
     let e = BDDEnv::new();
 
-    let n = 5;
+    let n_str = env::var("QUEENS").unwrap_or("4".into());
+
+    let n: usize = n_str.parse().unwrap();
 
     // every row must contain exactly one queen
     let row_expr = (0..n)
@@ -382,7 +422,7 @@ fn test_queens() {
     });
 
     // duplicates tested in hash.rs
-    // assert_eq!(e.duplicates(expr_comb.clone()), 0);
+    assert_eq!(e.duplicates(expr_comb.clone()), 0);
 
     let model = e.model(expr_comb.clone());
 
@@ -397,7 +437,7 @@ fn test_queens() {
 
     println!("size of environment: {} nodes", e.size());
 
-    let mut f = File::create("n_queens_full.dot").unwrap();
+    let mut f = File::create(format!("n_queens_{}.dot", n)).unwrap();
 
     let graph = BDDGraph::new(&Rc::new(e), &expr_comb);
 

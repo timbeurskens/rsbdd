@@ -68,6 +68,8 @@ impl<S: BDDSymbol> BDDEnv<S> {
         self.nodes.borrow().len()
     }
 
+    // clean tries to reduce all duplicate subtrees to single nodes in the lookup table
+    // this function currently has no effect, might be removed later
     pub fn clean(&self, root: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match root.as_ref() {
             &BDD::Choice(ref l, s, ref r) => {
@@ -79,6 +81,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
             _ => self.find(&root),
         }
     }
+
 
     pub fn duplicates(&self, root: Rc<BDD<S>>) -> usize {
         let all_nodes: Vec<Rc<BDD<S>>> = self.node_list(root);
@@ -119,21 +122,27 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
+    // make a new choice based on the given symbol and the left and right subtree.
+    // the new choice is then simplified and a reference is added to the lookup table
     pub fn mk_choice(
         &self,
         true_subtree: Rc<BDD<S>>,
         symbol: S,
         false_subtree: Rc<BDD<S>>,
     ) -> Rc<BDD<S>> {
-        let ins = Rc::new(BDD::Choice(true_subtree, symbol, false_subtree));
+        // early simplification step
+        let ins = self.simplify(&Rc::new(BDD::Choice(true_subtree, symbol, false_subtree)));
 
-        self.nodes
-            .borrow_mut()
-            .insert(ins.as_ref().clone(), Rc::clone(&ins));
-
-        self.simplify(&self.find(&ins))
+        if self.nodes.borrow().contains_key(&ins) {
+            self.find(&ins)
+        } else {
+            // only insert if it is not already in the lookup table
+            self.nodes.borrow_mut().insert(ins.as_ref().clone(), Rc::clone(&ins));
+            Rc::clone(&ins)
+        }
     }
 
+    // find the true or false node in the lookup table and return a reference to it
     pub fn mk_const(&self, v: bool) -> Rc<BDD<S>> {
         if v {
             Rc::clone(self.nodes.borrow().get(&BDD::True).unwrap())
@@ -142,6 +151,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
+    // find an equivalent subtree in the lookup table and return a reference to it
     pub fn find(&self, r: &Rc<BDD<S>>) -> Rc<BDD<S>> {
         Rc::clone(self.nodes.borrow().get(r.as_ref()).unwrap())
     }
@@ -157,6 +167,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
+    // conjunction
     pub fn and(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match (a.as_ref(), b.as_ref()) {
             (&BDD::False, _) | (_, &BDD::False) => self.mk_const(false),
@@ -185,6 +196,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
+    // if a then b
     pub fn implies(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match (a.as_ref(), b.as_ref()) {
             (&BDD::False, _) | (_, &BDD::True) => self.mk_const(true),
@@ -233,14 +245,17 @@ impl<S: BDDSymbol> BDDEnv<S> {
         )
     }
 
+    // negation
     pub fn not(&self, a: Rc<BDD<S>>) -> Rc<BDD<S>> {
         self.implies(a, self.mk_const(false))
     }
 
+    // disjunction
     pub fn or(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         self.not(self.and(self.not(a), self.not(b)))
     }
 
+    // exclusive disjunction
     pub fn xor(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         self.or(
             self.and(self.not(Rc::clone(&a)), Rc::clone(&b)),
@@ -325,6 +340,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
+    // forall quantification
     pub fn all(&self, s: S, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         self.not(self.exists(s, self.not(b)))
     }
@@ -374,6 +390,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
+    // simplify removes a choice node if both subtrees are equivalent
     pub fn simplify(&self, a: &Rc<BDD<S>>) -> Rc<BDD<S>> {
         let result = match a.as_ref() {
             &BDD::Choice(ref t, _, ref f) if t.as_ref() == f.as_ref() => t,
