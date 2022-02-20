@@ -12,7 +12,7 @@ use std::string::String;
 use std::vec::Vec;
 
 lazy_static! {
-    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+|>=|=|>|<|\[|\]|,|\(|\))|(?P<countable>\d+)|(?P<identifier>\w+)|(?P<eof>$)"#).unwrap();
+    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+|>=|=|>|<|\[|\]|,|\(|\))|(?P<countable>\d+)|(?P<identifier>\w+)|(?P<comment>"[^"]*")|(?P<eof>$)"#).unwrap();
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -416,6 +416,8 @@ impl SymbolicBDD {
                 result.push(SymbolicBDDToken::Countable(parsed_number));
             } else if let Some(_) = c.name("eof") {
                 result.push(SymbolicBDDToken::Eof);
+            } else if let Some(_) = c.name("comment") {
+                // ignore comments
             } else {
                 return Err(io::Error::new(io::ErrorKind::InvalidData, "Unknown token"));
             }
