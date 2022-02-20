@@ -11,11 +11,6 @@ type BDD = bdd::BDD<usize>;
 // try and check whether we can find nodes with the same hash, but are not equal
 #[test]
 fn test_duplicates() {
-    let n = 3;
-    let k = 1;
-
-    let vars: Vec<usize> = (0..n).collect();
-
     let e = BDDEnv::new();
 
     let n = 5;
