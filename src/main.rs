@@ -18,6 +18,7 @@ fn main() {
         (@arg show_truth_table: -t --truthtable !takes_value "print the truth-table to stdout")
         (@arg show_dot: -d --dot +takes_value "write the bdd to a dot graphviz file")
         (@arg model: -m --model !takes_value "use a model of the bdd as output (instead of the satisfying assignment)")
+        (@arg expect: -e --expect +takes_value "only show true or false entries in the truth-table")
     )
     .get_matches();
 
@@ -34,6 +35,12 @@ fn main() {
         }
 
         if args.is_present("show_truth_table") {
+            let filter = match args.value_of("expect") {
+                Some("true") => TruthTableEntry::True,
+                Some("false") => TruthTableEntry::False,
+                _ => TruthTableEntry::Any,
+            };
+
             println!("{:?}", input_parsed.vars);
             print_truth_table_recursive(
                 &result,
@@ -43,6 +50,7 @@ fn main() {
                     .map(|_| TruthTableEntry::Any)
                     .collect(),
                 &input_parsed,
+                filter,
             );
         }
 
@@ -60,7 +68,7 @@ fn main() {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum TruthTableEntry {
     True,
     False,
@@ -71,19 +79,23 @@ fn print_truth_table_recursive(
     root: &Rc<BDD<usize>>,
     vars: Vec<TruthTableEntry>,
     e: &ParsedFormula,
+    filter: TruthTableEntry,
 ) {
     match root.as_ref() {
         BDD::Choice(ref l, s, ref r) => {
             // first visit the false subtree
             let mut r_vars = vars.clone();
             r_vars[*s] = TruthTableEntry::False;
-            print_truth_table_recursive(r, r_vars, e);
+            print_truth_table_recursive(r, r_vars, e, filter.clone());
 
             // then visit the true subtree
             let mut l_vars = vars.clone();
             l_vars[*s] = TruthTableEntry::True;
-            print_truth_table_recursive(l, l_vars, e);
+            print_truth_table_recursive(l, l_vars, e, filter.clone());
         }
-        c => println!("{:?} {:?}", vars, c),
+        c if filter == TruthTableEntry::Any => println!("{:?} {:?}", vars, c),
+        c if filter == TruthTableEntry::True && *c == BDD::True => println!("{:?} {:?}", vars, c),
+        c if filter == TruthTableEntry::False && *c == BDD::False => println!("{:?} {:?}", vars, c),
+        _ => {}
     }
 }
