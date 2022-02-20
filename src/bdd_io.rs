@@ -5,6 +5,7 @@ use itertools::Itertools;
 use std::borrow::Cow;
 use std::io::Write;
 use std::rc::Rc;
+use std::io;
 
 // todo: currently the filter step: find a similar node in the environment, and filter duplicates reduces the graph significantly
 // this should be done during the bdd computation instead (but how?)
@@ -18,8 +19,8 @@ pub struct BDDGraph<S: BDDSymbol> {
 }
 
 impl<S: BDDSymbol> BDDGraph<S> {
-    pub fn render_dot<W: Write>(&self, writer: &mut W) {
-        dot::render(self, writer).unwrap()
+    pub fn render_dot<W: Write>(&self, writer: &mut W) -> io::Result<()> {
+        dot::render(self, writer)
     }
 
     pub fn new(env: &Rc<BDDEnv<S>>, root: &Rc<BDD<S>>) -> Self {

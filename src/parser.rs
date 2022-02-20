@@ -57,7 +57,7 @@ pub enum SymbolicBDD {
 pub struct ParsedFormula {
     pub vars: Vec<String>,
     pub bdd: SymbolicBDD,
-    env: RefCell<BDDEnv<usize>>,
+    pub env: RefCell<BDDEnv<usize>>,
 }
 
 type TokenReader<'a> = Peekable<Iter<'a, SymbolicBDDToken>>;

@@ -19,6 +19,7 @@ fn main() {
         (@arg input: -i --input +takes_value "logic input file")
         (@arg show_parsetree: -p --parsetree +takes_value "write the parse tree in dot format to this file")
         (@arg show_truth_table: -t --truthtable !takes_value "print the truth-table to stdout")
+        (@arg show_dot: -d --dot +takes_value "write the bdd to a dot graphviz file")
     )
     .get_matches();
 
@@ -32,6 +33,14 @@ fn main() {
         if args.is_present("show_truth_table") {
             println!("{:?}", input_parsed.vars);
             print_truth_table_recursive(&result, input_parsed.vars.iter().map(|_| TruthTableEntry::Any).collect(), &input_parsed);
+        }
+
+        if let Some(dot_filename) = args.value_of("show_dot") {
+            let mut f = File::create(dot_filename).expect("Could not create dot file");
+
+            let graph = BDDGraph::new(&Rc::new(input_parsed.env.borrow().clone()), &result);
+
+            graph.render_dot(&mut f).expect("Could not write BDD to dot file");
         }
     } else {
         println!("No input file specified");
