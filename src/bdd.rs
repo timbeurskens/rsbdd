@@ -290,9 +290,10 @@ impl<S: BDDSymbol> BDDEnv<S> {
             let first = &branches[0];
             let remainder = branches[1..].to_vec();
 
-            self.and(
-                self.implies(Rc::clone(&first), self.aln(&remainder, n - 1)),
-                self.implies(self.not(Rc::clone(&first)), self.aln(&remainder, n)),
+            self.ite(
+                Rc::clone(first),
+                self.aln(&remainder, n - 1),
+                self.aln(&remainder, n),
             )
         }
     }
@@ -308,15 +309,58 @@ impl<S: BDDSymbol> BDDEnv<S> {
             let first = &branches[0];
             let remainder = branches[1..].to_vec();
 
-            self.and(
-                self.implies(Rc::clone(&first), self.amn(&remainder, n - 1)),
-                self.implies(self.not(Rc::clone(&first)), self.amn(&remainder, n)),
+            self.ite(
+                Rc::clone(first),
+                self.amn(&remainder, n - 1),
+                self.amn(&remainder, n),
             )
         }
     }
 
     pub fn exn(&self, branches: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
         self.and(self.amn(branches, n), self.aln(branches, n))
+    }
+
+    pub fn count_leq(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>) -> Rc<BDD<S>> {
+        self.count_leq_recursive(a, b, 0)
+    }
+
+    fn count_leq_recursive(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
+        if a.len() == 0 {
+            self.aln(b, n)
+        } else {
+            let first = &a[0];
+            let remainder = a[1..].to_vec();
+
+            self.ite(
+                Rc::clone(first),
+                self.count_leq_recursive(&remainder, b, n+1),
+                self.count_leq_recursive(&remainder, b, n),
+            )
+        }
+    }
+
+    pub fn count_geq(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>) -> Rc<BDD<S>> {
+        self.count_geq_recursive(a, b, 0)
+    }
+
+    fn count_geq_recursive(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
+        if a.len() == 0 {
+            self.amn(b, n)
+        } else {
+            let first = &a[0];
+            let remainder = a[1..].to_vec();
+
+            self.ite(
+                Rc::clone(first),
+                self.count_geq_recursive(&remainder, b, n+1),
+                self.count_geq_recursive(&remainder, b, n),
+            )
+        }
+    }
+
+    pub fn count_eq(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>) -> Rc<BDD<S>> {
+        self.and(self.count_leq(a, b), self.count_geq(a, b))
     }
 
     /// existential quantification

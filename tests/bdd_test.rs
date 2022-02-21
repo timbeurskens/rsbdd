@@ -380,6 +380,15 @@ fn test_aln_model() {
 }
 
 #[test]
+fn test_count_geq_leq_eq() {
+    let e = BDDEnv::new();
+    assert_eq!(*e.count_eq(&vec![], &vec![]).as_ref(), BDD::True);
+    assert_eq!(*e.count_eq(&vec![e.var(0)], &vec![e.var(0)]).as_ref(), BDD::True);
+    assert_eq!(e.count_eq(&vec![e.var(0)], &vec![]), e.not(e.var(0)));
+    assert_eq!(e.count_eq(&vec![e.var(0)], &vec![e.var(1)]), e.eq(e.var(0), e.var(1)));
+}
+
+#[test]
 fn test_queens() {
     let e = BDDEnv::new();
 
