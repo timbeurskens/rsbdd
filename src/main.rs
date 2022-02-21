@@ -76,7 +76,7 @@ enum TruthTableEntry {
 }
 
 fn print_truth_table_recursive(
-    root: &Rc<BDD<usize>>,
+    root: &Rc<BDD<NamedSymbol>>,
     vars: Vec<TruthTableEntry>,
     e: &ParsedFormula,
     filter: TruthTableEntry,
@@ -85,12 +85,12 @@ fn print_truth_table_recursive(
         BDD::Choice(ref l, s, ref r) => {
             // first visit the false subtree
             let mut r_vars = vars.clone();
-            r_vars[*s] = TruthTableEntry::False;
+            r_vars[s.id] = TruthTableEntry::False;
             print_truth_table_recursive(r, r_vars, e, filter.clone());
 
             // then visit the true subtree
             let mut l_vars = vars.clone();
-            l_vars[*s] = TruthTableEntry::True;
+            l_vars[s.id] = TruthTableEntry::True;
             print_truth_table_recursive(l, l_vars, e, filter.clone());
         }
         c if filter == TruthTableEntry::Any => println!("{:?} {:?}", vars, c),

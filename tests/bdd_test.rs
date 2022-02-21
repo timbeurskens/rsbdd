@@ -131,6 +131,26 @@ fn test_fixedpoint() {
 }
 
 #[test]
+fn test_implication_biimplication() {
+    let e = BDDEnv::new();
+
+    assert_eq!(
+        e.implies(e.var(0), e.var(1)),
+        e.or(e.not(e.var(0)), e.var(1))
+    );
+
+    assert_eq!(
+        e.eq(e.var(0), e.var(1)),
+        e.and(e.implies(e.var(0), e.var(1)), e.implies(e.var(1), e.var(0)))
+    );
+
+    assert_eq!(
+        e.eq(e.var(0), e.var(1)),
+        e.and(e.or(e.not(e.var(0)), e.var(1)), e.or(e.not(e.var(1)), e.var(0)))
+    );
+}
+
+#[test]
 fn test_ite() {
     let e = BDDEnv::new();
 
