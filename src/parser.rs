@@ -564,37 +564,3 @@ fn check(token: SymbolicBDDToken, tokens: &mut TokenReader) -> io::Result<()> {
         )),
     }
 }
-
-// syntax:
-// a
-// a & b
-// a | b
-// a and b
-// a or b
-// a => b
-// a <=> b
-// !a
-// not a
-// a & !b
-// !a & b
-// !a & !b
-// (a & b) | c
-// (a & b) | (c & d)
-// (a & b) | (c & d) | e
-// a | b | c
-// a & b & c
-// a => b => c == (a => (b => c))
-// ((a)) == a
-//
-// quantifiers:
-// exists a # a & b & all c # c & b
-// all a # true
-// forall a # true
-//
-// countable:
-// at least 2 from a, b, c:
-// [a, b, c] > 2
-// at most 1 from a, b, c:
-// [a, b, c] < 1
-// exactly 2 from a, b, c:
-// [a, b, c] = 2
