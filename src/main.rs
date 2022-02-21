@@ -1,6 +1,7 @@
 use rsbdd::bdd::*;
 use rsbdd::bdd_io::*;
 use rsbdd::parser::*;
+use rsbdd::parser_io::*;
 use std::fs::File;
 use std::io::BufReader;
 use std::rc::Rc;
@@ -27,6 +28,17 @@ fn main() {
 
         let input_parsed = ParsedFormula::new(&mut BufReader::new(input_file))
             .expect("Could not parse input file");
+
+        if let Some(parsetree_filename) = args.value_of("show_parsetree") {
+            let mut f =
+                File::create(parsetree_filename).expect("Could not create parsetree dot file");
+
+            let graph = SymbolicParseTree::new(&input_parsed.bdd);
+
+            graph
+                .render_dot(&mut f)
+                .expect("Could not write parsetree to dot file");
+        }
 
         let mut result = input_parsed.eval();
 
@@ -76,7 +88,7 @@ enum TruthTableEntry {
 }
 
 fn print_truth_table_recursive(
-    root: &Rc<BDD<usize>>,
+    root: &Rc<BDD<NamedSymbol>>,
     vars: Vec<TruthTableEntry>,
     e: &ParsedFormula,
     filter: TruthTableEntry,
@@ -85,12 +97,12 @@ fn print_truth_table_recursive(
         BDD::Choice(ref l, s, ref r) => {
             // first visit the false subtree
             let mut r_vars = vars.clone();
-            r_vars[*s] = TruthTableEntry::False;
+            r_vars[s.id] = TruthTableEntry::False;
             print_truth_table_recursive(r, r_vars, e, filter.clone());
 
             // then visit the true subtree
             let mut l_vars = vars.clone();
-            l_vars[*s] = TruthTableEntry::True;
+            l_vars[s.id] = TruthTableEntry::True;
             print_truth_table_recursive(l, l_vars, e, filter.clone());
         }
         c if filter == TruthTableEntry::Any => println!("{:?} {:?}", vars, c),

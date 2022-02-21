@@ -131,6 +131,29 @@ fn test_fixedpoint() {
 }
 
 #[test]
+fn test_implication_biimplication() {
+    let e = BDDEnv::new();
+
+    assert_eq!(
+        e.implies(e.var(0), e.var(1)),
+        e.or(e.not(e.var(0)), e.var(1))
+    );
+
+    assert_eq!(
+        e.eq(e.var(0), e.var(1)),
+        e.and(e.implies(e.var(0), e.var(1)), e.implies(e.var(1), e.var(0)))
+    );
+
+    assert_eq!(
+        e.eq(e.var(0), e.var(1)),
+        e.and(
+            e.or(e.not(e.var(0)), e.var(1)),
+            e.or(e.not(e.var(1)), e.var(0))
+        )
+    );
+}
+
+#[test]
 fn test_ite() {
     let e = BDDEnv::new();
 
@@ -377,6 +400,38 @@ fn test_aln_model() {
             assert!(count >= c);
         }
     }
+}
+
+#[test]
+fn test_count_geq_leq_eq() {
+    let e = BDDEnv::new();
+    assert_eq!(e.count_eq(&vec![], &vec![]), e.mk_const(true));
+
+    assert_eq!(
+        e.count_eq(&vec![e.var(0)], &vec![e.var(0)]),
+        e.mk_const(true)
+    );
+
+    assert_eq!(e.count_eq(&vec![e.var(0)], &vec![]), e.not(e.var(0)));
+
+    assert_eq!(
+        e.count_eq(&vec![e.var(0)], &vec![e.var(1)]),
+        e.eq(e.var(0), e.var(1))
+    );
+
+    assert_eq!(
+        e.count_eq(&vec![e.var(0), e.var(1)], &vec![e.var(1), e.var(0)]),
+        e.mk_const(true)
+    );
+
+    assert_eq!(e.count_leq(&vec![], &vec![]), e.mk_const(true));
+    assert_eq!(e.count_leq(&vec![], &vec![e.var(0)]), e.mk_const(true));
+    assert_eq!(e.count_leq(&vec![e.var(0)], &vec![]), e.not(e.var(0)));
+
+    assert_eq!(e.count_geq(&vec![], &vec![]), e.mk_const(true));
+    assert_eq!(e.count_geq(&vec![e.var(0)], &vec![]), e.mk_const(true));
+
+    assert_eq!(e.count_geq(&vec![], &vec![e.var(0)]), e.not(e.var(0)));
 }
 
 #[test]
