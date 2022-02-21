@@ -45,15 +45,15 @@ RsBDD supports the most common, and some uncommon binary operators, such as conj
 
 Most operators have a symbolic and textual representation, e.g. `and` or `&`.
 
-| Operator           | Option 1    | Option 2 |
-|--------------------|-------------|----------|
-| Conjunction        | `and`       | `&`      |
-| Disjunction        | `or`        | `\|`     |
-| Implication        | `implies`   | `=>`     |
-| Bi-implication     | `biimplies` | `<=>`    |
-| Exlusive or        | `xor`       | `^`      |
-| Joint denial       | `nor`       | N.A.     |
-| Alternative denial | `nand`      | N.A.     |
+| Operator           | Option 1      | Option 2 |
+|--------------------|---------------|----------|
+| Conjunction        | `and`         | `&`      |
+| Disjunction        | `or`          | `\|`     |
+| Implication        | `implies`     | `=>`     |
+| Bi-implication     | `iff` or `eq` | `<=>`    |
+| Exlusive or        | `xor`         | `^`      |
+| Joint denial       | `nor`         | N.A.     |
+| Alternative denial | `nand`        | N.A.     |
 
 ```
 true or false
