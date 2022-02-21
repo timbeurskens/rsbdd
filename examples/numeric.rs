@@ -22,9 +22,9 @@ fn main() {
     let ft = e.and(f1, e.and(f2, f3));
 
     let g1 = e.exists(
-        0,
+        vec![0],
         e.exists(
-            1,
+            vec![1],
             e.and(
                 e.eq(x.clone(), z.clone()),
                 e.and(e.eq(y.clone(), w.clone()), e.or(z.clone(), w.clone())),
