@@ -13,7 +13,7 @@ pub struct SymbolicParseTree {
 }
 
 type GraphNode = usize;
-type GraphEdge = (usize, usize);
+type GraphEdge = (usize, String, usize);
 
 impl SymbolicParseTree {
     pub fn render_dot<W: Write>(&self, writer: &mut W) -> io::Result<()> {
@@ -88,17 +88,21 @@ impl<'a> dot::Labeller<'a, GraphNode, GraphEdge> for SymbolicParseTree {
     fn node_label(&self, n: &GraphNode) -> dot::LabelText<'a> {
         match self.nodes[*n].as_ref() {
             SymbolicBDD::BinaryOp(ref op, _, _) => dot::LabelText::label(format!("{:?}", op)),
-            SymbolicBDD::Exists(ref v, _) => dot::LabelText::label(format!("exists {}", v)),
-            SymbolicBDD::Forall(ref v, _) => dot::LabelText::label(format!("forall {}", v)),
-            SymbolicBDD::Not(_) => dot::LabelText::label("not".to_string()),
+            SymbolicBDD::Exists(ref v, _) => dot::LabelText::label(format!("Exists {}", v)),
+            SymbolicBDD::Forall(ref v, _) => dot::LabelText::label(format!("Forall {}", v)),
+            SymbolicBDD::Not(_) => dot::LabelText::label("Not".to_string()),
             SymbolicBDD::CountableConst(ref v, _, _) => dot::LabelText::label(format!("{:?}", v)),
             SymbolicBDD::CountableVariable(ref v, _, _) => {
                 dot::LabelText::label(format!("{:?}", v))
             }
-            SymbolicBDD::False => dot::LabelText::label("false".to_string()),
-            SymbolicBDD::True => dot::LabelText::label("true".to_string()),
-            SymbolicBDD::Var(v) => dot::LabelText::label(format!("{}", v)),
+            SymbolicBDD::False => dot::LabelText::label("False".to_string()),
+            SymbolicBDD::True => dot::LabelText::label("True".to_string()),
+            SymbolicBDD::Var(v) => dot::LabelText::label(format!("Var {}", v)),
         }
+    }
+
+    fn edge_label(&self, e: &GraphEdge) -> dot::LabelText<'a> {
+        dot::LabelText::label(e.1.clone())
     }
 }
 
@@ -108,21 +112,34 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
     }
 
     fn edges(&self) -> dot::Edges<'a, GraphEdge> {
-        let mut edges = Vec::new();
+        let mut edges: Vec<GraphEdge> = Vec::new();
 
         for (i, node) in self.nodes.iter().enumerate() {
             match node.as_ref() {
                 SymbolicBDD::BinaryOp(_, l, r) => {
-                    edges.push((i, self.nodes.iter().position(|n| n == l).unwrap()));
-                    edges.push((i, self.nodes.iter().position(|n| n == r).unwrap()));
+                    edges.push((
+                        i,
+                        "l".to_string(),
+                        self.nodes.iter().position(|n| n == l).unwrap(),
+                    ));
+                    edges.push((
+                        i,
+                        "r".to_string(),
+                        self.nodes.iter().position(|n| n == r).unwrap(),
+                    ));
                 }
                 SymbolicBDD::Exists(_, f) | SymbolicBDD::Forall(_, f) | SymbolicBDD::Not(f) => {
-                    edges.push((i, self.nodes.iter().position(|n| n == f).unwrap()));
+                    edges.push((
+                        i,
+                        "".to_string(),
+                        self.nodes.iter().position(|n| n == f).unwrap(),
+                    ));
                 }
                 SymbolicBDD::CountableConst(_, f, _) => {
-                    for subtree in f {
+                    for (j, subtree) in f.iter().enumerate() {
                         edges.push((
                             i,
+                            format!("{}", j),
                             self.nodes
                                 .iter()
                                 .position(|n| n.as_ref() == subtree)
@@ -131,18 +148,20 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                     }
                 }
                 SymbolicBDD::CountableVariable(_, a, b) => {
-                    for subtree in a {
+                    for (j, subtree) in a.iter().enumerate() {
                         edges.push((
                             i,
+                            format!("l_{}", j),
                             self.nodes
                                 .iter()
                                 .position(|n| n.as_ref() == subtree)
                                 .unwrap(),
                         ));
                     }
-                    for subtree in b {
+                    for (j, subtree) in b.iter().enumerate() {
                         edges.push((
                             i,
+                            format!("r_{}", j),
                             self.nodes
                                 .iter()
                                 .position(|n| n.as_ref() == subtree)
@@ -162,6 +181,6 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
     }
 
     fn target(&self, e: &GraphEdge) -> GraphNode {
-        e.1
+        e.2
     }
 }
