@@ -114,10 +114,35 @@ fn test_combined() {
 fn test_quantifiers() {
     let e = BDDEnv::new();
 
-    assert_eq!(e.exists(0, e.or(e.var(0), e.var(1))), e.mk_const(true));
-    assert_eq!(e.all(0, e.var(0)), e.mk_const(false));
-    assert_eq!(e.all(0, e.mk_const(true)), e.mk_const(true));
-    assert_eq!(e.exists(0, e.mk_const(false)), e.mk_const(false));
+    assert_eq!(
+        e.exists(vec![0], e.or(e.var(0), e.var(1))),
+        e.mk_const(true)
+    );
+    assert_eq!(e.all(vec![0], e.var(0)), e.mk_const(false));
+    assert_eq!(e.all(vec![0], e.mk_const(true)), e.mk_const(true));
+    assert_eq!(e.exists(vec![0], e.mk_const(false)), e.mk_const(false));
+}
+
+#[test]
+fn test_quantifier_lists() {
+    let e = BDDEnv::new();
+
+    assert_eq!(
+        e.exists(vec![0, 1], e.var(2)),
+        e.exists(vec![0], e.exists(vec![1], e.var(2)))
+    );
+    assert_eq!(
+        e.exists(vec![0, 1], e.var(1)),
+        e.exists(vec![0], e.exists(vec![1], e.var(1)))
+    );
+    assert_eq!(
+        e.all(vec![0, 1], e.var(1)),
+        e.all(vec![0], e.all(vec![1], e.var(1)))
+    );
+    assert_eq!(
+        e.all(vec![0, 1], e.var(1)),
+        e.all(vec![0], e.all(vec![1], e.var(1)))
+    );
 }
 
 #[test]
@@ -258,11 +283,11 @@ fn test_amn_quantifiers() {
     assert_eq!(
         e.amn(&vec![0, 1, 2].iter().map(|&i| e.var(i)).collect(), 2),
         e.exists(
-            3,
+            vec![3],
             e.exists(
-                4,
+                vec![4],
                 e.exists(
-                    5,
+                    vec![5],
                     e.and(
                         e.eq(e.var(0), e.var(3)),
                         e.and(

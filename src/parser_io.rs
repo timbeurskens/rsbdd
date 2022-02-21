@@ -33,7 +33,7 @@ impl SymbolicParseTree {
                     .chain(this_node)
                     .collect()
             }
-            SymbolicBDD::Exists(_, f) | SymbolicBDD::Forall(_, f) | SymbolicBDD::Not(f) => {
+            SymbolicBDD::Quantifier(_, _, f) | SymbolicBDD::Not(f) => {
                 let new_nodes = SymbolicParseTree::nodes_recursive(f);
 
                 new_nodes.into_iter().chain(this_node).collect()
@@ -87,8 +87,9 @@ impl<'a> dot::Labeller<'a, GraphNode, GraphEdge> for SymbolicParseTree {
     fn node_label(&self, n: &GraphNode) -> dot::LabelText<'a> {
         match self.nodes[*n].as_ref() {
             SymbolicBDD::BinaryOp(ref op, _, _) => dot::LabelText::label(format!("{:?}", op)),
-            SymbolicBDD::Exists(ref v, _) => dot::LabelText::label(format!("Exists {}", v)),
-            SymbolicBDD::Forall(ref v, _) => dot::LabelText::label(format!("Forall {}", v)),
+            SymbolicBDD::Quantifier(op, ref v, _) => {
+                dot::LabelText::label(format!("{:?} {:?}", op, v))
+            }
             SymbolicBDD::Not(_) => dot::LabelText::label("Not".to_string()),
             SymbolicBDD::CountableConst(ref v, _, n) => {
                 dot::LabelText::label(format!("{:?} {}", v, n))
@@ -129,7 +130,7 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                         self.nodes.iter().position(|n| n == r).unwrap(),
                     ));
                 }
-                SymbolicBDD::Exists(_, f) | SymbolicBDD::Forall(_, f) | SymbolicBDD::Not(f) => {
+                SymbolicBDD::Quantifier(_, _, f) | SymbolicBDD::Not(f) => {
                     edges.push((
                         i,
                         "".to_string(),

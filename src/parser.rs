@@ -67,13 +67,18 @@ pub enum CountableOperator {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum QuantifierType {
+    Exists,
+    Forall,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SymbolicBDD {
     False,
     True,
     Var(String),
     Not(Box<SymbolicBDD>),
-    Exists(String, Box<SymbolicBDD>),
-    Forall(String, Box<SymbolicBDD>),
+    Quantifier(QuantifierType, Vec<String>, Box<SymbolicBDD>),
     CountableConst(CountableOperator, Vec<SymbolicBDD>, usize),
     CountableVariable(CountableOperator, Vec<SymbolicBDD>, Vec<SymbolicBDD>),
     BinaryOp(BinaryOperator, Box<SymbolicBDD>, Box<SymbolicBDD>),
@@ -120,14 +125,14 @@ impl ParsedFormula {
             SymbolicBDD::True => self.env.borrow().mk_const(true),
             SymbolicBDD::Var(v) => self.env.borrow().var(self.name2var(v)),
             SymbolicBDD::Not(b) => self.env.borrow().not(self.eval_recursive(b)),
-            SymbolicBDD::Exists(v, b) => self
-                .env
-                .borrow()
-                .exists(self.name2var(v), self.eval_recursive(b)),
-            SymbolicBDD::Forall(v, b) => self
-                .env
-                .borrow()
-                .all(self.name2var(v), self.eval_recursive(b)),
+            SymbolicBDD::Quantifier(QuantifierType::Exists, v, b) => self.env.borrow().exists(
+                v.into_iter().map(|i| self.name2var(i)).collect(),
+                self.eval_recursive(b),
+            ),
+            SymbolicBDD::Quantifier(QuantifierType::Forall, v, b) => self.env.borrow().all(
+                v.into_iter().map(|i| self.name2var(i)).collect(),
+                self.eval_recursive(b),
+            ),
             SymbolicBDD::CountableConst(op, bs, n) => {
                 let branches = bs.iter().map(|b| self.eval_recursive(b)).collect();
 
@@ -216,9 +221,8 @@ impl SymbolicBDD {
                 expect(SymbolicBDDToken::True, tokens)?;
                 SymbolicBDD::True
             }
-            Some(SymbolicBDDToken::Var(var)) => {
-                expect(SymbolicBDDToken::Var(var.clone()), tokens)?;
-                SymbolicBDD::Var(var.clone())
+            Some(SymbolicBDDToken::Var(_)) => {
+                SymbolicBDD::Var(SymbolicBDD::parse_variable_name(tokens)?)
             }
             Some(SymbolicBDDToken::Not) => SymbolicBDD::parse_negation(tokens)?,
             Some(SymbolicBDDToken::Exists) => SymbolicBDD::parse_existence_quantifier(tokens)?,
@@ -319,38 +323,66 @@ impl SymbolicBDD {
         }
     }
 
-    fn parse_existence_quantifier(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
-        expect(SymbolicBDDToken::Exists, tokens)?;
-        let var = match tokens.next() {
-            Some(SymbolicBDDToken::Var(var)) => var,
+    fn parse_variable_name(tokens: &mut TokenReader) -> io::Result<String> {
+        match tokens.next() {
+            Some(SymbolicBDDToken::Var(var)) => Ok(var.clone()),
             other => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     format!("Expected variable, got {:?}", other),
                 ))
             }
-        };
+        }
+    }
+
+    fn parse_variable_list(tokens: &mut TokenReader) -> io::Result<Vec<String>> {
+        let mut vars = Vec::new();
+
+        loop {
+            if check(SymbolicBDDToken::Hash, tokens).is_err() {
+                vars.push(SymbolicBDD::parse_variable_name(tokens)?);
+
+                // if no comma is found after the variable, the list should end with a closing hash
+                if check(SymbolicBDDToken::Comma, tokens).is_err() {
+                    break;
+                } else {
+                    // otherwise expect a comma
+                    expect(SymbolicBDDToken::Comma, tokens)?;
+                }
+            } else {
+                break;
+            }
+        }
+
+        Ok(vars)
+    }
+
+    fn parse_existence_quantifier(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
+        expect(SymbolicBDDToken::Exists, tokens)?;
+        let vars = SymbolicBDD::parse_variable_list(tokens)?;
+
         expect(SymbolicBDDToken::Hash, tokens)?;
         let formula = SymbolicBDD::parse_sub_formula(tokens)?;
 
-        Ok(SymbolicBDD::Exists(var.clone(), Box::new(formula)))
+        Ok(SymbolicBDD::Quantifier(
+            QuantifierType::Exists,
+            vars,
+            Box::new(formula),
+        ))
     }
 
     fn parse_universal_quantifier(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
         expect(SymbolicBDDToken::Forall, tokens)?;
-        let var = match tokens.next() {
-            Some(SymbolicBDDToken::Var(var)) => var,
-            other => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Expected variable, got {:?}", other),
-                ))
-            }
-        };
+        let vars = SymbolicBDD::parse_variable_list(tokens)?;
+
         expect(SymbolicBDDToken::Hash, tokens)?;
         let formula = SymbolicBDD::parse_sub_formula(tokens)?;
 
-        Ok(SymbolicBDD::Forall(var.clone(), Box::new(formula)))
+        Ok(SymbolicBDD::Quantifier(
+            QuantifierType::Forall,
+            vars,
+            Box::new(formula),
+        ))
     }
 
     fn parse_binary_operator(tokens: &mut TokenReader) -> io::Result<BinaryOperator> {
