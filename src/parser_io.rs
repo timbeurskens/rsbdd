@@ -60,7 +60,16 @@ impl SymbolicParseTree {
 
                 new_nodes
             }
-            other => vec![Box::new(other.clone())],
+            SymbolicBDD::Ite(c, t, e) => {
+                let mut new_nodes: Vec<Box<SymbolicBDD>> = this_node;
+
+                new_nodes.extend(SymbolicParseTree::nodes_recursive(c).into_iter());
+                new_nodes.extend(SymbolicParseTree::nodes_recursive(t).into_iter());
+                new_nodes.extend(SymbolicParseTree::nodes_recursive(e).into_iter());
+
+                new_nodes
+            }
+            _ => this_node,
         }
     }
 
@@ -97,6 +106,7 @@ impl<'a> dot::Labeller<'a, GraphNode, GraphEdge> for SymbolicParseTree {
             SymbolicBDD::CountableVariable(ref v, _, _) => {
                 dot::LabelText::label(format!("{:?}", v))
             }
+            SymbolicBDD::Ite(_, _, _) => dot::LabelText::label("Ite".to_string()),
             SymbolicBDD::False => dot::LabelText::label("False".to_string()),
             SymbolicBDD::True => dot::LabelText::label("True".to_string()),
             SymbolicBDD::Var(v) => dot::LabelText::label(format!("Var {}", v)),
@@ -170,6 +180,23 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                                 .unwrap(),
                         ));
                     }
+                }
+                SymbolicBDD::Ite(c, t, e) => {
+                    edges.push((
+                        i,
+                        "If".to_string(),
+                        self.nodes.iter().position(|n| n == c).unwrap(),
+                    ));
+                    edges.push((
+                        i,
+                        "Then".to_string(),
+                        self.nodes.iter().position(|n| n == t).unwrap(),
+                    ));
+                    edges.push((
+                        i,
+                        "Else".to_string(),
+                        self.nodes.iter().position(|n| n == e).unwrap(),
+                    ));
                 }
                 _ => {}
             }
