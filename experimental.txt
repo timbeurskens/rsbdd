@@ -1,0 +1,42 @@
+"
+compare countables:
+
+it could be desirable to express the following property:
+
+the number of satisfying assignments in a is less than or equal to the number of satisfying assignments in b.
+"
+
+[a, b, c, d] <= [e, f, g, h, i]
+
+"
+we could implement this by running the amn/aln/exn algorithm within a variation of amn/aln/exn on one of the groups.
+"
+
+"some properties:"
+[] = [] equals true
+[a] = [] equals !a
+[a] = [b] equals a <=> b
+[a, b, c] = [a, b, c] equals true
+
+"
+function rewriting:
+
+similar to prover9 and other theorem provers, it would be nice to express rewrite rules in this syntax.
+"
+
+"Alice and Bob are persons"
+is_person(Alice) -> true
+is_person(Bob) -> true
+
+
+"p lives in house A if p is a person, and p is Alice"
+forall p # person_lives_in(p, House_A) -> ( is_person(p) => p = Alice )
+
+"no person lives in house B"
+forall p # person_lives_in(p, House_B) -> is_person(p) => false
+
+"a person can only live in one house (or: a person lives in a house if it does not live in another house)"
+forall p # forall h # person_lives_in(p, h) -> (is_person(p) & is_house(h)) => !exists h2 # h2 != h & person_lives_in(p, h2)
+
+"now the following should rewrite to true:"
+person_lives_in(Alice, House_B) | person_lives_in(Alice, House_A)
