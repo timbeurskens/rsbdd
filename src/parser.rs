@@ -1,4 +1,4 @@
-use crate::bdd::{BDDEnv, BDD, NamedSymbol};
+use crate::bdd::{BDDEnv, NamedSymbol, BDD};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;

@@ -2,10 +2,10 @@ use itertools::Itertools;
 use std::cell::RefCell;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::fmt;
 use std::fmt::{Debug, Display};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
-use std::fmt;
 
 pub trait BDDSymbol: Ord + Display + Debug + Clone + Hash {}
 
@@ -16,8 +16,6 @@ pub struct NamedSymbol {
     pub name: Rc<String>,
     pub id: usize,
 }
-
-// impl BDDSymbol for NamedSymbol {}
 
 impl fmt::Display for NamedSymbol {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -50,7 +48,6 @@ impl PartialOrd for NamedSymbol {
         Some(self.cmp(other))
     }
 }
-
 
 // todo: place bdd items in a collection (hashmap?)
 // when constructing a new bdd, check if it already exists in the collection.
@@ -228,7 +225,9 @@ impl<S: BDDSymbol> BDDEnv<S> {
                     vb.clone(),
                     self.and(Rc::clone(bf), Rc::clone(&a)),
                 ),
-            (&BDD::Choice(ref at, ref va, ref af), &BDD::Choice(ref bt, ref vb, ref bf)) if va == vb => {
+            (&BDD::Choice(ref at, ref va, ref af), &BDD::Choice(ref bt, ref vb, ref bf))
+                if va == vb =>
+            {
                 self.mk_choice(
                     self.and(Rc::clone(at), Rc::clone(bt)),
                     va.clone(),
@@ -261,7 +260,9 @@ impl<S: BDDSymbol> BDDEnv<S> {
                     vb.clone(),
                     self.implies(Rc::clone(bf), Rc::clone(&a)),
                 ),
-            (&BDD::Choice(ref at, ref va, ref af), &BDD::Choice(ref bt, ref vb, ref bf)) if va == vb => {
+            (&BDD::Choice(ref at, ref va, ref af), &BDD::Choice(ref bt, ref vb, ref bf))
+                if va == vb =>
+            {
                 self.mk_choice(
                     self.implies(Rc::clone(at), Rc::clone(bt)),
                     va.clone(),
