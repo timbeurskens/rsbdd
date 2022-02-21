@@ -221,7 +221,7 @@ impl SymbolicBDD {
                 expect(SymbolicBDDToken::True, tokens)?;
                 SymbolicBDD::True
             }
-            Some(SymbolicBDDToken::Var(var)) => {
+            Some(SymbolicBDDToken::Var(_)) => {
                 SymbolicBDD::Var(SymbolicBDD::parse_variable_name(tokens)?)
             }
             Some(SymbolicBDDToken::Not) => SymbolicBDD::parse_negation(tokens)?,
