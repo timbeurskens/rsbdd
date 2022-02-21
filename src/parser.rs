@@ -45,7 +45,7 @@ pub enum SymbolicBDDToken {
     Eof,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BinaryOperator {
     And,
     Or,
@@ -57,7 +57,7 @@ pub enum BinaryOperator {
     Iff,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CountableOperator {
     AtMost,
     LessThan,
@@ -66,7 +66,7 @@ pub enum CountableOperator {
     Exactly,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SymbolicBDD {
     False,
     True,
