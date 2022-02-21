@@ -26,11 +26,15 @@ Hints
 12) the owner who smokes BlueMaster drinks beer
 13) the German smokes Prince
 14) the Norwegian lives next to the blue house
-15) the man who smokes blend has a neighbor who drinks water 
+15) the man who smokes blend has a neighbor who drinks water
 
 Einstein wrote this riddle this century. He said that 98% of the world could not solve it.
 
 From: https://udel.edu/~os/riddle.html
-"
 
-true
+---
+
+In this example, some details are already extracted from the text, although they are a part of the puzzle.
+A concrete example: the domain of houses, colors, and nationalities are collected to express their constraints.
+
+"
