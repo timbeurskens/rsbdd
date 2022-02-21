@@ -50,7 +50,7 @@ impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<S>, GraphEdge<S>> for BDDGrap
         match n.as_ref() {
             &BDD::True => dot::LabelText::label("true"),
             &BDD::False => dot::LabelText::label("false"),
-            &BDD::Choice(_, v, _) => dot::LabelText::label(format!("{}", v)),
+            &BDD::Choice(_, ref v, _) => dot::LabelText::label(format!("{}", v)),
         }
     }
 
