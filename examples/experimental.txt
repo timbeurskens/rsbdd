@@ -1,4 +1,18 @@
 "
+quantifier variable lists:
+
+currently describing quantified formulas ranging over multiple variables requires a lot of syntactic overhead:
+
+forall a # forall b # forall c # a => exists d # d <=> b
+
+can be reduced to:
+
+forall a, b, c # a => exists d # d <=> b
+"
+
+(exists a,b,c # a => b => c) <=> (exists a # exists b # exists c # a => b => c)
+
+"
 function rewriting:
 
 similar to prover9 and other theorem provers, it would be nice to express rewrite rules in this syntax.
