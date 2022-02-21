@@ -1,6 +1,7 @@
 use rsbdd::bdd::*;
 use rsbdd::bdd_io::*;
 use rsbdd::parser::*;
+use rsbdd::parser_io::*;
 use std::fs::File;
 use std::io::BufReader;
 use std::rc::Rc;
@@ -27,6 +28,17 @@ fn main() {
 
         let input_parsed = ParsedFormula::new(&mut BufReader::new(input_file))
             .expect("Could not parse input file");
+
+        if let Some(parsetree_filename) = args.value_of("show_parsetree") {
+            let mut f =
+                File::create(parsetree_filename).expect("Could not create parsetree dot file");
+
+            let graph = SymbolicParseTree::new(&input_parsed.bdd);
+
+            graph
+                .render_dot(&mut f)
+                .expect("Could not write parsetree to dot file");
+        }
 
         let mut result = input_parsed.eval();
 
