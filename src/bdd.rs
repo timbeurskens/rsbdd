@@ -342,6 +342,10 @@ impl<S: BDDSymbol> BDDEnv<S> {
         self.count_leq_recursive(a, b, 0)
     }
 
+    pub fn count_lt(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>) -> Rc<BDD<S>> {
+        self.count_leq_recursive(a, b, 1)
+    }
+
     fn count_leq_recursive(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
         if a.len() == 0 {
             self.aln(b, n)
@@ -355,6 +359,10 @@ impl<S: BDDSymbol> BDDEnv<S> {
                 self.count_leq_recursive(&remainder, b, n),
             )
         }
+    }
+
+    pub fn count_gt(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>) -> Rc<BDD<S>> {
+        self.count_geq_recursive(a, b, -1)
     }
 
     pub fn count_geq(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>) -> Rc<BDD<S>> {
