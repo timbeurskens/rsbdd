@@ -1,24 +1,4 @@
 "
-compare countables:
-
-it could be desirable to express the following property:
-
-the number of satisfying assignments in a is less than or equal to the number of satisfying assignments in b.
-"
-
-[a, b, c, d] <= [e, f, g, h, i]
-
-"
-we could implement this by running the amn/aln/exn algorithm within a variation of amn/aln/exn on one of the groups.
-"
-
-"some properties:"
-[] = [] equals true
-[a] = [] equals !a
-[a] = [b] equals a <=> b
-[a, b, c] = [a, b, c] equals true
-
-"
 function rewriting:
 
 similar to prover9 and other theorem provers, it would be nice to express rewrite rules in this syntax.
