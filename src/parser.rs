@@ -28,6 +28,9 @@ pub enum SymbolicBDDToken {
     Implies,
     ImpliesInv,
     Iff,
+    If,
+    Then,
+    Else,
     Exists,
     Forall,
     Eq,
@@ -81,6 +84,7 @@ pub enum SymbolicBDD {
     Quantifier(QuantifierType, Vec<String>, Box<SymbolicBDD>),
     CountableConst(CountableOperator, Vec<SymbolicBDD>, usize),
     CountableVariable(CountableOperator, Vec<SymbolicBDD>, Vec<SymbolicBDD>),
+    Ite(Box<SymbolicBDD>, Box<SymbolicBDD>, Box<SymbolicBDD>),
     BinaryOp(BinaryOperator, Box<SymbolicBDD>, Box<SymbolicBDD>),
 }
 
@@ -166,6 +170,11 @@ impl ParsedFormula {
                     }
                 }
             }
+            SymbolicBDD::Ite(c, t, e) => self.env.borrow().ite(
+                self.eval_recursive(c),
+                self.eval_recursive(t),
+                self.eval_recursive(e),
+            ),
             SymbolicBDD::BinaryOp(op, l, r) => {
                 let l = self.eval_recursive(l);
                 let r = self.eval_recursive(r);
@@ -227,6 +236,7 @@ impl SymbolicBDD {
             Some(SymbolicBDDToken::Not) => SymbolicBDD::parse_negation(tokens)?,
             Some(SymbolicBDDToken::Exists) => SymbolicBDD::parse_existence_quantifier(tokens)?,
             Some(SymbolicBDDToken::Forall) => SymbolicBDD::parse_universal_quantifier(tokens)?,
+            Some(SymbolicBDDToken::If) => SymbolicBDD::parse_ite(tokens)?,
             None | Some(SymbolicBDDToken::Eof) => {
                 return Err(io::Error::new(io::ErrorKind::InvalidData, "Unexpected EOF"))
             }
@@ -254,6 +264,21 @@ impl SymbolicBDD {
             }
             _ => Ok(left),
         }
+    }
+
+    fn parse_ite(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
+        expect(SymbolicBDDToken::If, tokens)?;
+        let cond = SymbolicBDD::parse_sub_formula(tokens)?;
+        expect(SymbolicBDDToken::Then, tokens)?;
+        let then = SymbolicBDD::parse_sub_formula(tokens)?;
+        expect(SymbolicBDDToken::Else, tokens)?;
+        let else_ = SymbolicBDD::parse_sub_formula(tokens)?;
+
+        Ok(SymbolicBDD::Ite(
+            Box::new(cond),
+            Box::new(then),
+            Box::new(else_),
+        ))
     }
 
     fn parse_formula_list(tokens: &mut TokenReader) -> io::Result<Vec<SymbolicBDD>> {
@@ -489,6 +514,9 @@ impl SymbolicBDD {
                     "exists" => result.push(SymbolicBDDToken::Exists),
                     "forall" => result.push(SymbolicBDDToken::Forall),
                     "all" => result.push(SymbolicBDDToken::Forall),
+                    "if" => result.push(SymbolicBDDToken::If),
+                    "then" => result.push(SymbolicBDDToken::Then),
+                    "else" => result.push(SymbolicBDDToken::Else),
                     var => result.push(SymbolicBDDToken::Var(var.to_string())),
                 }
             } else if let Some(number) = c.name("countable") {
