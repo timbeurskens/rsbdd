@@ -197,37 +197,18 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    // if a then b
-    pub fn implies(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
-        match (a.as_ref(), b.as_ref()) {
-            (&BDD::False, _) | (_, &BDD::True) => self.mk_const(true),
-            (&BDD::True, _) => Rc::clone(&b),
-            (&BDD::Choice(ref t, v, ref f), &BDD::False) => self.mk_choice(
-                self.implies(Rc::clone(t), self.mk_const(false)),
-                v,
-                self.implies(Rc::clone(f), self.mk_const(false)),
-            ),
-            (&BDD::Choice(ref at, va, ref af), &BDD::Choice(_, vb, _)) if va < vb => self
-                .mk_choice(
-                    self.implies(Rc::clone(at), Rc::clone(&b)),
-                    va,
-                    self.implies(Rc::clone(af), Rc::clone(&b)),
-                ),
-            (&BDD::Choice(_, va, _), &BDD::Choice(ref bt, vb, ref bf)) if vb < va => self
-                .mk_choice(
-                    self.implies(Rc::clone(bt), Rc::clone(&a)),
-                    vb,
-                    self.implies(Rc::clone(bf), Rc::clone(&a)),
-                ),
-            (&BDD::Choice(ref at, va, ref af), &BDD::Choice(ref bt, vb, ref bf)) if va == vb => {
-                self.mk_choice(
-                    self.implies(Rc::clone(at), Rc::clone(bt)),
-                    va,
-                    self.implies(Rc::clone(af), Rc::clone(bf)),
-                )
+    pub fn not(&self, a: Rc<BDD<S>>) -> Rc<BDD<S>> {
+        match a.as_ref() {
+            &BDD::False => self.mk_const(true),
+            &BDD::True => self.mk_const(false),
+            &BDD::Choice(ref at, va, ref af) => {
+                self.mk_choice(self.not(Rc::clone(at)), va, self.not(Rc::clone(af)))
             }
-            _ => panic!("unsupported match: {:?} {:?}", a, b),
         }
+    }
+
+    pub fn implies(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
+        self.or(self.not(Rc::clone(&a)), Rc::clone(&b))
     }
 
     /// ite computes if a then b else c
@@ -244,11 +225,6 @@ impl<S: BDDSymbol> BDDEnv<S> {
             self.implies(Rc::clone(&a), Rc::clone(&b)),
             self.implies(Rc::clone(&b), Rc::clone(&a)),
         )
-    }
-
-    // negation
-    pub fn not(&self, a: Rc<BDD<S>>) -> Rc<BDD<S>> {
-        self.implies(a, self.mk_const(false))
     }
 
     // disjunction
