@@ -1,3 +1,10 @@
+"
+The 4-Queens Problem consists of placing four queens on a 4 x 4 chessboard so that no two queens can capture each other. 
+That is, no two queens are allowed to be placed on the same row, the same column or the same diagonal.
+
+Although this particular problem isn’t very impressive, keep in mind that you can generalize it to n x n chessboards with n >= 4.
+"
+
 "optional: there are exactly 4 queens (this increases the run-time tenfold due to the complexity of the counting operators)"
 "[_0x0, _0x1, _0x2, _0x3, _1x0, _1x1, _1x2, _1x3, _2x0, _2x1, _2x2, _2x3, _3x0, _3x1, _3x2, _3x3] = 4 &"
 
