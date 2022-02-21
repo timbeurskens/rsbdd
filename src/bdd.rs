@@ -351,7 +351,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
 
             self.ite(
                 Rc::clone(first),
-                self.count_leq_recursive(&remainder, b, n+1),
+                self.count_leq_recursive(&remainder, b, n + 1),
                 self.count_leq_recursive(&remainder, b, n),
             )
         }
@@ -370,7 +370,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
 
             self.ite(
                 Rc::clone(first),
-                self.count_geq_recursive(&remainder, b, n+1),
+                self.count_geq_recursive(&remainder, b, n + 1),
                 self.count_geq_recursive(&remainder, b, n),
             )
         }
