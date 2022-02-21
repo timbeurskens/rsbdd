@@ -2,7 +2,6 @@ extern crate dot;
 
 use crate::parser::*;
 use itertools::Itertools;
-use std::borrow::Cow;
 use std::boxed::Box;
 use std::io;
 use std::io::Write;
