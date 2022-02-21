@@ -2,13 +2,52 @@ use itertools::Itertools;
 use std::cell::RefCell;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::fmt;
 use std::fmt::{Debug, Display};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
-pub trait BDDSymbol: Ord + Display + Debug + Clone + Copy + Hash {}
+pub trait BDDSymbol: Ord + Display + Debug + Clone + Hash {}
 
-impl<T> BDDSymbol for T where T: Ord + Display + Debug + Clone + Copy + Hash {}
+impl<T> BDDSymbol for T where T: Ord + Display + Debug + Clone + Hash {}
+
+#[derive(Debug, Clone)]
+pub struct NamedSymbol {
+    pub name: Rc<String>,
+    pub id: usize,
+}
+
+impl fmt::Display for NamedSymbol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.name, f)
+    }
+}
+
+impl Hash for NamedSymbol {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
+impl PartialEq for NamedSymbol {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for NamedSymbol {}
+
+impl Ord for NamedSymbol {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.id.cmp(&other.id)
+    }
+}
+
+impl PartialOrd for NamedSymbol {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 // todo: place bdd items in a collection (hashmap?)
 // when constructing a new bdd, check if it already exists in the collection.
@@ -72,11 +111,11 @@ impl<S: BDDSymbol> BDDEnv<S> {
     // this function currently has no effect, might be removed later
     pub fn clean(&self, root: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match root.as_ref() {
-            &BDD::Choice(ref l, s, ref r) => {
+            &BDD::Choice(ref l, ref s, ref r) => {
                 let _l = self.find(l);
                 let _r = self.find(r);
 
-                self.mk_choice(_l, s, _r)
+                self.mk_choice(_l, s.clone(), _r)
             }
             _ => self.find(&root),
         }
@@ -174,22 +213,24 @@ impl<S: BDDSymbol> BDDEnv<S> {
             (&BDD::False, _) | (_, &BDD::False) => self.mk_const(false),
             (&BDD::True, _) => Rc::clone(&b),
             (_, &BDD::True) => Rc::clone(&a),
-            (&BDD::Choice(ref at, va, ref af), &BDD::Choice(_, vb, _)) if va < vb => self
+            (&BDD::Choice(ref at, ref va, ref af), &BDD::Choice(_, ref vb, _)) if va < vb => self
                 .mk_choice(
                     self.and(Rc::clone(at), Rc::clone(&b)),
-                    va,
+                    va.clone(),
                     self.and(Rc::clone(af), Rc::clone(&b)),
                 ),
-            (&BDD::Choice(_, va, _), &BDD::Choice(ref bt, vb, ref bf)) if vb < va => self
+            (&BDD::Choice(_, ref va, _), &BDD::Choice(ref bt, ref vb, ref bf)) if vb < va => self
                 .mk_choice(
                     self.and(Rc::clone(bt), Rc::clone(&a)),
-                    vb,
+                    vb.clone(),
                     self.and(Rc::clone(bf), Rc::clone(&a)),
                 ),
-            (&BDD::Choice(ref at, va, ref af), &BDD::Choice(ref bt, vb, ref bf)) if va == vb => {
+            (&BDD::Choice(ref at, ref va, ref af), &BDD::Choice(ref bt, ref vb, ref bf))
+                if va == vb =>
+            {
                 self.mk_choice(
                     self.and(Rc::clone(at), Rc::clone(bt)),
-                    va,
+                    va.clone(),
                     self.and(Rc::clone(af), Rc::clone(bf)),
                 )
             }
@@ -201,8 +242,8 @@ impl<S: BDDSymbol> BDDEnv<S> {
         match a.as_ref() {
             &BDD::False => self.mk_const(true),
             &BDD::True => self.mk_const(false),
-            &BDD::Choice(ref at, va, ref af) => {
-                self.mk_choice(self.not(Rc::clone(at)), va, self.not(Rc::clone(af)))
+            &BDD::Choice(ref at, ref va, ref af) => {
+                self.mk_choice(self.not(Rc::clone(at)), va.clone(), self.not(Rc::clone(af)))
             }
         }
     }
@@ -299,11 +340,11 @@ impl<S: BDDSymbol> BDDEnv<S> {
     pub fn exists(&self, s: S, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match b.as_ref() {
             &BDD::False | &BDD::True => b,
-            &BDD::Choice(ref t, v, ref f) if v == s => self.or(Rc::clone(t), Rc::clone(f)),
-            &BDD::Choice(ref t, v, ref f) => self.mk_choice(
-                self.exists(s, Rc::clone(t)),
-                v,
-                self.exists(s, Rc::clone(f)),
+            &BDD::Choice(ref t, ref v, ref f) if *v == s => self.or(Rc::clone(t), Rc::clone(f)),
+            &BDD::Choice(ref t, ref v, ref f) => self.mk_choice(
+                self.exists(s.clone(), Rc::clone(t)),
+                v.clone(),
+                self.exists(s.clone(), Rc::clone(f)),
             ),
         }
     }
@@ -331,13 +372,13 @@ impl<S: BDDSymbol> BDDEnv<S> {
 
     pub fn model(&self, a: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match a.as_ref() {
-            &BDD::Choice(ref t, v, ref f) => {
+            &BDD::Choice(ref t, ref v, ref f) => {
                 let lhs = self.model(Rc::clone(t));
                 let rhs = self.model(Rc::clone(f));
                 if lhs != self.mk_const(false) {
-                    self.and(lhs, self.var(v))
+                    self.and(lhs, self.var(v.clone()))
                 } else if rhs != self.mk_const(false) {
-                    self.and(self.not(self.var(v)), rhs)
+                    self.and(self.not(self.var(v.clone())), rhs)
                 } else {
                     self.mk_const(false)
                 }

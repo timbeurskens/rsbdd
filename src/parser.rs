@@ -1,4 +1,4 @@
-use crate::bdd::{BDDEnv, BDD};
+use crate::bdd::{BDDEnv, NamedSymbol, BDD};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -82,7 +82,7 @@ pub enum SymbolicBDD {
 pub struct ParsedFormula {
     pub vars: Vec<String>,
     pub bdd: SymbolicBDD,
-    pub env: RefCell<BDDEnv<usize>>,
+    pub env: RefCell<BDDEnv<NamedSymbol>>,
 }
 
 type TokenReader<'a> = Peekable<Iter<'a, SymbolicBDDToken>>;
@@ -109,24 +109,24 @@ impl ParsedFormula {
         })
     }
 
-    pub fn eval(&self) -> Rc<BDD<usize>> {
+    pub fn eval(&self) -> Rc<BDD<NamedSymbol>> {
         self.eval_recursive(&self.bdd)
     }
 
-    fn eval_recursive(&self, root: &SymbolicBDD) -> Rc<BDD<usize>> {
+    fn eval_recursive(&self, root: &SymbolicBDD) -> Rc<BDD<NamedSymbol>> {
         match root {
             SymbolicBDD::False => self.env.borrow().mk_const(false),
             SymbolicBDD::True => self.env.borrow().mk_const(true),
-            SymbolicBDD::Var(v) => self.env.borrow().var(self.var2usize(v)),
+            SymbolicBDD::Var(v) => self.env.borrow().var(self.name2var(v)),
             SymbolicBDD::Not(b) => self.env.borrow().not(self.eval_recursive(b)),
             SymbolicBDD::Exists(v, b) => self
                 .env
                 .borrow()
-                .exists(self.var2usize(v), self.eval_recursive(b)),
+                .exists(self.name2var(v), self.eval_recursive(b)),
             SymbolicBDD::Forall(v, b) => self
                 .env
                 .borrow()
-                .all(self.var2usize(v), self.eval_recursive(b)),
+                .all(self.name2var(v), self.eval_recursive(b)),
             SymbolicBDD::Countable(op, n, bs) => {
                 let branches = bs.iter().map(|b| self.eval_recursive(b)).collect();
 
@@ -162,6 +162,13 @@ impl ParsedFormula {
 
     pub fn usize2var(&self, usize: usize) -> &str {
         &self.vars[usize]
+    }
+
+    pub fn name2var(&self, name: &str) -> NamedSymbol {
+        NamedSymbol {
+            name: Rc::new(name.to_string()),
+            id: self.var2usize(name),
+        }
     }
 }
 
