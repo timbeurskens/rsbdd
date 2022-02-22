@@ -121,6 +121,111 @@ The RsBDD library supports the use of fixed-point equations. At this moment the 
 
 Currently the RsBDD language relies heavily on logical primitives. Integer arithmetic could be expressed by manually introducing the primitive 'bits' of a number. Rewrite rules could significantly simplify this process by introducting domains other than boolean variables. Embedding rewrite rules in the BDD could prove to be a challenge.
 
+## Rewrite rules (experimental)
+
+Rewrite rules introduce rewriting of domain-based variables and constants into logical primitives.
+The rewrite system introduces two basic types, variables and constants, and some new operators.
+
+- Summation (`sum`): introduce a new variable which can take any value.
+- Rewrite (`->`): binary operator specifying a uni-directional rewrite rule.
+- Bi-directional rewrite (`<->`): the symmetric version of the rewrite operator.
+- Equivalence (`=`): binary relation specifying the equivalence of the left and right variables / constants.
+
+A rewrite rule, yields a truth value similar to an implication. 
+It is therefore possible that the rewrite operator and the implication operator will share the same symbol.
+For extra clarity, the rewrite operator `->` differs from the implication operator `=>` in this design document.
+For every formula requiring a rewrite, every rewrite rule must be satisfied (conjunction of all rules).
+
+A rewrite rule is embedded into the BDD. New rewrite rules can be introduced later in the formula, and rewrites can be influenced by early assumptions.
+This property is illustrated in example 'assumption rewriting'.
+
+**A basic example is provided below:**
+
+```
+Given rule:
+sum p # is_person(p) -> p = Alice
+
+Formula:
+is_person(Alice)
+
+Rewrites to:
+sum p # is_person(Alice) -> Alice = Alice   [p -> Alice; summation]
+is_person(Alice) -> Alice = Alice           [sum elimination]
+is_person(Alice) -> true                    [(Alice = Alice) -> true; equivalence]
+true -> true                                [is_person(Alice) -> true; goal/assumption]
+true                                        [logical equivalence]
+
+Alternatively: (conditional rewriting)
+sum p # (p = Alice) -> (is_person(p) -> true)
+
+Formula:
+is_person(Alice)
+
+Rewrites to:
+sum p # (Alice = Alice) -> (is_person(Alice) -> true)   [p -> Alice; summation]
+(Alice = Alice) -> (is_person(Alice) -> true)           [sum elimination]
+(true) -> (is_person(Alice) -> true)                    [(Alice = Alice) -> true; equivalence]
+(true) -> (true -> true)                                [is_person(Alice) -> true; goal/assumption]
+(true) -> (true)                                        [logical equivalence]
+(true)                                                  [logical equivalence]
+```
+
+**Multiple rules:**
+
+```
+Given rules:
+is_person(Alice) -> true &
+is_person(Bob) -> true &
+is_person(Chair) -> false
+
+Formula:
+is_person(Bob)
+
+Rewrites to:
+(is_person(Alice) -> true) & (true -> true) & (is_person(Chair) -> false)   [is_person(Bob) -> true; goal/assumption]
+(false -> true) & (true -> true) & (is_person(Chair) -> false)              [is_person(Alice) -> false; no match for closed rewrite rule]
+(false -> true) & (true -> true) & (false -> false)                         [is_person(Chair) -> false; no match for closed rewrite rule]
+(true) & (true) & (true)                                                    [logical equivalence]
+(true)                                                                      [logical equivalence]
+```
+
+**Assumption rewriting:**
+
+```
+Formula:
+(sum p # is_person(p) -> (p = Alice)) &
+(forall p # is_person(p) => (p = Alice))
+
+Rewrites to:
+(sum p # is_person(p) -> (p = Alice)) & (forall p # is_person(p) => (p = Alice))
+
+
+Formula:
+(sum p # is_person(p) -> (p = Alice) | (p = Bob)) &
+(forall p # is_person(p) => (p = Alice))
+
+Rewrites to:
+
+Formula:
+(sum p # is_person(p) -> (p = Alice) | (p = Bob)) &
+(exists p # is_person(p) => (p = Alice))
+
+Rewrites to:
+
+```
+
+**Quantifiers:**
+
+```
+X
+```
+
+**Peano natural numbers:**
+
+```
+X
+```
+
 ## Examples
 
 ### Example 1: transitivity of the `>=` operator
