@@ -222,8 +222,35 @@ X
 
 **Peano natural numbers:**
 
+Recursive rewrite rules can be illustrated by an implementation of peanos natural numbers.
+This example contains two constants: `_0` and `suc(n)`, where `suc` accepts a variable `n`.
+
 ```
-X
+Formula:
+(is_nat(_0) -> true) &
+(sum n # is_nat(suc(n)) -> is_nat(n)) &
+is_nat(suc(suc(_0)))
+
+Rewrites to:
+assume: is_nat(suc(suc(_0)))                                                        [goal]
+(is_nat(_0) -> true) & (sum n # is_nat(suc(n)) -> is_nat(n))                        [insert rules]
+(false -> true) & (is_nat(suc(suc(_0))) -> is_nat(suc(_0)))                         [match n = suc(_0)]
+(false -> true) & (true -> is_nat(suc(_0)))                                         [match goal]
+(true) & (is_nat(suc(_0)))                                                          [rewrite elimination]
+--
+assume: is_nat(suc(_0))                                                             [new goal (recursive)]
+(true) & ((is_nat(_0) -> true) & (sum n # is_nat(suc(n)) -> is_nat(n)))             [insert rules]
+(true) & ((false -> true) & (is_nat(suc(_0)) -> is_nat(_0)))                        [match n = _0]
+(true) & ((false -> true) & (true -> is_nat(_0)))                                   [match goal]
+(true) & ((true) & (is_nat(_0)))                                                    [rewrite elimination]
+---
+assume: is_nat(_0)                                                                  [new goal (recursive)]
+(true) & ((true) & ((is_nat(_0) -> true) & (sum n # is_nat(suc(n)) -> is_nat(n))))  [insert rules]
+(true) & ((true) & ((true -> true) & (sum n # is_nat(suc(n)) -> is_nat(n))))        [match goal]
+(true) & ((true) & ((true -> true) & (false -> is_nat(n))))                         [no match (difficult operation!)]
+(true) & ((true) & ((true) & (true)))                                               [rewrite elimination]
+---
+(true)                                                                              [logical equivalence]
 ```
 
 ## Examples
