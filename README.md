@@ -268,6 +268,23 @@ assume: is_nat(_0)                                                              
 (true)                                                                              [logical equivalence]
 ```
 
+**Deferred evaluation:**
+
+In some cases, rewriting only is not sufficient to reach a closed formula.
+The example below shows equivalence testing on unknown variables. 
+By replacing these equivalence tests with boolean variables the obtained formula can be evaluated by the SAT solver.
+
+```
+const(Alice) -> true &
+const(Bob) -> true &
+forall d # ((d = _0) & (d = _1)) => (_0 = _1)
+(((Alice = _0) & (Alice = _1)) => (_0 = _1)) & (((Bob = _0) & (Bob = _1)) => (_0 = _1)) [forall elimination]
+(((Alice = _0) & (Alice = _1)) => (_0 = _1)) & (((Bob = _0) & (Bob = _1)) => (_0 = _1)) [Alice = _0 -> a; Alice = _1 -> b; boolean variable introduction]
+
+this needs work!
+
+```
+
 ## Examples
 
 ### Example 1: transitivity of the `>=` operator

@@ -12,7 +12,7 @@ use std::string::String;
 use std::vec::Vec;
 
 lazy_static! {
-    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+|>=|=|>|<|\[|\]|,|\(|\))|(?P<countable>\d+)|(?P<identifier>\w+)|(?P<comment>"[^"]*")|(?P<eof>$)"#).unwrap();
+    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+|>=|=|>|<|\[|\]|,|\(|\)|->)|(?P<countable>\d+)|(?P<identifier>\w+)|(?P<comment>"[^"]*")|(?P<eof>$)"#).unwrap();
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -26,6 +26,7 @@ pub enum SymbolicBDDToken {
     Nor,
     Nand,
     Implies,
+    Rewrite,
     ImpliesInv,
     Iff,
     If,
@@ -33,6 +34,7 @@ pub enum SymbolicBDDToken {
     Else,
     Exists,
     Forall,
+    Sum,
     Eq,
     Geq,
     Gt,
@@ -76,6 +78,12 @@ pub enum QuantifierType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum RuleApplication {
+    Terminal(String),
+    Application(String, Box<RuleApplication>)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SymbolicBDD {
     False,
     True,
@@ -86,6 +94,8 @@ pub enum SymbolicBDD {
     CountableVariable(CountableOperator, Vec<SymbolicBDD>, Vec<SymbolicBDD>),
     Ite(Box<SymbolicBDD>, Box<SymbolicBDD>, Box<SymbolicBDD>),
     BinaryOp(BinaryOperator, Box<SymbolicBDD>, Box<SymbolicBDD>),
+    RuleApplication(RuleApplication),
+    RewriteRule(RuleApplication, Box<SymbolicBDD>),
 }
 
 #[derive(Debug, Clone)]
@@ -479,6 +489,7 @@ impl SymbolicBDD {
                     "^" => result.push(SymbolicBDDToken::Xor),
                     "-" | "!" => result.push(SymbolicBDDToken::Not),
                     "=>" => result.push(SymbolicBDDToken::Implies),
+                    "->" => result.push(SymbolicBDDToken::Rewrite),
                     "<=" => result.push(SymbolicBDDToken::ImpliesInv),
                     "<=>" => result.push(SymbolicBDDToken::Iff),
                     "#" => result.push(SymbolicBDDToken::Hash),
@@ -517,6 +528,7 @@ impl SymbolicBDD {
                     "if" => result.push(SymbolicBDDToken::If),
                     "then" => result.push(SymbolicBDDToken::Then),
                     "else" => result.push(SymbolicBDDToken::Else),
+                    "sum" => result.push(SymbolicBDDToken::Sum),
                     var => result.push(SymbolicBDDToken::Var(var.to_string())),
                 }
             } else if let Some(number) = c.name("countable") {
