@@ -136,6 +136,21 @@ It is therefore possible that the rewrite operator and the implication operator 
 For extra clarity, the rewrite operator `->` differs from the implication operator `=>` in this design document.
 For every formula requiring a rewrite, every rewrite rule must be satisfied (conjunction of all rules).
 
+**Rewriting:**
+
+For every rewrite application in the formula, the rule application is replaced by a conjunction of all rewrite rules.
+The environment is updated (recursively), where the rule application is now an assumption / goal.
+Until the formula is closed (no remaining variables), the algorithm tries to match any open rewrite rule to an assumption in the environment.
+If a match has been found for some rewrite rule `x -> y`, `x` is replaced by `true`. If no match can be found for the rule, `x` is replaced by `false`.
+A rewrite rule `false -> y` can be rewritten as `true` by `rewrite elimination`. A rewrite rule `true -> y` can be rewritten as `y` by `rewrite elimination`.
+
+**Matching:**
+
+**Quantification:**
+
+Quantifiers (`forall`, `exists`) convert a rewrite rule to a logically equivalent rule application with additional conditions.
+Suppose a formula has variables `Alice`, `Bob`, and `Neighbour(p)`. The formula `forall q # has_house(q)` can be converted to `has_house(Alice) & has_house(Bob) & (forall q # has_house(Neighbour(q)))`.
+
 A rewrite rule is embedded into the BDD. New rewrite rules can be introduced later in the formula, and rewrites can be influenced by early assumptions.
 This property is illustrated in example 'assumption rewriting'.
 
