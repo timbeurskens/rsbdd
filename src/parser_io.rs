@@ -33,11 +33,11 @@ impl SymbolicParseTree {
                     .chain(this_node)
                     .collect()
             }
-            SymbolicBDD::Quantifier(_, _, f) | SymbolicBDD::Not(f) => {
+            SymbolicBDD::Summation(_, f) | SymbolicBDD::Quantifier(_, _, f) | SymbolicBDD::Not(f) => {
                 let new_nodes = SymbolicParseTree::nodes_recursive(f);
 
                 new_nodes.into_iter().chain(this_node).collect()
-            }
+            },
             SymbolicBDD::CountableConst(_, f, _) => {
                 let mut new_nodes: Vec<Box<SymbolicBDD>> = this_node;
 
@@ -68,7 +68,14 @@ impl SymbolicParseTree {
                 new_nodes.extend(SymbolicParseTree::nodes_recursive(e).into_iter());
 
                 new_nodes
-            }
+            },
+            SymbolicBDD::RewriteRule(_, f) => {
+                let mut new_nodes: Vec<Box<SymbolicBDD>> = this_node;
+
+                new_nodes.extend(SymbolicParseTree::nodes_recursive(f).into_iter());
+
+                new_nodes
+            },
             _ => this_node,
         }
     }
@@ -98,6 +105,9 @@ impl<'a> dot::Labeller<'a, GraphNode, GraphEdge> for SymbolicParseTree {
             SymbolicBDD::BinaryOp(ref op, _, _) => dot::LabelText::label(format!("{:?}", op)),
             SymbolicBDD::Quantifier(op, ref v, _) => {
                 dot::LabelText::label(format!("{:?} {:?}", op, v))
+            },
+            SymbolicBDD::Summation(ref v, _) => {
+                dot::LabelText::label(format!("Sum {:?}", v))
             }
             SymbolicBDD::Not(_) => dot::LabelText::label("Not".to_string()),
             SymbolicBDD::CountableConst(ref v, _, n) => {
@@ -110,6 +120,8 @@ impl<'a> dot::Labeller<'a, GraphNode, GraphEdge> for SymbolicParseTree {
             SymbolicBDD::False => dot::LabelText::label("False".to_string()),
             SymbolicBDD::True => dot::LabelText::label("True".to_string()),
             SymbolicBDD::Var(v) => dot::LabelText::label(format!("Var {}", v)),
+            SymbolicBDD::RewriteRule(m, _) => dot::LabelText::label(format!("Rule {}", m)),
+            SymbolicBDD::RuleApplication(m) => dot::LabelText::label(format!("Rewrite {}", m)),
         }
     }
 
@@ -140,7 +152,7 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                         self.nodes.iter().position(|n| n == r).unwrap(),
                     ));
                 }
-                SymbolicBDD::Quantifier(_, _, f) | SymbolicBDD::Not(f) => {
+                SymbolicBDD::Summation(_, f) | SymbolicBDD::Quantifier(_, _, f) | SymbolicBDD::Not(f) => {
                     edges.push((
                         i,
                         "".to_string(),
@@ -196,6 +208,13 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                         i,
                         "Else".to_string(),
                         self.nodes.iter().position(|n| n == e).unwrap(),
+                    ));
+                },
+                SymbolicBDD::RewriteRule(_, f) => {
+                    edges.push((
+                        i,
+                        "".to_string(),
+                        self.nodes.iter().position(|n| n == f).unwrap(),
                     ));
                 }
                 _ => {}
