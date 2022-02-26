@@ -3,6 +3,7 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::cell::RefCell;
+use std::fmt::Display;
 use std::io;
 use std::io::BufRead;
 use std::iter::Peekable;
@@ -10,7 +11,6 @@ use std::rc::Rc;
 use std::slice::Iter;
 use std::string::String;
 use std::vec::Vec;
-use std::fmt::Display;
 
 lazy_static! {
     static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|<=>|<=|\||\^|#|\*|\+|>=|=|>|<|\[|\]|,|\(|\)|->|-)|(?P<countable>\d+)|(?P<identifier>\w+)|(?P<comment>"[^"]*")|(?P<eof>$)"#).unwrap();
@@ -61,7 +61,7 @@ pub enum BinaryOperator {
     Implies,
     ImpliesInv,
     Iff,
-    Equals
+    Equals,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -82,14 +82,14 @@ pub enum QuantifierType {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DomainConstant {
     Terminal(String),
-    Application(String, Box<DomainConstant>)
+    Application(String, Box<DomainConstant>),
 }
 
 impl Display for DomainConstant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DomainConstant::Terminal(s) => write!(f, "{}", s),
-            DomainConstant::Application(s, c) => write!(f, "{}({})", s, c)
+            DomainConstant::Application(s, c) => write!(f, "{}({})", s, c),
         }
     }
 }
@@ -212,7 +212,7 @@ impl ParsedFormula {
                     BinaryOperator::Iff => self.env.borrow().eq(l, r),
                     other => panic!("unexpected operator: {:?}", other),
                 }
-            },
+            }
             other => panic!("unexpected node: {:?}", other),
         }
     }
@@ -249,11 +249,11 @@ impl SymbolicBDD {
             Some(SymbolicBDDToken::False) => {
                 expect(SymbolicBDDToken::False, tokens)?;
                 SymbolicBDD::False
-            },
+            }
             Some(SymbolicBDDToken::True) => {
                 expect(SymbolicBDDToken::True, tokens)?;
                 SymbolicBDD::True
-            },
+            }
             Some(SymbolicBDDToken::Ident(_)) => {
                 // either a variable, or a constant, or a rewrite rule
                 let name = SymbolicBDD::parse_ident(tokens)?;
@@ -275,8 +275,8 @@ impl SymbolicBDD {
                     }
                 } else {
                     SymbolicBDD::Var(name)
-                }                
-            },
+                }
+            }
             Some(SymbolicBDDToken::Not) => SymbolicBDD::parse_negation(tokens)?,
             Some(SymbolicBDDToken::Exists) => SymbolicBDD::parse_existence_quantifier(tokens)?,
             Some(SymbolicBDDToken::Forall) => SymbolicBDD::parse_universal_quantifier(tokens)?,
@@ -284,7 +284,7 @@ impl SymbolicBDD {
             Some(SymbolicBDDToken::If) => SymbolicBDD::parse_ite(tokens)?,
             None | Some(SymbolicBDDToken::Eof) => {
                 return Err(io::Error::new(io::ErrorKind::InvalidData, "Unexpected EOF"))
-            },
+            }
             Some(other) => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
@@ -307,7 +307,7 @@ impl SymbolicBDD {
                 let op = SymbolicBDD::parse_binary_operator(tokens)?;
                 let right = SymbolicBDD::parse_sub_formula(tokens)?;
                 Ok(SymbolicBDD::BinaryOp(op, Box::new(left), Box::new(right)))
-            },
+            }
             _ => Ok(left),
         }
     }
@@ -319,7 +319,10 @@ impl SymbolicBDD {
         let inside = SymbolicBDD::parse_domain_constant(tokens)?;
         expect(SymbolicBDDToken::CloseParen, tokens)?;
 
-        Ok(SymbolicBDD::RuleApplication(DomainConstant::Application(rulename, Box::new(inside))))
+        Ok(SymbolicBDD::RuleApplication(DomainConstant::Application(
+            rulename,
+            Box::new(inside),
+        )))
     }
 
     fn parse_domain_constant(tokens: &mut TokenReader) -> io::Result<DomainConstant> {
@@ -486,10 +489,7 @@ impl SymbolicBDD {
         expect(SymbolicBDDToken::Hash, tokens)?;
         let formula = SymbolicBDD::parse_sub_formula(tokens)?;
 
-        Ok(SymbolicBDD::Summation(
-            vars,
-            Box::new(formula),
-        ))
+        Ok(SymbolicBDD::Summation(vars, Box::new(formula)))
     }
 
     fn parse_binary_operator(tokens: &mut TokenReader) -> io::Result<BinaryOperator> {
@@ -525,7 +525,7 @@ impl SymbolicBDD {
             Some(SymbolicBDDToken::Iff) => {
                 expect(SymbolicBDDToken::Iff, tokens)?;
                 Ok(BinaryOperator::Iff)
-            },
+            }
             Some(SymbolicBDDToken::Eq) => {
                 expect(SymbolicBDDToken::Eq, tokens)?;
                 Ok(BinaryOperator::Equals)
