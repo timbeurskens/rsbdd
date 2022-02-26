@@ -136,6 +136,8 @@ It is therefore possible that the rewrite operator and the implication operator 
 For extra clarity, the rewrite operator `->` differs from the implication operator `=>` in this design document.
 For every formula requiring a rewrite, every rewrite rule must be satisfied (conjunction of all rules).
 
+Rewrite rules should be specified in a separate file with the `-r` or `--rules` parameter _Note: this complicates unix piping unfortunately._ The formula to be evaluated should not contain any rewrite rules. Rewrite rules are allowed in input formulas (and actually encouraged!).
+
 **Rewriting:**
 
 For every rewrite application in the formula, the rule application is replaced by a conjunction of all rewrite rules.
