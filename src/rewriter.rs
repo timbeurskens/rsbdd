@@ -1,25 +1,31 @@
 use crate::parser::{SymbolicBDD, DomainConstant};
+use std::vec::Vec;
 
 #[derive(Debug, Clone)]
 pub struct Rewriter {
+    pub environment: Vec<DomainConstant>,
     pub rules: SymbolicBDD,
     pub formula: SymbolicBDD,
 }
 
 impl Rewriter {
     pub fn new(rules: SymbolicBDD, formula: SymbolicBDD) -> Self {
-        Self { rules, formula }
+        Self {
+            environment: vec![],
+            rules,
+            formula,
+        }
     }
 
     pub fn merge(&mut self) {
 
     }
 
-    fn merge_recursive(root: &SymbolicBDD, replacement: &SymbolicBDD) -> SymbolicBDD {
+    fn merge_recursive(&self, root: &SymbolicBDD) -> SymbolicBDD {
         match root {
-            SymbolicBDD::RuleApplication(ref rule) => Rewriter::apply_rules(rule, replacement),
-            SymbolicBDD::Not(ref f) => SymbolicBDD::Not(Box::new(Rewriter::merge_recursive(f, replacement))),
-            SymbolicBDD::Quantifier(ref t, ref v, ref f) => SymbolicBDD::Quantifier(t.clone(), v.clone(), Box::new(Rewriter::merge_recursive(f, replacement))),
+            SymbolicBDD::RuleApplication(ref rule) => self.apply_rules(rule),
+            SymbolicBDD::Not(ref f) => SymbolicBDD::Not(Box::new(self.merge_recursive(f))),
+            SymbolicBDD::Quantifier(ref t, ref v, ref f) => SymbolicBDD::Quantifier(t.clone(), v.clone(), Box::new(self.merge_recursive(f))),
             // CountableConst(CountableOperator, Vec<SymbolicBDD>, usize),
             // CountableVariable(CountableOperator, Vec<SymbolicBDD>, Vec<SymbolicBDD>),
             // Ite(Box<SymbolicBDD>, Box<SymbolicBDD>, Box<SymbolicBDD>),
@@ -32,7 +38,7 @@ impl Rewriter {
         }
     }
 
-    fn apply_rules(dc: &DomainConstant, rules: &SymbolicBDD) -> SymbolicBDD {
+    fn apply_rules(&self, dc: &DomainConstant) -> SymbolicBDD {
         unimplemented!()
     }
 }
