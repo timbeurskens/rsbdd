@@ -5,6 +5,7 @@ use rsbdd::parser_io::*;
 use std::fs::File;
 use std::io::BufReader;
 use std::rc::Rc;
+use std::time::{Duration, Instant};
 
 #[macro_use]
 extern crate clap;
@@ -20,8 +21,15 @@ fn main() {
         (@arg show_dot: -d --dot +takes_value "write the bdd to a dot graphviz file")
         (@arg model: -m --model !takes_value "use a model of the bdd as output (instead of the satisfying assignment)")
         (@arg expect: -e --expect +takes_value "only show true or false entries in the truth-table")
+        (@arg benchmark: -b --benchmark +takes_value "Repeat the solving process n times for more accurate performance reports")
     )
     .get_matches();
+
+    let repeat = args
+        .value_of("benchmark")
+        .unwrap_or("1")
+        .parse::<usize>()
+        .expect("Could not parse benchmark value as usize");
 
     if let Some(input_filename) = args.value_of("input") {
         let input_file = File::open(input_filename).expect("Could not open input file");
@@ -40,7 +48,19 @@ fn main() {
                 .expect("Could not write parsetree to dot file");
         }
 
-        let mut result = input_parsed.eval();
+        let mut result: Rc<BDD<NamedSymbol>> = Rc::default();
+        let mut exec_times = Vec::new();
+
+        for _ in 0..repeat {
+            let tick = Instant::now();
+            result = input_parsed.eval();
+            exec_times.push(tick.elapsed());
+        }
+
+        // only print performance results when the benchmark flag is available, and more than 1 run has completed
+        if args.is_present("benchmark") && repeat > 0 {
+            print_performance_results(&exec_times);
+        }
 
         if args.is_present("model") {
             result = input_parsed.env.borrow().model(result);
@@ -78,6 +98,27 @@ fn main() {
     } else {
         println!("No input file specified");
     }
+}
+
+fn print_performance_results(results: &Vec<Duration>) {
+    let mut sresults = results.clone();
+    sresults.sort();
+
+    let median = sresults[sresults.len() / 2].as_secs_f64();
+    let sum: Duration = sresults.iter().sum();
+    let mean = sum.as_secs_f64() / (sresults.len() as f64);
+
+    let sum_variance: f64 = sresults
+        .iter()
+        .map(|d| (d.as_secs_f64() - mean) * (d.as_secs_f64() - mean))
+        .sum();
+    let variance = sum_variance / (sresults.len() as f64);
+    let stddev = variance.sqrt();
+
+    eprintln!("Runtime report for {} iterations:", results.len());
+    eprintln!("Median runtime: {:.4} s", median);
+    eprintln!("Mean runtime: {:.4} s", mean);
+    eprintln!("Standard deviation: {:.4} s", stddev);
 }
 
 #[derive(Debug, Clone, PartialEq)]
