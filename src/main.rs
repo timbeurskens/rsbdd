@@ -12,7 +12,7 @@ extern crate clap;
 
 fn main() {
     let args = clap_app!(Solver =>
-        (version: "0.2.0")
+        (version: "0.2.1")
         (author: "Tim Beurskens")
         (about: "A BDD-based SAT solver")
         (@arg input: -i --input +takes_value "logic input file")
