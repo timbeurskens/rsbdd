@@ -1,3 +1,11 @@
+"
+Describe the basic properties of peanos natural numbers:
+
+1) 0 is a natural number
+2) if n is a natural number, then suc(n) is a natural number
+
+Given these 2 properties, can we prove suc(suc(0)) (=2) is a natural number?
+"
 (is_nat(_0) -> true) &
 (sum n # is_nat(suc(n)) -> is_nat(n)) &
 is_nat(suc(suc(_0)))
