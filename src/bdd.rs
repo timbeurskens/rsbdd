@@ -56,10 +56,16 @@ impl PartialOrd for NamedSymbol {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum BDD<Symbol: BDDSymbol> {
-    True,
     False,
+    True,
     // Choice (true-subtree, symbol, false-subtree)
     Choice(Rc<BDD<Symbol>>, Symbol, Rc<BDD<Symbol>>),
+}
+
+impl<S: BDDSymbol> Default for BDD<S> {
+    fn default() -> Self {
+        BDD::False
+    }
 }
 
 // impl<S: BDDSymbol> Hash for BDD<S> {
