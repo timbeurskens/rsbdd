@@ -16,6 +16,7 @@ type GraphNode<S> = Rc<BDD<S>>;
 pub struct BDDGraph<S: BDDSymbol> {
     env: Rc<BDDEnv<S>>,
     root: Rc<BDD<S>>,
+    filter: TruthTableEntry,
 }
 
 impl<S: BDDSymbol> BDDGraph<S> {
@@ -23,10 +24,11 @@ impl<S: BDDSymbol> BDDGraph<S> {
         dot::render(self, writer)
     }
 
-    pub fn new(env: &Rc<BDDEnv<S>>, root: &Rc<BDD<S>>) -> Self {
+    pub fn new(env: &Rc<BDDEnv<S>>, root: &Rc<BDD<S>>, filter: TruthTableEntry) -> Self {
         BDDGraph {
             env: env.clone(),
             root: root.clone(),
+            filter: filter,
         }
     }
 }
@@ -96,7 +98,13 @@ impl<'a, S: BDDSymbol> BDDGraph<S> {
                     .cloned()
                     .collect()
             }
-            &BDD::True | &BDD::False => vec![root.clone()].into(),
+            c if (self.filter == TruthTableEntry::Any)
+                || (self.filter == TruthTableEntry::True && *c == BDD::True)
+                || (self.filter == TruthTableEntry::False && *c == BDD::False) =>
+            {
+                vec![root.clone()].into()
+            }
+            _ => vec![].into(),
         }
     }
 
@@ -106,18 +114,33 @@ impl<'a, S: BDDSymbol> BDDGraph<S> {
                 let l_edges = self.edges_recursive(l.clone());
                 let r_edges = self.edges_recursive(r.clone());
 
+                let mut self_edges = Vec::with_capacity(2);
+
+                if (self.filter == TruthTableEntry::Any)
+                    || (l.as_ref() != &BDD::True && l.as_ref() != &BDD::False)
+                    || (l.as_ref() == &BDD::True && self.filter == TruthTableEntry::True)
+                    || (l.as_ref() == &BDD::False && self.filter == TruthTableEntry::False)
+                {
+                    self_edges.push((root.clone(), true, l.clone()));
+                }
+
+                if (self.filter == TruthTableEntry::Any)
+                    || (r.as_ref() != &BDD::True && r.as_ref() != &BDD::False)
+                    || (r.as_ref() == &BDD::True && self.filter == TruthTableEntry::True)
+                    || (r.as_ref() == &BDD::False && self.filter == TruthTableEntry::False)
+                {
+                    self_edges.push((root.clone(), false, r.clone()));
+                }
+
                 l_edges
                     .iter()
                     .chain(r_edges.iter())
-                    .chain(&vec![
-                        (root.clone(), true, l.clone()),
-                        (root.clone(), false, r.clone()),
-                    ])
+                    .chain(self_edges.iter())
                     .unique() // disable unique edges when testing for duplicates
                     .cloned()
                     .collect()
             }
-            &BDD::True | &BDD::False => vec![].into(),
+            _ => vec![].into(),
         }
     }
 }

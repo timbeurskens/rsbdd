@@ -62,6 +62,13 @@ pub enum BDD<Symbol: BDDSymbol> {
     Choice(Rc<BDD<Symbol>>, Symbol, Rc<BDD<Symbol>>),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TruthTableEntry {
+    True,
+    False,
+    Any,
+}
+
 impl<S: BDDSymbol> Default for BDD<S> {
     fn default() -> Self {
         BDD::False

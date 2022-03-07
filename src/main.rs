@@ -73,13 +73,13 @@ fn main() {
             result = input_parsed.env.borrow().model(result);
         }
 
-        if args.is_present("show_truth_table") {
-            let filter = match args.value_of("expect") {
-                Some("true") => TruthTableEntry::True,
-                Some("false") => TruthTableEntry::False,
-                _ => TruthTableEntry::Any,
-            };
+        let filter = match args.value_of("expect") {
+            Some("true") => TruthTableEntry::True,
+            Some("false") => TruthTableEntry::False,
+            _ => TruthTableEntry::Any,
+        };
 
+        if args.is_present("show_truth_table") {
             println!("{:?}", input_parsed.vars);
             print_truth_table_recursive(
                 &result,
@@ -96,7 +96,7 @@ fn main() {
         if let Some(dot_filename) = args.value_of("show_dot") {
             let mut f = File::create(dot_filename).expect("Could not create dot file");
 
-            let graph = BDDGraph::new(&Rc::new(input_parsed.env.borrow().clone()), &result);
+            let graph = BDDGraph::new(&Rc::new(input_parsed.env.borrow().clone()), &result, filter);
 
             graph
                 .render_dot(&mut f)
@@ -163,13 +163,6 @@ fn plot_performance_results(results: &Vec<Duration>) {
     gnuplot_cmd
         .wait()
         .expect("Could not wait for gnuplot to finish");
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum TruthTableEntry {
-    True,
-    False,
-    Any,
 }
 
 fn print_truth_table_recursive(
