@@ -49,6 +49,12 @@ impl PartialOrd for NamedSymbol {
     }
 }
 
+impl From<NamedSymbol> for usize {
+    fn from(ns: NamedSymbol) -> Self {
+        ns.id
+    }
+}
+
 // todo: place bdd items in a collection (hashmap?)
 // when constructing a new bdd, check if it already exists in the collection.
 // if it does, return a reference to the existing bdd.
@@ -60,6 +66,20 @@ pub enum BDD<Symbol: BDDSymbol> {
     True,
     // Choice (true-subtree, symbol, false-subtree)
     Choice(Rc<BDD<Symbol>>, Symbol, Rc<BDD<Symbol>>),
+}
+
+impl From<BDD<NamedSymbol>> for BDD<usize> {
+    fn from(bdd: BDD<NamedSymbol>) -> BDD<usize> {
+        match bdd {
+            BDD::False => BDD::False,
+            BDD::True => BDD::True,
+            BDD::Choice(true_subtree, symbol, false_subtree) => BDD::Choice(
+                Rc::new(BDD::from(true_subtree.as_ref().clone())),
+                symbol.into(),
+                Rc::new(BDD::from(false_subtree.as_ref().clone())),
+            ),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -75,34 +95,7 @@ impl<S: BDDSymbol> Default for BDD<S> {
     }
 }
 
-// impl<S: BDDSymbol> Hash for BDD<S> {
-//     fn hash<H: Hasher>(&self, state: &mut H) {
-//         match self {
-//             &BDD::Choice(ref l, s, ref r) => {
-//                 l.short_hash(state);
-//                 s.hash(state);
-//                 r.short_hash(state);
-//             },
-//             &BDD::True | &BDD::False => self.short_hash(state)
-//         }
-//     }
-// }
-
 impl<S: BDDSymbol> BDD<S> {
-    // fn short_hash<H: Hasher>(&self, state: &mut H) {
-    //     match self {
-    //         &BDD::Choice(_, s, _) => {
-    //             s.hash(state);
-    //         },
-    //         &BDD::True => {
-    //             true.hash(state);
-    //         },
-    //         &BDD::False => {
-    //             false.hash(state);
-    //         }
-    //     }
-    // }
-
     pub fn get_hash(&self) -> u64 {
         let mut s = DefaultHasher::new();
         self.hash(&mut s);

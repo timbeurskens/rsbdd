@@ -1,6 +1,8 @@
+use rsbdd::bdd::*;
 use rsbdd::parser::*;
 use std::io;
 use std::io::BufReader;
+use std::rc::Rc;
 
 #[test]
 fn test_basic_tokens() -> io::Result<()> {
@@ -59,6 +61,35 @@ fn test_parser() -> io::Result<()> {
 
         dbg!(result.eval());
     }
+
+    Ok(())
+}
+
+fn parse_and_evaluate(test_str: &str) -> io::Result<Rc<BDD<usize>>> {
+    let result = ParsedFormula::new(&mut BufReader::new(test_str.as_bytes()))?;
+    Ok(Rc::new(BDD::<usize>::from(result.eval().as_ref().clone())))
+}
+
+fn env() -> BDDEnv<usize> {
+    BDDEnv::new()
+}
+
+#[test]
+fn test_parsed_solutions() -> io::Result<()> {
+    // constants are evaluated to true and
+    assert_eq!(parse_and_evaluate("true")?, env().mk_const(true));
+    assert_eq!(parse_and_evaluate("false")?, env().mk_const(false));
+
+    // variables are evaluated to choice nodes
+    assert_eq!(parse_and_evaluate("a")?, env().var(0));
+
+    // simple tautologies and contradictions
+    assert_eq!(parse_and_evaluate("-a & a")?, env().mk_const(false));
+    assert_eq!(parse_and_evaluate("-a | a")?, env().mk_const(true));
+    assert_eq!(parse_and_evaluate("-true & true")?, env().mk_const(false));
+    assert_eq!(parse_and_evaluate("-true | true")?, env().mk_const(true));
+    assert_eq!(parse_and_evaluate("-false & false")?, env().mk_const(false));
+    assert_eq!(parse_and_evaluate("-false | false")?, env().mk_const(true));
 
     Ok(())
 }

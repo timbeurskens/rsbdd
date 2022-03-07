@@ -218,35 +218,37 @@ impl SymbolicBDD {
         Ok(result)
     }
 
-    fn parse_sub_formula(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
-        let left = match tokens.peek() {
-            Some(SymbolicBDDToken::OpenParen) => SymbolicBDD::parse_parentized_formula(tokens)?,
-            Some(SymbolicBDDToken::OpenSquare) => SymbolicBDD::parse_countable_formula(tokens)?,
+    fn parse_simple_sub_formula(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
+        match tokens.peek() {
+            Some(SymbolicBDDToken::OpenParen) => SymbolicBDD::parse_parentized_formula(tokens),
+            Some(SymbolicBDDToken::OpenSquare) => SymbolicBDD::parse_countable_formula(tokens),
             Some(SymbolicBDDToken::False) => {
                 expect(SymbolicBDDToken::False, tokens)?;
-                SymbolicBDD::False
+                Ok(SymbolicBDD::False)
             }
             Some(SymbolicBDDToken::True) => {
                 expect(SymbolicBDDToken::True, tokens)?;
-                SymbolicBDD::True
+                Ok(SymbolicBDD::True)
             }
             Some(SymbolicBDDToken::Var(_)) => {
-                SymbolicBDD::Var(SymbolicBDD::parse_variable_name(tokens)?)
+                Ok(SymbolicBDD::Var(SymbolicBDD::parse_variable_name(tokens)?))
             }
-            Some(SymbolicBDDToken::Not) => SymbolicBDD::parse_negation(tokens)?,
-            Some(SymbolicBDDToken::Exists) => SymbolicBDD::parse_existence_quantifier(tokens)?,
-            Some(SymbolicBDDToken::Forall) => SymbolicBDD::parse_universal_quantifier(tokens)?,
-            Some(SymbolicBDDToken::If) => SymbolicBDD::parse_ite(tokens)?,
+            Some(SymbolicBDDToken::Not) => SymbolicBDD::parse_negation(tokens),
+            Some(SymbolicBDDToken::Exists) => SymbolicBDD::parse_existence_quantifier(tokens),
+            Some(SymbolicBDDToken::Forall) => SymbolicBDD::parse_universal_quantifier(tokens),
+            Some(SymbolicBDDToken::If) => SymbolicBDD::parse_ite(tokens),
             None | Some(SymbolicBDDToken::Eof) => {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, "Unexpected EOF"))
+                Err(io::Error::new(io::ErrorKind::InvalidData, "Unexpected EOF"))
             }
-            Some(other) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Unexpected token {:?}", other),
-                ))
-            }
-        };
+            Some(other) => Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Unexpected token {:?}", other),
+            )),
+        }
+    }
+
+    fn parse_sub_formula(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
+        let left = SymbolicBDD::parse_simple_sub_formula(tokens)?;
 
         // either a binary operator or end of sub-formula
         match tokens.peek() {
@@ -454,13 +456,15 @@ impl SymbolicBDD {
     fn parse_negation(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
         expect(SymbolicBDDToken::Not, tokens)?;
 
-        if check_ident(tokens).is_ok() {
-            Ok(SymbolicBDD::Not(Box::new(SymbolicBDD::Var(
-                SymbolicBDD::parse_variable_name(tokens)?,
-            ))))
+        let sf = SymbolicBDD::parse_simple_sub_formula(tokens);
+
+        if sf.is_ok() {
+            Ok(SymbolicBDD::Not(Box::new(sf.unwrap())))
         } else {
-            let negated = SymbolicBDD::parse_sub_formula(tokens)?;
-            Ok(SymbolicBDD::Not(Box::new(negated)))
+            // failover if the next part is not a simple formula
+            Ok(SymbolicBDD::Not(Box::new(SymbolicBDD::parse_sub_formula(
+                tokens,
+            )?)))
         }
     }
 
@@ -567,19 +571,6 @@ fn check(token: SymbolicBDDToken, tokens: &mut TokenReader) -> io::Result<()> {
             format!(
                 "Checked for {:?}, got {:?}; No capture condition available",
                 token, t
-            ),
-        )),
-    }
-}
-
-fn check_ident(tokens: &mut TokenReader) -> io::Result<()> {
-    match tokens.peek() {
-        Some(SymbolicBDDToken::Var(_)) => Ok(()),
-        t => Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!(
-                "Checked for ident/var, got {:?}; No capture condition available",
-                t
             ),
         )),
     }
