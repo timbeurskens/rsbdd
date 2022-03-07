@@ -13,7 +13,6 @@ fn test_simple_rewrite_summation() -> io::Result<()> {
     let formula_str = r#"
     is_person(Alice)
     "#;
-    
     let rules_tree = ParsedFormula::new(&mut BufReader::new(rules_str.as_bytes()))?;
     let formula_tree = ParsedFormula::new(&mut BufReader::new(formula_str.as_bytes()))?;
 

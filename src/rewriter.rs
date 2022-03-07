@@ -1,4 +1,4 @@
-use crate::parser::{SymbolicBDD, DomainConstant};
+use crate::parser::{DomainConstant, SymbolicBDD};
 use std::vec::Vec;
 
 #[derive(Debug, Clone)]
@@ -17,15 +17,15 @@ impl Rewriter {
         }
     }
 
-    pub fn merge(&mut self) {
-
-    }
+    pub fn merge(&mut self) {}
 
     fn merge_recursive(&self, root: &SymbolicBDD) -> SymbolicBDD {
         match root {
             SymbolicBDD::RuleApplication(ref rule) => self.apply_rules(rule),
             SymbolicBDD::Not(ref f) => SymbolicBDD::Not(Box::new(self.merge_recursive(f))),
-            SymbolicBDD::Quantifier(ref t, ref v, ref f) => SymbolicBDD::Quantifier(t.clone(), v.clone(), Box::new(self.merge_recursive(f))),
+            SymbolicBDD::Quantifier(ref t, ref v, ref f) => {
+                SymbolicBDD::Quantifier(t.clone(), v.clone(), Box::new(self.merge_recursive(f)))
+            }
             // CountableConst(CountableOperator, Vec<SymbolicBDD>, usize),
             // CountableVariable(CountableOperator, Vec<SymbolicBDD>, Vec<SymbolicBDD>),
             // Ite(Box<SymbolicBDD>, Box<SymbolicBDD>, Box<SymbolicBDD>),
