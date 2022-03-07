@@ -2,8 +2,10 @@ use rsbdd::bdd::*;
 use rsbdd::bdd_io::*;
 use rsbdd::parser::*;
 use rsbdd::parser_io::*;
+use rsbdd::plot::*;
 use std::fs::File;
 use std::io::BufReader;
+use std::process::{Command, Stdio};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
@@ -22,6 +24,7 @@ fn main() {
         (@arg model: -m --model !takes_value "use a model of the bdd as output (instead of the satisfying assignment)")
         (@arg expect: -e --expect +takes_value "only show true or false entries in the truth-table")
         (@arg benchmark: -b --benchmark +takes_value "Repeat the solving process n times for more accurate performance reports")
+        (@arg show_plot: --plot !takes_value "show a distribution plot of the runtime")
     )
     .get_matches();
 
@@ -60,6 +63,10 @@ fn main() {
         // only print performance results when the benchmark flag is available, and more than 1 run has completed
         if args.is_present("benchmark") && repeat > 0 {
             print_performance_results(&exec_times);
+
+            if args.is_present("show_plot") {
+                plot_performance_results(&exec_times);
+            }
         }
 
         if args.is_present("model") {
@@ -100,7 +107,7 @@ fn main() {
     }
 }
 
-fn print_performance_results(results: &Vec<Duration>) {
+fn stats(results: &Vec<Duration>) -> (f64, f64, f64, f64, f64) {
     let mut sresults = results.clone();
     sresults.sort();
 
@@ -115,10 +122,48 @@ fn print_performance_results(results: &Vec<Duration>) {
     let variance = sum_variance / (sresults.len() as f64);
     let stddev = variance.sqrt();
 
+    let min = sresults.iter().min().unwrap().as_secs_f64();
+    let max = sresults.iter().max().unwrap().as_secs_f64();
+
+    (min, max, median, mean, stddev)
+}
+fn print_performance_results(results: &Vec<Duration>) {
+    let (min, max, median, mean, stddev) = stats(results);
+
     eprintln!("Runtime report for {} iterations:", results.len());
-    eprintln!("Median runtime: {:.4} s", median);
-    eprintln!("Mean runtime: {:.4} s", mean);
-    eprintln!("Standard deviation: {:.4} s", stddev);
+    eprintln!("Min runtime: {:.4}s", min);
+    eprintln!("Max runtime: {:.4}s", max);
+    eprintln!("Median runtime: {:.4}s", median);
+    eprintln!("Mean runtime: {:.4}s", mean);
+    eprintln!("Standard deviation: {:.4}s", stddev);
+}
+
+fn plot_performance_results(results: &Vec<Duration>) {
+    let (_, _, _, mean, stddev) = stats(results);
+
+    let mut gnuplot_cmd = Command::new("gnuplot")
+        .arg("-p") // persistent mode
+        .arg("-") // piped mode
+        .stdin(Stdio::piped())
+        .spawn()
+        .expect("Could not spawn gnuplot");
+
+    // let mut writer = BufWriter::new(gnuplot_cmd.stdin.as_mut().unwrap());
+
+    let stdin = gnuplot_cmd.stdin.as_mut().unwrap();
+    write_gnuplot_normal_distribution(
+        stdin,
+        mean - (stddev * 2.0),
+        mean + (stddev * 2.0),
+        mean,
+        stddev,
+    )
+    .expect("Could not write to gnuplot command");
+    drop(stdin);
+
+    gnuplot_cmd
+        .wait()
+        .expect("Could not wait for gnuplot to finish");
 }
 
 #[derive(Debug, Clone, PartialEq)]
