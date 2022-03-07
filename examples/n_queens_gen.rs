@@ -18,10 +18,11 @@ fn main() -> io::Result<()> {
 
     let n = args
         .value_of("queens")
-        .expect("No number of queens specified")
+        .unwrap_or("4")
         .parse::<usize>()
         .expect("Invalid number of queens");
-    let output = args.value_of("output").expect("No output file specified");
+
+    let output = args.value_of("output").unwrap_or("/dev/stdout");
 
     let f = File::create(output)?;
     let mut writer = BufWriter::new(f);
