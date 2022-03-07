@@ -54,6 +54,7 @@ fn main() {
         let mut result: Rc<BDD<NamedSymbol>> = Rc::default();
         let mut exec_times = Vec::new();
 
+        // Benchmark: repeat n times and log runtime per iteration
         for _ in 0..repeat {
             let tick = Instant::now();
             result = input_parsed.eval();
@@ -69,6 +70,7 @@ fn main() {
             }
         }
 
+        // reduce the bdd to a single path from root to a single 'true' node
         if args.is_present("model") {
             result = input_parsed.env.borrow().model(result);
         }
@@ -107,6 +109,7 @@ fn main() {
     }
 }
 
+// compute run-time statistics: minimum, maximum, median, mean, standard-deviation
 fn stats(results: &Vec<Duration>) -> (f64, f64, f64, f64, f64) {
     let mut sresults = results.clone();
     sresults.sort();
@@ -128,6 +131,7 @@ fn stats(results: &Vec<Duration>) -> (f64, f64, f64, f64, f64) {
     (min, max, median, mean, stddev)
 }
 
+// print performance results to stderr
 fn print_performance_results(results: &Vec<Duration>) {
     let (min, max, median, mean, stddev) = stats(results);
 
@@ -139,6 +143,7 @@ fn print_performance_results(results: &Vec<Duration>) {
     eprintln!("Standard deviation: {:.4}s", stddev);
 }
 
+// invoke gnuplot to show the run-time distribution plot
 fn plot_performance_results(results: &Vec<Duration>) {
     let (_, _, _, mean, stddev) = stats(results);
 
@@ -165,6 +170,7 @@ fn plot_performance_results(results: &Vec<Duration>) {
         .expect("Could not wait for gnuplot to finish");
 }
 
+// recursively walk through the bdd and assign values to the variables until every permutation is assigned a true or false value
 fn print_truth_table_recursive(
     root: &Rc<BDD<NamedSymbol>>,
     vars: Vec<TruthTableEntry>,
