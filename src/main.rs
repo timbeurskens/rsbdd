@@ -105,7 +105,7 @@ fn main() {
                 .expect("Could not write BDD to dot file");
         }
     } else {
-        println!("No input file specified");
+        eprintln!("No input file specified");
     }
 }
 
