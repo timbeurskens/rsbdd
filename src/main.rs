@@ -127,6 +127,7 @@ fn stats(results: &Vec<Duration>) -> (f64, f64, f64, f64, f64) {
 
     (min, max, median, mean, stddev)
 }
+
 fn print_performance_results(results: &Vec<Duration>) {
     let (min, max, median, mean, stddev) = stats(results);
 
@@ -148,8 +149,6 @@ fn plot_performance_results(results: &Vec<Duration>) {
         .spawn()
         .expect("Could not spawn gnuplot");
 
-    // let mut writer = BufWriter::new(gnuplot_cmd.stdin.as_mut().unwrap());
-
     let stdin = gnuplot_cmd.stdin.as_mut().unwrap();
     write_gnuplot_normal_distribution(
         stdin,
@@ -166,7 +165,7 @@ fn plot_performance_results(results: &Vec<Duration>) {
         .expect("Could not wait for gnuplot to finish");
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum TruthTableEntry {
     True,
     False,
@@ -191,9 +190,12 @@ fn print_truth_table_recursive(
             l_vars[s.id] = TruthTableEntry::True;
             print_truth_table_recursive(l, l_vars, e, filter.clone());
         }
-        c if filter == TruthTableEntry::Any => println!("{:?} {:?}", vars, c),
-        c if filter == TruthTableEntry::True && *c == BDD::True => println!("{:?} {:?}", vars, c),
-        c if filter == TruthTableEntry::False && *c == BDD::False => println!("{:?} {:?}", vars, c),
+        c if (filter == TruthTableEntry::Any)
+            || (filter == TruthTableEntry::True && *c == BDD::True)
+            || (filter == TruthTableEntry::False && *c == BDD::False) =>
+        {
+            println!("{:?} {:?}", vars, c)
+        }
         _ => {}
     }
 }
