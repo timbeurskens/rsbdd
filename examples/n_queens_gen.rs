@@ -68,9 +68,6 @@ fn main() -> io::Result<()> {
 
     writeln!(writer)?;
 
-    // 15 = n * n - 1
-    // 11 = n * (n-1) - 1 ; 14 = n * n - 2
-    // 7 = n * (n-2) - 1 ; 10 = n * (n-1) - 2 ; 13 = n * n - 3
     for i in 1..n {
         write!(writer, "[")?;
         for j in 0..i {
@@ -111,16 +108,4 @@ fn main() -> io::Result<()> {
     writer.flush().expect("Could not flush write buffer");
 
     Ok(())
-
-    // // skip the first, as this is already covered by the previous expression
-    // let diag_expr_vr = (1..n)
-    //     .map(|i| {
-    //         (0..=i)
-    //             .map(|j| e.var((i * n) + (j * (n - 1))))
-    //             .collect::<Vec<_>>()
-    //     })
-    //     .map(|ref c| e.amn(c, 1))
-    //     .fold(e.mk_const(true), |ref acc, ref k| {
-    //         e.and(Rc::clone(acc), Rc::clone(k))
-    //     });
 }
