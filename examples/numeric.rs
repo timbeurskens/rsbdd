@@ -38,7 +38,9 @@ fn main() {
 
     let mut f = File::create("numeric.dot").unwrap();
 
-    let graph = BDDGraph::new(&Rc::new(e), &gt);
+    let graph = BDDGraph::new(&Rc::new(e), &gt, bdd::TruthTableEntry::Any);
 
-    graph.render_dot(&mut f);
+    graph
+        .render_dot(&mut f)
+        .expect("could not render to dot graph");
 }
