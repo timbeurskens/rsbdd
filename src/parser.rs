@@ -453,8 +453,15 @@ impl SymbolicBDD {
 
     fn parse_negation(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
         expect(SymbolicBDDToken::Not, tokens)?;
-        let negated = SymbolicBDD::parse_sub_formula(tokens)?;
-        Ok(SymbolicBDD::Not(Box::new(negated)))
+
+        if check_ident(tokens).is_ok() {
+            Ok(SymbolicBDD::Not(Box::new(SymbolicBDD::Var(
+                SymbolicBDD::parse_variable_name(tokens)?,
+            ))))
+        } else {
+            let negated = SymbolicBDD::parse_sub_formula(tokens)?;
+            Ok(SymbolicBDD::Not(Box::new(negated)))
+        }
     }
 
     fn parse_parentized_formula(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
@@ -560,6 +567,19 @@ fn check(token: SymbolicBDDToken, tokens: &mut TokenReader) -> io::Result<()> {
             format!(
                 "Checked for {:?}, got {:?}; No capture condition available",
                 token, t
+            ),
+        )),
+    }
+}
+
+fn check_ident(tokens: &mut TokenReader) -> io::Result<()> {
+    match tokens.peek() {
+        Some(SymbolicBDDToken::Var(_)) => Ok(()),
+        t => Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "Checked for ident/var, got {:?}; No capture condition available",
+                t
             ),
         )),
     }
