@@ -3,6 +3,7 @@ extern crate clap;
 
 use std::fs::File;
 use std::io;
+use std::io::Write;
 use std::io::*;
 
 fn main() -> io::Result<()> {
@@ -105,6 +106,9 @@ fn main() -> io::Result<()> {
 
     writeln!(writer, "\"end\"")?;
     writeln!(writer, "true")?;
+
+    // flush the writer before dropping it
+    writer.flush();
 
     Ok(())
 
