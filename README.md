@@ -171,7 +171,7 @@ The explosive nature of the problem makes n=9 an infeasable problem. Further opt
 ## CLI Usage
 
 ```
-Solver 0.2.0
+Solver 0.3.0
 Tim Beurskens
 A BDD-based SAT solver
 
@@ -181,12 +181,15 @@ USAGE:
 FLAGS:
     -h, --help          Prints help information
     -m, --model         use a model of the bdd as output (instead of the satisfying assignment)
+        --plot          show a distribution plot of the runtime
     -t, --truthtable    print the truth-table to stdout
     -V, --version       Prints version information
 
 OPTIONS:
+    -b, --benchmark <benchmark>         Repeat the solving process n times for more accurate performance reports
     -e, --expect <expect>               only show true or false entries in the truth-table
     -i, --input <input>                 logic input file
     -d, --dot <show_dot>                write the bdd to a dot graphviz file
     -p, --parsetree <show_parsetree>    write the parse tree in dot format to this file
+
 ```
