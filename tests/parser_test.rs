@@ -1,5 +1,6 @@
 use rsbdd::bdd::*;
 use rsbdd::parser::*;
+use std::fs::File;
 use std::io;
 use std::io::BufReader;
 use std::rc::Rc;
@@ -90,6 +91,41 @@ fn test_parsed_solutions() -> io::Result<()> {
     assert_eq!(parse_and_evaluate("-true | true")?, env().mk_const(true));
     assert_eq!(parse_and_evaluate("-false & false")?, env().mk_const(false));
     assert_eq!(parse_and_evaluate("-false | false")?, env().mk_const(true));
+
+    // counting operations
+    assert_eq!(parse_and_evaluate("[a] = 1")?, env().var(0));
+
+    Ok(())
+}
+
+#[test]
+fn test_4_queens_file() -> io::Result<()> {
+    let n = 4;
+
+    let input_file = File::open("examples/4_queens.txt").expect("Could not open input file");
+
+    let input_parsed =
+        ParsedFormula::new(&mut BufReader::new(input_file)).expect("Could not parse input file");
+
+    let input_evaluated = input_parsed.eval();
+
+    let model = input_parsed.env.borrow().model(input_evaluated.clone());
+
+    // only retain the queens
+    let queens: Vec<usize> = (0..(n * n))
+        .filter(|&i| {
+            input_parsed
+                .env
+                .borrow()
+                .infer(
+                    model.clone(),
+                    input_parsed.name2var(input_parsed.vars[i].as_str()),
+                )
+                .1
+        })
+        .collect();
+
+    assert_eq!(queens.len(), n);
 
     Ok(())
 }
