@@ -8,7 +8,7 @@ use std::io::*;
 
 fn main() -> io::Result<()> {
     let args = clap_app!(QueenGenerator =>
-        (version: "0.1")
+        (version: env!("CARGO_PKG_VERSION"))
         (author: "Tim Beurskens")
         (about: "Generates n-queen formulae for the SAT solver")
         (@arg queens: -n --queens +takes_value "The number of queens")

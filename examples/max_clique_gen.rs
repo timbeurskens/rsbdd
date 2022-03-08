@@ -10,7 +10,7 @@ use std::io::*;
 
 fn main() -> io::Result<()> {
     let args = clap_app!(CliqueGenerator =>
-        (version: "0.1")
+        (version: env!("CARGO_PKG_VERSION"))
         (author: "Tim Beurskens")
         (about: "Converts a graph into a max-clique specification")
         (@arg input: -i --input +takes_value "Input file (graph in csv edge-list format)")
