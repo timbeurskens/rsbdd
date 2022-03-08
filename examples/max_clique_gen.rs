@@ -15,6 +15,7 @@ fn main() -> io::Result<()> {
         (about: "Converts a graph into a max-clique specification")
         (@arg input: -i --input +takes_value "Input file (graph in csv edge-list format)")
         (@arg output: -o --output +takes_value "The output file")
+        (@arg undirected: -u --undirected !takes_value "Use undirected edges (test for both directions in the set complement operation)")
     )
     .get_matches();
 
@@ -46,12 +47,22 @@ fn main() -> io::Result<()> {
 
     let mut edges_complement: Vec<(String, String)> = Vec::new();
 
+    let is_undirected : bool = args.is_present("undirected");
+
     for v1 in &vertices {
         for v2 in &vertices {
             if v1 != v2 {
-                if !edges.contains(&(v1.to_string(), v2.to_string())) {
-                    edges_complement.push((v1.to_string(), v2.to_string()));
-                }
+                if is_undirected {
+                    if !(edges.contains(&(v1.to_string(), v2.to_string())) || edges.contains(&(v2.to_string(), v1.to_string()))) {
+                        if !edges_complement.contains(&(v2.to_string(), v1.to_string())) {
+                            edges_complement.push((v1.to_string(), v2.to_string()));
+                        }                        
+                    }
+                } else {
+                    if !edges.contains(&(v1.to_string(), v2.to_string())) {
+                        edges_complement.push((v1.to_string(), v2.to_string()));
+                    }
+                }                
             }
         }
     }
