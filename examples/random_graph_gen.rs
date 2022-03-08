@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate clap;
 
-use rand::prelude::*;
+use rand::seq::SliceRandom;
 use std::fs::File;
 use std::io;
 use std::io::Write;
@@ -39,24 +39,21 @@ fn main() -> io::Result<()> {
         .collect::<Vec<String>>();
     let mut edges: Vec<(String, String)> = Vec::new();
 
-    let p = 1.0 / (num_vertices * num_vertices) as f64;
-
-    while edges.len() < num_edges {
-        for (i, v1) in vertices.iter().enumerate() {
+    for (i, v1) in vertices.iter().enumerate() {
+        if undirected {
             for v2 in vertices[(i + 1)..].iter() {
-                let clear = if undirected {
-                    !(edges.contains(&(v1.clone(), v2.clone()))
-                        || edges.contains(&(v2.clone(), v1.clone())))
-                } else {
-                    !edges.contains(&(v1.clone(), v2.clone()))
-                };
-
-                if clear && edges.len() < num_edges && rng.gen_bool(p) {
+                edges.push((v1.clone(), v2.clone()));
+            }
+        } else {
+            for (j, v2) in vertices.iter().enumerate() {
+                if i != j {
                     edges.push((v1.clone(), v2.clone()));
                 }
             }
         }
     }
+
+    edges.shuffle(&mut rng);
 
     let output = args.value_of("output");
 
@@ -67,7 +64,7 @@ fn main() -> io::Result<()> {
         Box::new(BufWriter::new(io::stdout())) as Box<dyn Write>
     };
 
-    for edge in edges {
+    for edge in edges[0..num_edges].iter() {
         writeln!(writer, "{},{}", edge.0, edge.1)?;
     }
 

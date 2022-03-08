@@ -4,7 +4,8 @@ use rsbdd::parser::*;
 use rsbdd::parser_io::*;
 use rsbdd::plot::*;
 use std::fs::File;
-use std::io::BufReader;
+use std::io;
+use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
@@ -35,89 +36,90 @@ fn main() {
         .parse::<usize>()
         .expect("Could not parse benchmark value as usize");
 
-    if let Some(input_filename) = args.value_of("input") {
-        let input_file = File::open(input_filename).expect("Could not open input file");
+    let input_filename = args.value_of("input");
 
-        let input_parsed = ParsedFormula::new(&mut BufReader::new(input_file))
-            .expect("Could not parse input file");
-
-        if let Some(parsetree_filename) = args.value_of("show_parsetree") {
-            let mut f =
-                File::create(parsetree_filename).expect("Could not create parsetree dot file");
-
-            let graph = SymbolicParseTree::new(&input_parsed.bdd);
-
-            graph
-                .render_dot(&mut f)
-                .expect("Could not write parsetree to dot file");
-        }
-
-        let mut result: Rc<BDD<NamedSymbol>> = Rc::default();
-        let mut exec_times = Vec::new();
-
-        // Benchmark: repeat n times and log runtime per iteration
-        for _ in 0..repeat {
-            let tick = Instant::now();
-            result = input_parsed.eval();
-            exec_times.push(tick.elapsed());
-        }
-
-        // only print performance results when the benchmark flag is available, and more than 1 run has completed
-        if args.is_present("benchmark") && repeat > 0 {
-            print_performance_results(&exec_times);
-
-            if args.is_present("show_plot") {
-                plot_performance_results(&exec_times);
-            }
-        }
-
-        // reduce the bdd to a single path from root to a single 'true' node
-        if args.is_present("model") {
-            result = input_parsed.env.borrow().model(result);
-        }
-
-        let filter = match args.value_of("expect") {
-            Some("true") => TruthTableEntry::True,
-            Some("false") => TruthTableEntry::False,
-            _ => TruthTableEntry::Any,
-        };
-
-        if args.is_present("show_truth_table") {
-            println!("{:?}", input_parsed.vars);
-            print_truth_table_recursive(
-                &result,
-                input_parsed
-                    .vars
-                    .iter()
-                    .map(|_| TruthTableEntry::Any)
-                    .collect(),
-                filter,
-            );
-        }
-
-        if args.is_present("vars") {
-            print_true_vars_recursive(
-                &result,
-                input_parsed
-                    .vars
-                    .iter()
-                    .map(|_| TruthTableEntry::Any)
-                    .collect(),
-                &input_parsed.vars,
-            );
-        }
-
-        if let Some(dot_filename) = args.value_of("show_dot") {
-            let mut f = File::create(dot_filename).expect("Could not create dot file");
-
-            let graph = BDDGraph::new(&Rc::new(input_parsed.env.borrow().clone()), &result, filter);
-
-            graph
-                .render_dot(&mut f)
-                .expect("Could not write BDD to dot file");
-        }
+    let mut reader = if input_filename.is_some() {
+        let file = File::open(input_filename.unwrap()).expect("Could not open input file");
+        Box::new(BufReader::new(file)) as Box<dyn BufRead>
     } else {
-        eprintln!("No input file specified");
+        Box::new(BufReader::new(io::stdin())) as Box<dyn BufRead>
+    };
+
+    let input_parsed = ParsedFormula::new(&mut reader).expect("Could not parse input file");
+
+    if let Some(parsetree_filename) = args.value_of("show_parsetree") {
+        let mut f = File::create(parsetree_filename).expect("Could not create parsetree dot file");
+
+        let graph = SymbolicParseTree::new(&input_parsed.bdd);
+
+        graph
+            .render_dot(&mut f)
+            .expect("Could not write parsetree to dot file");
+    }
+
+    let mut result: Rc<BDD<NamedSymbol>> = Rc::default();
+    let mut exec_times = Vec::new();
+
+    // Benchmark: repeat n times and log runtime per iteration
+    for _ in 0..repeat {
+        let tick = Instant::now();
+        result = input_parsed.eval();
+        exec_times.push(tick.elapsed());
+    }
+
+    // only print performance results when the benchmark flag is available, and more than 1 run has completed
+    if args.is_present("benchmark") && repeat > 0 {
+        print_performance_results(&exec_times);
+
+        if args.is_present("show_plot") {
+            plot_performance_results(&exec_times);
+        }
+    }
+
+    // reduce the bdd to a single path from root to a single 'true' node
+    if args.is_present("model") {
+        result = input_parsed.env.borrow().model(result);
+    }
+
+    let filter = match args.value_of("expect") {
+        Some("true") => TruthTableEntry::True,
+        Some("false") => TruthTableEntry::False,
+        _ => TruthTableEntry::Any,
+    };
+
+    if args.is_present("show_truth_table") {
+        println!("{:?}", input_parsed.vars);
+        print_truth_table_recursive(
+            &result,
+            input_parsed
+                .vars
+                .iter()
+                .map(|_| TruthTableEntry::Any)
+                .collect(),
+            filter,
+        );
+    }
+
+    if args.is_present("vars") {
+        print_true_vars_recursive(
+            &result,
+            input_parsed
+                .vars
+                .iter()
+                .map(|_| TruthTableEntry::Any)
+                .collect(),
+            &input_parsed.vars,
+        );
+    }
+
+    if let Some(dot_filename) = args.value_of("show_dot") {
+        let mut f = File::create(dot_filename).expect("Could not create dot file");
+
+        let graph = BDDGraph::new(&Rc::new(input_parsed.env.borrow().clone()), &result, filter);
+
+        graph
+            .render_dot(&mut f)
+            .expect("Could not write BDD to dot file");
     }
 }
 
