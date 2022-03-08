@@ -475,10 +475,6 @@ impl<S: BDDSymbol> BDDEnv<S> {
             _ => a,
         };
 
-        // let dups = self.duplicates(result.clone());
-
-        // assert_eq!(dups.len(), 0);
-
         Rc::clone(result)
     }
 }
