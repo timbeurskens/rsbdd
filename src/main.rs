@@ -22,6 +22,7 @@ fn main() {
         (@arg show_truth_table: -t --truthtable !takes_value "print the truth-table to stdout")
         (@arg show_dot: -d --dot +takes_value "write the bdd to a dot graphviz file")
         (@arg model: -m --model !takes_value "use a model of the bdd as output (instead of the satisfying assignment)")
+        (@arg vars: -v --vars !takes_value "print all true variables leading to a truth evaluation")
         (@arg expect: -e --expect +takes_value "only show true or false entries in the truth-table")
         (@arg benchmark: -b --benchmark +takes_value "Repeat the solving process n times for more accurate performance reports")
         (@arg show_plot: --plot !takes_value "show a distribution plot of the runtime")
@@ -90,8 +91,19 @@ fn main() {
                     .iter()
                     .map(|_| TruthTableEntry::Any)
                     .collect(),
-                &input_parsed,
                 filter,
+            );
+        }
+
+        if args.is_present("vars") {
+            print_true_vars_recursive(
+                &result,
+                input_parsed
+                    .vars
+                    .iter()
+                    .map(|_| TruthTableEntry::Any)
+                    .collect(),
+                &input_parsed.vars,
             );
         }
 
@@ -170,11 +182,40 @@ fn plot_performance_results(results: &Vec<Duration>) {
         .expect("Could not wait for gnuplot to finish");
 }
 
+fn print_true_vars_recursive(
+    root: &Rc<BDD<NamedSymbol>>,
+    values: Vec<TruthTableEntry>,
+    vars: &Vec<String>,
+) {
+    match root.as_ref() {
+        BDD::Choice(ref l, s, ref r) => {
+            // first visit the false subtree
+            let mut r_vals = values.clone();
+            r_vals[s.id] = TruthTableEntry::False;
+            print_true_vars_recursive(r, r_vals, vars);
+
+            // then visit the true subtree
+            let mut l_vals = values.clone();
+            l_vals[s.id] = TruthTableEntry::True;
+            print_true_vars_recursive(l, l_vals, vars);
+        }
+        BDD::True => {
+            let mut vars_str = Vec::new();
+            for (i, v) in values.iter().enumerate() {
+                if *v == TruthTableEntry::True {
+                    vars_str.push(vars[i].clone());
+                }
+            }
+            println!("{};", vars_str.join(", "));
+        }
+        _ => {}
+    }
+}
+
 // recursively walk through the bdd and assign values to the variables until every permutation is assigned a true or false value
 fn print_truth_table_recursive(
     root: &Rc<BDD<NamedSymbol>>,
     vars: Vec<TruthTableEntry>,
-    e: &ParsedFormula,
     filter: TruthTableEntry,
 ) {
     match root.as_ref() {
@@ -182,12 +223,12 @@ fn print_truth_table_recursive(
             // first visit the false subtree
             let mut r_vars = vars.clone();
             r_vars[s.id] = TruthTableEntry::False;
-            print_truth_table_recursive(r, r_vars, e, filter.clone());
+            print_truth_table_recursive(r, r_vars, filter.clone());
 
             // then visit the true subtree
             let mut l_vars = vars.clone();
             l_vars[s.id] = TruthTableEntry::True;
-            print_truth_table_recursive(l, l_vars, e, filter.clone());
+            print_truth_table_recursive(l, l_vars, filter.clone());
         }
         c if (filter == TruthTableEntry::Any)
             || (filter == TruthTableEntry::True && *c == BDD::True)
