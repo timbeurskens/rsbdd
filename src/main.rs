@@ -24,9 +24,10 @@ fn main() {
         (@arg show_dot: -d --dot +takes_value "write the bdd to a dot graphviz file")
         (@arg model: -m --model !takes_value "use a model of the bdd as output (instead of the satisfying assignment)")
         (@arg vars: -v --vars !takes_value "print all true variables leading to a truth evaluation")
-        (@arg expect: -e --expect +takes_value "only show true or false entries in the truth-table")
+        (@arg filter: -f --filter +takes_value "only show true or false entries in the truth-table")
         (@arg benchmark: -b --benchmark +takes_value "Repeat the solving process n times for more accurate performance reports")
         (@arg show_plot: --plot !takes_value "show a distribution plot of the runtime")
+        (@arg evaluate: -e --eval +takes_value "Inline evaluate the given formula")
     )
     .get_matches();
 
@@ -36,9 +37,13 @@ fn main() {
         .parse::<usize>()
         .expect("Could not parse benchmark value as usize");
 
+    let inline_eval = args.value_of("evaluate");
     let input_filename = args.value_of("input");
 
-    let mut reader = if input_filename.is_some() {
+    let mut reader = if inline_eval.is_some() {
+        let inline_str = inline_eval.unwrap().as_bytes();
+        Box::new(BufReader::new(inline_str)) as Box<dyn BufRead>
+    } else if input_filename.is_some() {
         let file = File::open(input_filename.unwrap()).expect("Could not open input file");
         Box::new(BufReader::new(file)) as Box<dyn BufRead>
     } else {
@@ -81,7 +86,7 @@ fn main() {
         result = input_parsed.env.borrow().model(result);
     }
 
-    let filter = match args.value_of("expect") {
+    let filter = match args.value_of("filter") {
         Some("true" | "True" | "t" | "T" | "1") => TruthTableEntry::True,
         Some("false" | "False" | "f" | "F" | "0") => TruthTableEntry::False,
         _ => TruthTableEntry::Any,
