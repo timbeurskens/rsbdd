@@ -26,7 +26,7 @@ fn main() -> io::Result<()> {
     let selection = if args.is_present("convert") {
         let file = File::open(args.value_of("convert").unwrap()).expect("Could not open file");
         let mut bufreader = BufReader::new(file);
-        read_graph(&mut bufreader).expect("Could not parse edge list")
+        read_graph(&mut bufreader, undirected).expect("Could not parse edge list")
     } else {
         let num_vertices = args
             .value_of("vertices")
@@ -77,7 +77,7 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-fn read_graph<R: Read>(reader: R) -> io::Result<Vec<(String, String)>> {
+fn read_graph<R: Read>(reader: R, undirected: bool) -> io::Result<Vec<(String, String)>> {
     let mut csv_reader = csv::ReaderBuilder::new()
         .has_headers(false)
         .from_reader(reader);
@@ -89,7 +89,9 @@ fn read_graph<R: Read>(reader: R) -> io::Result<Vec<(String, String)>> {
 
         assert!(edge.len() == 2);
 
-        edges.push((edge[0].to_string(), edge[1].to_string()));
+        if !(undirected && edges.contains(&(edge[1].to_string(), edge[0].to_string()))) {
+            edges.push((edge[0].to_string(), edge[1].to_string()));
+        }
     }
 
     Ok(edges)
