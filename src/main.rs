@@ -82,8 +82,8 @@ fn main() {
     }
 
     let filter = match args.value_of("expect") {
-        Some("true") => TruthTableEntry::True,
-        Some("false") => TruthTableEntry::False,
+        Some("true" | "True" | "t" | "T" | "1") => TruthTableEntry::True,
+        Some("false" | "False" | "f" | "F" | "0") => TruthTableEntry::False,
         _ => TruthTableEntry::Any,
     };
 
