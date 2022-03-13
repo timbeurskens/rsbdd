@@ -101,6 +101,8 @@ impl ParsedFormula {
     pub fn new(contents: &mut dyn BufRead) -> io::Result<Self> {
         let tokens = SymbolicBDD::tokenize(contents)?;
 
+        let formula = SymbolicBDD::parse_formula(&mut tokens.iter().peekable())?;
+
         let vars = tokens
             .iter()
             .filter_map(|t| match t {
@@ -108,12 +110,13 @@ impl ParsedFormula {
                 _ => None,
             })
             .unique()
+            .filter(|v| !formula.var_is_bound(v))
             .collect();
 
-        let formula = SymbolicBDD::parse_formula(&mut tokens.iter().peekable())?;
+        dbg!(&vars);
 
         Ok(ParsedFormula {
-            vars,
+            vars: vars,
             bdd: formula,
             env: RefCell::new(BDDEnv::new()),
         })
@@ -216,6 +219,26 @@ impl SymbolicBDD {
         expect(SymbolicBDDToken::Eof, tokens)?;
 
         Ok(result)
+    }
+
+    // check whether a given variable is bound by a quantifier in the formula
+    pub fn var_is_bound(&self, var: &String) -> bool {
+        match self {
+            SymbolicBDD::Var(v) if v == var => false,
+            SymbolicBDD::Quantifier(_, vars, f) => {
+                if !vars.contains(var) {
+                    f.var_is_bound(var)
+                } else {
+                    false
+                }
+            },
+            SymbolicBDD::Ite(a, b, c) => a.var_is_bound(var) || b.var_is_bound(var) || c.var_is_bound(var),
+            SymbolicBDD::Not(f) => f.var_is_bound(var),
+            SymbolicBDD::BinaryOp(_, a, b) => a.var_is_bound(var) || b.var_is_bound(var),
+            SymbolicBDD::CountableConst(_, sub, _) => sub.iter().any(|f| f.var_is_bound(var)),
+            SymbolicBDD::CountableVariable(_, l, r) => l.iter().any(|f| f.var_is_bound(var)) || r.iter().any(|f| f.var_is_bound(var)),
+            _ => false,
+        }
     }
 
     fn parse_simple_sub_formula(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {

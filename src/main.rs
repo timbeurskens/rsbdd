@@ -211,6 +211,8 @@ fn print_true_vars_recursive(
             for (i, v) in values.iter().enumerate() {
                 if *v == TruthTableEntry::True {
                     vars_str.push(vars[i].clone());
+                } else if *v == TruthTableEntry::Any {
+                    vars_str.push(vars[i].clone() + "*");
                 }
             }
             println!("{};", vars_str.join(", "));
