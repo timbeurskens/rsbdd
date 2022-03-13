@@ -18,6 +18,7 @@ fn main() -> io::Result<()> {
         (@arg input: -i --input +takes_value "Input file (graph in csv edge-list format)")
         (@arg output: -o --output +takes_value "The output file")
         (@arg undirected: -u --undirected !takes_value "Use undirected edges (test for both directions in the set complement operation)")
+        (@arg all: -a --all !takes_value "Construct a BDD satisfying all cliques, not just the maximum clique(s)")
     )
     .get_matches();
 
@@ -50,6 +51,7 @@ fn main() -> io::Result<()> {
     let mut edges_complement: Vec<(String, String)> = Vec::new();
 
     let is_undirected: bool = args.is_present("undirected");
+    let show_all: bool = args.is_present("all");
 
     for v1 in &vertices {
         for v2 in &vertices {
@@ -102,39 +104,44 @@ fn main() -> io::Result<()> {
     }
 
     writeln!(writer)?;
-    writeln!(writer, "\"No larger clique exists (every other clique is at most as big as the clique defined above)\"")?;
-    writeln!(writer)?;
 
-    writeln!(
-        writer,
-        "forall {} # (",
-        vertices
-            .iter()
-            .map(|v| format!("v_{}", v))
-            .collect::<Vec<String>>()
-            .join(", ")
-    )?;
+    if show_all {
+        writeln!(writer, "true")?;
+    } else {
+        writeln!(writer, "\"No larger clique exists (every other clique is at most as big as the clique defined above)\"")?;
+        writeln!(writer)?;
 
-    writeln!(
-        writer,
-        "{}",
-        edges_complement
-            .iter()
-            .map(|(from, to)| format!("  -(v_{} & v_{})", from, to))
-            .collect::<Vec<String>>()
-            .join(" &\n")
-    )?;
+        writeln!(
+            writer,
+            "forall {} # (",
+            vertices
+                .iter()
+                .map(|v| format!("v_{}", v))
+                .collect::<Vec<String>>()
+                .join(", ")
+        )?;
 
-    writeln!(
-        writer,
-        ") => [{}] >= [{}]",
-        vertices.iter().cloned().collect::<Vec<String>>().join(", "),
-        vertices
-            .iter()
-            .map(|v| format!("v_{}", v))
-            .collect::<Vec<String>>()
-            .join(", ")
-    )?;
+        writeln!(
+            writer,
+            "{}",
+            edges_complement
+                .iter()
+                .map(|(from, to)| format!("  -(v_{} & v_{})", from, to))
+                .collect::<Vec<String>>()
+                .join(" &\n")
+        )?;
+
+        writeln!(
+            writer,
+            ") => [{}] >= [{}]",
+            vertices.iter().cloned().collect::<Vec<String>>().join(", "),
+            vertices
+                .iter()
+                .map(|v| format!("v_{}", v))
+                .collect::<Vec<String>>()
+                .join(", ")
+        )?;
+    }
 
     // flush the writer before dropping it
     writer.flush().expect("Could not flush write buffer");
