@@ -90,9 +90,13 @@ pub enum SymbolicBDD {
 
 #[derive(Debug, Clone)]
 pub struct ParsedFormula {
+    // all variables in the parse tree
     pub vars: Vec<String>,
+    // all variables not bound by a quantifier in the parse tree
     pub free_vars: Vec<String>,
+    // the parse tree
     pub bdd: SymbolicBDD,
+    // the environment
     pub env: RefCell<BDDEnv<NamedSymbol>>,
 }
 
