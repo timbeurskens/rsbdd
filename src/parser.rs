@@ -91,6 +91,7 @@ pub enum SymbolicBDD {
 #[derive(Debug, Clone)]
 pub struct ParsedFormula {
     pub vars: Vec<String>,
+    pub free_vars: Vec<String>,
     pub bdd: SymbolicBDD,
     pub env: RefCell<BDDEnv<NamedSymbol>>,
 }
@@ -103,20 +104,22 @@ impl ParsedFormula {
 
         let formula = SymbolicBDD::parse_formula(&mut tokens.iter().peekable())?;
 
-        let vars = tokens
+        let vars: Vec<String> = tokens
             .iter()
             .filter_map(|t| match t {
                 SymbolicBDDToken::Var(v) => Some(v.clone()),
                 _ => None,
             })
             .unique()
-            .filter(|v| !formula.var_is_bound(v))
             .collect();
 
-        dbg!(&vars);
-
         Ok(ParsedFormula {
-            vars: vars,
+            vars: vars.clone(),
+            free_vars: vars
+                .iter()
+                .filter(|v| formula.var_is_free(v))
+                .cloned()
+                .collect(),
             bdd: formula,
             env: RefCell::new(BDDEnv::new()),
         })
@@ -222,21 +225,25 @@ impl SymbolicBDD {
     }
 
     // check whether a given variable is bound by a quantifier in the formula
-    pub fn var_is_bound(&self, var: &String) -> bool {
+    pub fn var_is_free(&self, var: &String) -> bool {
         match self {
-            SymbolicBDD::Var(v) if v == var => false,
+            SymbolicBDD::Var(v) if v == var => true,
             SymbolicBDD::Quantifier(_, vars, f) => {
                 if !vars.contains(var) {
-                    f.var_is_bound(var)
+                    f.var_is_free(var)
                 } else {
                     false
                 }
-            },
-            SymbolicBDD::Ite(a, b, c) => a.var_is_bound(var) || b.var_is_bound(var) || c.var_is_bound(var),
-            SymbolicBDD::Not(f) => f.var_is_bound(var),
-            SymbolicBDD::BinaryOp(_, a, b) => a.var_is_bound(var) || b.var_is_bound(var),
-            SymbolicBDD::CountableConst(_, sub, _) => sub.iter().any(|f| f.var_is_bound(var)),
-            SymbolicBDD::CountableVariable(_, l, r) => l.iter().any(|f| f.var_is_bound(var)) || r.iter().any(|f| f.var_is_bound(var)),
+            }
+            SymbolicBDD::Ite(a, b, c) => {
+                a.var_is_free(var) || b.var_is_free(var) || c.var_is_free(var)
+            }
+            SymbolicBDD::Not(f) => f.var_is_free(var),
+            SymbolicBDD::BinaryOp(_, a, b) => a.var_is_free(var) || b.var_is_free(var),
+            SymbolicBDD::CountableConst(_, sub, _) => sub.iter().any(|f| f.var_is_free(var)),
+            SymbolicBDD::CountableVariable(_, l, r) => {
+                l.iter().any(|f| f.var_is_free(var)) || r.iter().any(|f| f.var_is_free(var))
+            }
             _ => false,
         }
     }

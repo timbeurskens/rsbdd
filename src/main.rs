@@ -97,7 +97,7 @@ fn main() {
         print_truth_table_recursive(
             &result,
             input_parsed
-                .vars
+                .free_vars
                 .iter()
                 .map(|_| TruthTableEntry::Any)
                 .collect(),
@@ -109,11 +109,11 @@ fn main() {
         print_true_vars_recursive(
             &result,
             input_parsed
-                .vars
+                .free_vars
                 .iter()
                 .map(|_| TruthTableEntry::Any)
                 .collect(),
-            &input_parsed.vars,
+            &input_parsed.free_vars,
         );
     }
 
