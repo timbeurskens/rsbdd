@@ -129,3 +129,45 @@ fn test_4_queens_file() -> io::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_cliques_file() -> io::Result<()> {
+    let input_file = File::open("examples/cliques.txt").expect("Could not open input file");
+
+    let input_parsed =
+        ParsedFormula::new(&mut BufReader::new(input_file)).expect("Could not parse input file");
+
+    let input_evaluated = input_parsed.eval();
+
+    let model = input_parsed.env.borrow().model(input_evaluated.clone());
+
+    let var_map: Vec<(String, (bool, bool))> = input_parsed
+        .free_vars
+        .iter()
+        .map(|v| {
+            (
+                v.clone(),
+                input_parsed
+                    .env
+                    .borrow()
+                    .infer(model.clone(), input_parsed.name2var(v)),
+            )
+        })
+        .collect();
+
+    dbg!(&var_map);
+
+    let reference: Vec<(String, (bool, bool))> = vec![
+        ("a".to_string(), (false, false)),
+        ("f".to_string(), (true, true)),
+        ("g".to_string(), (true, true)),
+        ("b".to_string(), (false, false)),
+        ("d".to_string(), (true, true)),
+        ("e".to_string(), (true, true)),
+        ("c".to_string(), (false, false)),
+    ];
+
+    assert_eq!(var_map, reference);
+
+    Ok(())
+}
