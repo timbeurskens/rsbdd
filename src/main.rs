@@ -93,7 +93,7 @@ fn main() {
     };
 
     if args.is_present("show_truth_table") {
-        println!("{:?}", input_parsed.vars);
+        println!("{:?}", input_parsed.free_vars);
         print_truth_table_recursive(
             &result,
             input_parsed
