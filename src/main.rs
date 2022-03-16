@@ -66,10 +66,12 @@ fn main() {
     let mut exec_times = Vec::new();
 
     // Benchmark: repeat n times and log runtime per iteration
-    for _ in 0..repeat {
+    for i in 0..repeat {
         let tick = Instant::now();
         result = input_parsed.eval();
         exec_times.push(tick.elapsed());
+
+        eprintln!("finished {}/{} runs", i + 1, repeat);
     }
 
     // only print performance results when the benchmark flag is available, and more than 1 run has completed
