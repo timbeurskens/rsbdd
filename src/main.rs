@@ -122,7 +122,7 @@ fn main() {
     if let Some(dot_filename) = args.value_of("show_dot") {
         let mut f = File::create(dot_filename).expect("Could not create dot file");
 
-        let graph = BDDGraph::new(&Rc::new(input_parsed.env.borrow().clone()), &result, filter);
+        let graph = BDDGraph::new(&result, filter);
 
         graph
             .render_dot(&mut f)

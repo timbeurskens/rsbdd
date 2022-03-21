@@ -560,7 +560,7 @@ fn test_queens() {
 
     let mut f = File::create(format!("n_queens_{}.dot", n)).unwrap();
 
-    let graph = BDDGraph::new(&Rc::new(e), &expr_comb, TruthTableEntry::Any);
+    let graph = BDDGraph::new(&expr_comb, TruthTableEntry::Any);
 
     graph.render_dot(&mut f).expect("failed to render dot");
 }
