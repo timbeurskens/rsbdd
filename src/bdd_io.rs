@@ -11,7 +11,6 @@ type GraphEdge<S> = (Rc<BDD<S>>, bool, Rc<BDD<S>>);
 type GraphNode<S> = Rc<BDD<S>>;
 
 pub struct BDDGraph<S: BDDSymbol> {
-    env: Rc<BDDEnv<S>>,
     root: Rc<BDD<S>>,
     filter: TruthTableEntry,
 }
@@ -21,9 +20,8 @@ impl<S: BDDSymbol> BDDGraph<S> {
         dot::render(self, writer)
     }
 
-    pub fn new(env: &Rc<BDDEnv<S>>, root: &Rc<BDD<S>>, filter: TruthTableEntry) -> Self {
+    pub fn new(root: &Rc<BDD<S>>, filter: TruthTableEntry) -> Self {
         BDDGraph {
-            env: env.clone(),
             root: root.clone(),
             filter: filter,
         }
