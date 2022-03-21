@@ -170,6 +170,8 @@ The explosive nature of the problem makes n=9 an infeasable problem. Further opt
 
 ## CLI Usage
 
+### rsbdd
+
 ```
 Solver 0.6.2
 Tim Beurskens
@@ -193,5 +195,52 @@ OPTIONS:
     -i, --input <input>                 logic input file
     -d, --dot <show_dot>                write the bdd to a dot graphviz file
     -p, --parsetree <show_parsetree>    write the parse tree in dot format to this file
+
+```
+
+### max_clique_gen
+
+```
+CliqueGenerator 0.6.2
+Tim Beurskens
+Converts a graph into a max-clique specification
+
+USAGE:
+    max_clique_gen [FLAGS] [OPTIONS]
+
+FLAGS:
+    -a, --all           Construct a BDD satisfying all cliques, not just the maximum clique(s)
+    -h, --help          Prints help information
+    -u, --undirected    Use undirected edges (test for both directions in the set complement operation)
+    -V, --version       Prints version information
+
+OPTIONS:
+    -i, --input <input>      Input file (graph in csv edge-list format)
+    -o, --output <output>    The output file
+
+```
+
+### random_graph_gen
+
+```
+RandomGraphGenerator 0.6.2
+Tim Beurskens
+Generates a random edge list formatted graph
+
+USAGE:
+    random_graph_gen [FLAGS] [OPTIONS]
+
+FLAGS:
+    -d, --dot           Output in dot format
+    -h, --help          Prints help information
+    -u, --undirected    Use undirected edges (test for both directions in the set complement operation)
+    -V, --version       Prints version information
+
+OPTIONS:
+    -c, --colors <colors>        Convert the graph to a graph-coloring specification
+    -i, --input <convert>        Do not generate a new graph, but convert an existing edge list
+    -e, --edges <edges>          Number of edges
+    -o, --output <output>        The output file
+    -v, --vertices <vertices>    Number of vertices
 
 ```
