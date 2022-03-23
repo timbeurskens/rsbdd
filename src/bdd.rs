@@ -182,13 +182,15 @@ impl<S: BDDSymbol> BDDEnv<S> {
         // early simplification step
         let ins = self.simplify(&Rc::new(BDD::Choice(true_subtree, symbol, false_subtree)));
 
-        if self.nodes.borrow().contains_key(&ins) {
-            self.find(&ins)
+        // pre-borrow the nodes as mutable
+        let mut nodes_borrow = self.nodes.borrow_mut();
+
+        // if the node already exists, return a reference to it
+        if let Some(subtree) = nodes_borrow.get(&ins) {
+            Rc::clone(subtree)
         } else {
             // only insert if it is not already in the lookup table
-            self.nodes
-                .borrow_mut()
-                .insert(ins.as_ref().clone(), Rc::clone(&ins));
+            nodes_borrow.insert(ins.as_ref().clone(), Rc::clone(&ins));
             Rc::clone(&ins)
         }
     }
