@@ -184,7 +184,6 @@ fn plot_performance_results(results: &Vec<Duration>) {
         stddev,
     )
     .expect("Could not write to gnuplot command");
-    drop(stdin);
 
     gnuplot_cmd
         .wait()
@@ -194,7 +193,7 @@ fn plot_performance_results(results: &Vec<Duration>) {
 fn print_true_vars_recursive(
     root: &Rc<BDD<NamedSymbol>>,
     values: Vec<TruthTableEntry>,
-    vars: &Vec<String>,
+    vars: &[String],
 ) {
     match root.as_ref() {
         BDD::Choice(ref l, s, ref r) => {
@@ -204,7 +203,7 @@ fn print_true_vars_recursive(
             print_true_vars_recursive(r, r_vals, vars);
 
             // then visit the true subtree
-            let mut l_vals = values.clone();
+            let mut l_vals = values;
             l_vals[s.id] = TruthTableEntry::True;
             print_true_vars_recursive(l, l_vals, vars);
         }
@@ -234,12 +233,12 @@ fn print_truth_table_recursive(
             // first visit the false subtree
             let mut r_vars = vars.clone();
             r_vars[s.id] = TruthTableEntry::False;
-            print_truth_table_recursive(r, r_vars, filter.clone());
+            print_truth_table_recursive(r, r_vars, filter);
 
             // then visit the true subtree
-            let mut l_vars = vars.clone();
+            let mut l_vars = vars;
             l_vars[s.id] = TruthTableEntry::True;
-            print_truth_table_recursive(l, l_vars, filter.clone());
+            print_truth_table_recursive(l, l_vars, filter);
         }
         c if (filter == TruthTableEntry::Any)
             || (filter == TruthTableEntry::True && *c == BDD::True)
