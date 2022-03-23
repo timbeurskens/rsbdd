@@ -103,6 +103,11 @@ pub struct ParsedFormula {
 type TokenReader<'a> = Peekable<Iter<'a, SymbolicBDDToken>>;
 
 impl ParsedFormula {
+    /// todo: implement lookup for free variables
+    pub fn to_free_index(ns: NamedSymbol) -> usize {
+        unimplemented!()
+    }
+
     pub fn new(contents: &mut dyn BufRead) -> io::Result<Self> {
         let tokens = SymbolicBDD::tokenize(contents)?;
 
