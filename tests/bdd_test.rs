@@ -23,13 +23,13 @@ fn test_equivalence() {
     assert_ne!(e.mk_const(true), e.mk_const(false));
     assert_ne!(e.mk_const(false), e.mk_const(true));
 
-    assert_eq!(e.and(_true.clone(), _true.clone()), _true.clone());
+    assert_eq!(e.and(_true.clone(), _true.clone()), _true);
     assert_ne!(e.and(e.var(0), e.var(1)), e.and(e.var(1), e.var(2)));
     assert_eq!(e.and(e.var(0), e.var(1)), e.and(e.var(1), e.var(0)));
 
     assert_eq!(
         e.not(e.var(0)),
-        e.mk_choice(_false.clone(), 0, _true.clone())
+        e.mk_choice(_false, 0, _true)
     )
 }
 
@@ -315,7 +315,7 @@ fn test_model() {
 
     assert_eq!(e.implies(model.clone(), e.var(0)), e.mk_const(true));
     assert_eq!(e.implies(model.clone(), e.var(1)), e.mk_const(true));
-    assert_ne!(e.implies(model.clone(), e.var(2)), e.mk_const(true));
+    assert_ne!(e.implies(model, e.var(2)), e.mk_const(true));
 }
 
 #[test]
@@ -538,7 +538,7 @@ fn test_queens() {
         diag_expr_vr,
     ];
 
-    let expr_comb = expr_list.iter().fold(e.mk_const(true), |ref acc, ref k| {
+    let expr_comb = expr_list.iter().fold(e.mk_const(true), |ref acc, k| {
         e.and(Rc::clone(acc), Rc::clone(k))
     });
 

@@ -86,7 +86,7 @@ fn test_duplicates() {
         diag_expr_vr,
     ];
 
-    let expr_comb = expr_list.iter().fold(e.mk_const(true), |ref acc, ref k| {
+    let expr_comb = expr_list.iter().fold(e.mk_const(true), |ref acc, k| {
         e.and(Rc::clone(acc), Rc::clone(k))
     });
 

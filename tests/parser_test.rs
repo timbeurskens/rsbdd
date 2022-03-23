@@ -109,7 +109,7 @@ fn test_4_queens_file() -> io::Result<()> {
 
     let input_evaluated = input_parsed.eval();
 
-    let model = input_parsed.env.borrow().model(input_evaluated.clone());
+    let model = input_parsed.env.borrow().model(input_evaluated);
 
     // only retain the queens
     let queens: Vec<usize> = (0..(n * n))
@@ -139,7 +139,7 @@ fn test_cliques_file() -> io::Result<()> {
 
     let input_evaluated = input_parsed.eval();
 
-    let model = input_parsed.env.borrow().model(input_evaluated.clone());
+    let model = input_parsed.env.borrow().model(input_evaluated);
 
     let var_map: Vec<(String, (bool, bool))> = input_parsed
         .free_vars
