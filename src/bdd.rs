@@ -1,7 +1,7 @@
 use itertools::Itertools;
+use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::collections::hash_map::DefaultHasher;
-use std::collections::HashMap;
 use std::fmt;
 use std::fmt::{Debug, Display};
 use std::hash::{Hash, Hasher};
@@ -105,7 +105,13 @@ impl<S: BDDSymbol> BDD<S> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BDDEnv<Symbol: BDDSymbol> {
-    pub nodes: RefCell<HashMap<BDD<Symbol>, Rc<BDD<Symbol>>>>,
+    pub nodes: RefCell<FxHashMap<BDD<Symbol>, Rc<BDD<Symbol>>>>,
+}
+
+impl<S: BDDSymbol> Default for BDDEnv<S> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<S: BDDSymbol> BDDEnv<S> {
@@ -133,20 +139,19 @@ impl<S: BDDSymbol> BDDEnv<S> {
         // todo: conclusion: hashes are stricter than pointers
         // try to rephrase the equivalence check, such hash a == hash b <=> a == b
 
-        let unique_hashes: Vec<Rc<BDD<S>>> = all_nodes
-            .clone()
+        let unique_hashes = all_nodes
             .iter()
             .map(|n| self.find(n))
             .unique_by(|n| n.get_hash())
-            .collect();
-        let unique_pointers: Vec<Rc<BDD<S>>> = all_nodes
-            .clone()
+            .count();
+
+        let unique_pointers = all_nodes
             .iter()
             .unique_by(|&n| Rc::into_raw(Rc::clone(n)) as u32)
             .cloned()
-            .collect();
+            .count();
 
-        unique_pointers.len() - unique_hashes.len()
+        unique_pointers - unique_hashes
     }
 
     pub fn node_list(&self, root: Rc<BDD<S>>) -> Vec<Rc<BDD<S>>> {
@@ -162,7 +167,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
                     .cloned()
                     .collect()
             }
-            &BDD::True | &BDD::False => vec![Rc::clone(&root)].into(),
+            &BDD::True | &BDD::False => vec![Rc::clone(&root)],
         }
     }
 
@@ -203,7 +208,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
     }
 
     pub fn new() -> Self {
-        let mut nodes = HashMap::new();
+        let mut nodes = FxHashMap::default();
 
         nodes.insert(BDD::True, Rc::new(BDD::True));
         nodes.insert(BDD::False, Rc::new(BDD::False));
@@ -245,10 +250,10 @@ impl<S: BDDSymbol> BDDEnv<S> {
     }
 
     pub fn not(&self, a: Rc<BDD<S>>) -> Rc<BDD<S>> {
-        match a.as_ref() {
-            &BDD::False => self.mk_const(true),
-            &BDD::True => self.mk_const(false),
-            &BDD::Choice(ref at, ref va, ref af) => {
+        match *a.as_ref() {
+            BDD::False => self.mk_const(true),
+            BDD::True => self.mk_const(false),
+            BDD::Choice(ref at, ref va, ref af) => {
                 self.mk_choice(self.not(Rc::clone(at)), va.clone(), self.not(Rc::clone(af)))
             }
         }
