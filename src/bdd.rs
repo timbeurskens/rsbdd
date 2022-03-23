@@ -303,7 +303,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
     }
 
     pub fn aln(&self, branches: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
-        if branches.len() == 0 {
+        if branches.is_empty() {
             if n > 0 {
                 self.mk_const(false)
             } else {
@@ -322,7 +322,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
     }
 
     pub fn amn(&self, branches: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
-        if branches.len() == 0 {
+        if branches.is_empty() {
             if n >= 0 {
                 self.mk_const(true)
             } else {
@@ -353,7 +353,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
     }
 
     fn count_leq_recursive(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
-        if a.len() == 0 {
+        if a.is_empty() {
             self.aln(b, n)
         } else {
             let first = &a[0];
@@ -376,7 +376,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
     }
 
     fn count_geq_recursive(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
-        if a.len() == 0 {
+        if a.is_empty() {
             self.amn(b, n)
         } else {
             let first = &a[0];
@@ -395,7 +395,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
     }
 
     pub fn exists(&self, s: Vec<S>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
-        if s.len() == 0 {
+        if s.is_empty() {
             b
         } else {
             let first = &s[0];
@@ -413,7 +413,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
             &BDD::Choice(ref t, ref v, ref f) => self.mk_choice(
                 self.exists_impl(s.clone(), Rc::clone(t)),
                 v.clone(),
-                self.exists_impl(s.clone(), Rc::clone(f)),
+                self.exists_impl(s, Rc::clone(f)),
             ),
         }
     }

@@ -18,10 +18,7 @@ fn test_set_ops() {
     dbg!(BDDSet::from_element(3, bits, &env));
     dbg!(BDDSet::from_element(4, bits, &env));
 
-    assert_eq!(
-        BDDSet::from_element(2, bits, &env).contains(2),
-        true
-    );
+    assert_eq!(BDDSet::from_element(2, bits, &env).contains(2), true);
 
     assert_eq!(
         BDDSet::from_element(2, bits, &env)

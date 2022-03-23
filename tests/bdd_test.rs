@@ -27,10 +27,7 @@ fn test_equivalence() {
     assert_ne!(e.and(e.var(0), e.var(1)), e.and(e.var(1), e.var(2)));
     assert_eq!(e.and(e.var(0), e.var(1)), e.and(e.var(1), e.var(0)));
 
-    assert_eq!(
-        e.not(e.var(0)),
-        e.mk_choice(_false, 0, _true)
-    )
+    assert_eq!(e.not(e.var(0)), e.mk_choice(_false, 0, _true))
 }
 
 #[test]
