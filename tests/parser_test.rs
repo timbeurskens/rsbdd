@@ -112,7 +112,7 @@ fn test_4_queens_file() -> io::Result<()> {
     let model = input_parsed.env.borrow().model(input_evaluated);
 
     // only retain the queens
-    let queens: Vec<usize> = (0..(n * n))
+    let queens = (0..(n * n))
         .filter(|&i| {
             input_parsed
                 .env
@@ -123,9 +123,9 @@ fn test_4_queens_file() -> io::Result<()> {
                 )
                 .1
         })
-        .collect();
+        .count();
 
-    assert_eq!(queens.len(), n);
+    assert_eq!(queens, n);
 
     Ok(())
 }

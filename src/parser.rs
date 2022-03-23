@@ -148,7 +148,8 @@ impl ParsedFormula {
                 self.eval_recursive(b),
             ),
             SymbolicBDD::CountableConst(op, bs, n) => {
-                let branches = bs.iter().map(|b| self.eval_recursive(b)).collect();
+                let branches: Vec<Rc<BDD<NamedSymbol>>> =
+                    bs.iter().map(|b| self.eval_recursive(b)).collect();
 
                 match op {
                     CountableOperator::AtMost => self.env.borrow().amn(&branches, *n as i64),
@@ -159,8 +160,10 @@ impl ParsedFormula {
                 }
             }
             SymbolicBDD::CountableVariable(op, l, r) => {
-                let l_branches = l.iter().map(|b| self.eval_recursive(b)).collect();
-                let r_branches = r.iter().map(|b| self.eval_recursive(b)).collect();
+                let l_branches: Vec<Rc<BDD<NamedSymbol>>> =
+                    l.iter().map(|b| self.eval_recursive(b)).collect();
+                let r_branches: Vec<Rc<BDD<NamedSymbol>>> =
+                    r.iter().map(|b| self.eval_recursive(b)).collect();
 
                 match op {
                     CountableOperator::AtMost => {

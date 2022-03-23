@@ -307,7 +307,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         self.mk_choice(self.mk_const(true), s, self.mk_const(false))
     }
 
-    pub fn aln(&self, branches: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
+    pub fn aln(&self, branches: &[Rc<BDD<S>>], n: i64) -> Rc<BDD<S>> {
         if branches.is_empty() {
             if n > 0 {
                 self.mk_const(false)
@@ -326,7 +326,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    pub fn amn(&self, branches: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
+    pub fn amn(&self, branches: &[Rc<BDD<S>>], n: i64) -> Rc<BDD<S>> {
         if branches.is_empty() {
             if n >= 0 {
                 self.mk_const(true)
@@ -345,19 +345,19 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    pub fn exn(&self, branches: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
+    pub fn exn(&self, branches: &[Rc<BDD<S>>], n: i64) -> Rc<BDD<S>> {
         self.and(self.amn(branches, n), self.aln(branches, n))
     }
 
-    pub fn count_leq(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>) -> Rc<BDD<S>> {
+    pub fn count_leq(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>]) -> Rc<BDD<S>> {
         self.count_leq_recursive(a, b, 0)
     }
 
-    pub fn count_lt(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>) -> Rc<BDD<S>> {
+    pub fn count_lt(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>]) -> Rc<BDD<S>> {
         self.count_leq_recursive(a, b, 1)
     }
 
-    fn count_leq_recursive(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
+    fn count_leq_recursive(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>], n: i64) -> Rc<BDD<S>> {
         if a.is_empty() {
             self.aln(b, n)
         } else {
@@ -372,15 +372,15 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    pub fn count_gt(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>) -> Rc<BDD<S>> {
+    pub fn count_gt(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>]) -> Rc<BDD<S>> {
         self.count_geq_recursive(a, b, -1)
     }
 
-    pub fn count_geq(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>) -> Rc<BDD<S>> {
+    pub fn count_geq(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>]) -> Rc<BDD<S>> {
         self.count_geq_recursive(a, b, 0)
     }
 
-    fn count_geq_recursive(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
+    fn count_geq_recursive(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>], n: i64) -> Rc<BDD<S>> {
         if a.is_empty() {
             self.amn(b, n)
         } else {
@@ -395,7 +395,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    pub fn count_eq(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>) -> Rc<BDD<S>> {
+    pub fn count_eq(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>]) -> Rc<BDD<S>> {
         self.and(self.count_leq(a, b), self.count_geq(a, b))
     }
 
