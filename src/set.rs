@@ -29,7 +29,7 @@ impl<'a> BDDSet {
         BDDSet {
             env: env.clone(),
             bdd: RefCell::new(env.mk_const(false)),
-            bits: bits,
+            bits,
         }
     }
 
@@ -37,7 +37,7 @@ impl<'a> BDDSet {
         BDDSet {
             env: env.clone(),
             bdd: RefCell::new(bdd.clone()),
-            bits: bits,
+            bits,
         }
     }
 
@@ -71,14 +71,14 @@ impl<'a> BDDSet {
 
         let _self = self.bdd.borrow().clone();
 
-        self.bdd.replace(self.env.or(_self.clone(), new_item));
+        self.bdd.replace(self.env.or(_self, new_item));
         self
     }
 
     pub fn union(&self, other: &BDDSet) -> &Self {
         let _self = self.bdd.borrow().clone();
         self.bdd
-            .replace(self.env.or(_self.clone(), other.bdd.borrow().clone()));
+            .replace(self.env.or(_self, other.bdd.borrow().clone()));
         self
     }
 
@@ -86,7 +86,7 @@ impl<'a> BDDSet {
         let _self = self.bdd.borrow().clone();
 
         self.bdd
-            .replace(self.env.and(_self.clone(), other.bdd.borrow().clone()));
+            .replace(self.env.and(_self, other.bdd.borrow().clone()));
         self
     }
 

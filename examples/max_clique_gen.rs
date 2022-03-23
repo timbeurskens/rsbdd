@@ -59,15 +59,12 @@ fn main() -> io::Result<()> {
                 if is_undirected {
                     if !(edges.contains(&(v1.to_string(), v2.to_string()))
                         || edges.contains(&(v2.to_string(), v1.to_string())))
+                        && !edges_complement.contains(&(v2.to_string(), v1.to_string()))
                     {
-                        if !edges_complement.contains(&(v2.to_string(), v1.to_string())) {
-                            edges_complement.push((v1.to_string(), v2.to_string()));
-                        }
-                    }
-                } else {
-                    if !edges.contains(&(v1.to_string(), v2.to_string())) {
                         edges_complement.push((v1.to_string(), v2.to_string()));
                     }
+                } else if !edges.contains(&(v1.to_string(), v2.to_string())) {
+                    edges_complement.push((v1.to_string(), v2.to_string()));
                 }
             }
         }

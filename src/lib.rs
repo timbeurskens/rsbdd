@@ -1,3 +1,5 @@
+#![warn(clippy::disallowed_types)]
+
 pub mod bdd;
 pub mod bdd_io;
 pub mod parser;

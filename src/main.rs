@@ -40,11 +40,10 @@ fn main() {
     let inline_eval = args.value_of("evaluate");
     let input_filename = args.value_of("input");
 
-    let mut reader = if inline_eval.is_some() {
-        let inline_str = inline_eval.unwrap().as_bytes();
-        Box::new(BufReader::new(inline_str)) as Box<dyn BufRead>
-    } else if input_filename.is_some() {
-        let file = File::open(input_filename.unwrap()).expect("Could not open input file");
+    let mut reader = if let Some(inline_str) = inline_eval {
+        Box::new(BufReader::new(inline_str.as_bytes())) as Box<dyn BufRead>
+    } else if let Some(some_input_filename) = input_filename {
+        let file = File::open(some_input_filename).expect("Could not open input file");
         Box::new(BufReader::new(file)) as Box<dyn BufRead>
     } else {
         Box::new(BufReader::new(io::stdin())) as Box<dyn BufRead>
@@ -131,8 +130,8 @@ fn main() {
 }
 
 // compute run-time statistics: minimum, maximum, median, mean, standard-deviation
-fn stats(results: &Vec<Duration>) -> (f64, f64, f64, f64, f64) {
-    let mut sresults = results.clone();
+fn stats(results: &[Duration]) -> (f64, f64, f64, f64, f64) {
+    let mut sresults = results.to_vec();
     sresults.sort();
 
     let median = sresults[sresults.len() / 2].as_secs_f64();
@@ -153,7 +152,7 @@ fn stats(results: &Vec<Duration>) -> (f64, f64, f64, f64, f64) {
 }
 
 // print performance results to stderr
-fn print_performance_results(results: &Vec<Duration>) {
+fn print_performance_results(results: &[Duration]) {
     let (min, max, median, mean, stddev) = stats(results);
 
     eprintln!("Runtime report for {} iterations:", results.len());
@@ -165,7 +164,7 @@ fn print_performance_results(results: &Vec<Duration>) {
 }
 
 // invoke gnuplot to show the run-time distribution plot
-fn plot_performance_results(results: &Vec<Duration>) {
+fn plot_performance_results(results: &[Duration]) {
     let (_, _, _, mean, stddev) = stats(results);
 
     let mut gnuplot_cmd = Command::new("gnuplot")
@@ -184,7 +183,6 @@ fn plot_performance_results(results: &Vec<Duration>) {
         stddev,
     )
     .expect("Could not write to gnuplot command");
-    drop(stdin);
 
     gnuplot_cmd
         .wait()
@@ -194,7 +192,7 @@ fn plot_performance_results(results: &Vec<Duration>) {
 fn print_true_vars_recursive(
     root: &Rc<BDD<NamedSymbol>>,
     values: Vec<TruthTableEntry>,
-    vars: &Vec<String>,
+    vars: &[String],
 ) {
     match root.as_ref() {
         BDD::Choice(ref l, s, ref r) => {
@@ -204,7 +202,7 @@ fn print_true_vars_recursive(
             print_true_vars_recursive(r, r_vals, vars);
 
             // then visit the true subtree
-            let mut l_vals = values.clone();
+            let mut l_vals = values;
             l_vals[s.id] = TruthTableEntry::True;
             print_true_vars_recursive(l, l_vals, vars);
         }
@@ -234,12 +232,12 @@ fn print_truth_table_recursive(
             // first visit the false subtree
             let mut r_vars = vars.clone();
             r_vars[s.id] = TruthTableEntry::False;
-            print_truth_table_recursive(r, r_vars, filter.clone());
+            print_truth_table_recursive(r, r_vars, filter);
 
             // then visit the true subtree
-            let mut l_vars = vars.clone();
+            let mut l_vars = vars;
             l_vars[s.id] = TruthTableEntry::True;
-            print_truth_table_recursive(l, l_vars, filter.clone());
+            print_truth_table_recursive(l, l_vars, filter);
         }
         c if (filter == TruthTableEntry::Any)
             || (filter == TruthTableEntry::True && *c == BDD::True)

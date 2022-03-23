@@ -140,15 +140,16 @@ impl ParsedFormula {
             SymbolicBDD::Var(v) => self.env.borrow().var(self.name2var(v)),
             SymbolicBDD::Not(b) => self.env.borrow().not(self.eval_recursive(b)),
             SymbolicBDD::Quantifier(QuantifierType::Exists, v, b) => self.env.borrow().exists(
-                v.into_iter().map(|i| self.name2var(i)).collect(),
+                v.iter().map(|i| self.name2var(i)).collect(),
                 self.eval_recursive(b),
             ),
             SymbolicBDD::Quantifier(QuantifierType::Forall, v, b) => self.env.borrow().all(
-                v.into_iter().map(|i| self.name2var(i)).collect(),
+                v.iter().map(|i| self.name2var(i)).collect(),
                 self.eval_recursive(b),
             ),
             SymbolicBDD::CountableConst(op, bs, n) => {
-                let branches = bs.iter().map(|b| self.eval_recursive(b)).collect();
+                let branches: Vec<Rc<BDD<NamedSymbol>>> =
+                    bs.iter().map(|b| self.eval_recursive(b)).collect();
 
                 match op {
                     CountableOperator::AtMost => self.env.borrow().amn(&branches, *n as i64),
@@ -159,8 +160,10 @@ impl ParsedFormula {
                 }
             }
             SymbolicBDD::CountableVariable(op, l, r) => {
-                let l_branches = l.iter().map(|b| self.eval_recursive(b)).collect();
-                let r_branches = r.iter().map(|b| self.eval_recursive(b)).collect();
+                let l_branches: Vec<Rc<BDD<NamedSymbol>>> =
+                    l.iter().map(|b| self.eval_recursive(b)).collect();
+                let r_branches: Vec<Rc<BDD<NamedSymbol>>> =
+                    r.iter().map(|b| self.eval_recursive(b)).collect();
 
                 match op {
                     CountableOperator::AtMost => {
@@ -229,11 +232,11 @@ impl SymbolicBDD {
     }
 
     // check whether a given variable is bound by a quantifier in the formula
-    pub fn var_is_free(&self, var: &String) -> bool {
+    pub fn var_is_free(&self, var: &str) -> bool {
         match self {
             SymbolicBDD::Var(v) if v == var => true,
             SymbolicBDD::Quantifier(_, vars, f) => {
-                if !vars.contains(var) {
+                if !vars.contains(&String::from(var)) {
                     f.var_is_free(var)
                 } else {
                     false
@@ -492,8 +495,8 @@ impl SymbolicBDD {
 
         let sf = SymbolicBDD::parse_simple_sub_formula(tokens);
 
-        if sf.is_ok() {
-            Ok(SymbolicBDD::Not(Box::new(sf.unwrap())))
+        if let Ok(sf_ok) = sf {
+            Ok(SymbolicBDD::Not(Box::new(sf_ok)))
         } else {
             // failover if the next part is not a simple formula
             Ok(SymbolicBDD::Not(Box::new(SymbolicBDD::parse_sub_formula(
@@ -567,9 +570,9 @@ impl SymbolicBDD {
             } else if let Some(number) = c.name("countable") {
                 let parsed_number = number.as_str().parse().expect("Failed to parse number");
                 result.push(SymbolicBDDToken::Countable(parsed_number));
-            } else if let Some(_) = c.name("eof") {
+            } else if c.name("eof").is_some() {
                 result.push(SymbolicBDDToken::Eof);
-            } else if let Some(_) = c.name("comment") {
+            } else if c.name("comment").is_some() {
                 // ignore comments
             } else {
                 return Err(io::Error::new(io::ErrorKind::InvalidData, "Unknown token"));
@@ -587,7 +590,7 @@ impl SymbolicBDD {
 
 fn expect(token: SymbolicBDDToken, tokens: &mut TokenReader) -> io::Result<()> {
     match &tokens.next() {
-        &Some(t) if *t == token => return Ok(()),
+        &Some(t) if *t == token => Ok(()),
         t => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
