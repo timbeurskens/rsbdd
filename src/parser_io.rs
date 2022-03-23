@@ -2,13 +2,12 @@ extern crate dot;
 
 use crate::parser::*;
 use itertools::Itertools;
-use std::boxed::Box;
 use std::io;
 use std::io::Write;
 
 pub struct SymbolicParseTree {
     pub internal_tree: SymbolicBDD,
-    pub nodes: Vec<Box<SymbolicBDD>>,
+    pub nodes: Vec<SymbolicBDD>,
 }
 
 type GraphNode = usize;
@@ -19,8 +18,8 @@ impl SymbolicParseTree {
         dot::render(self, writer)
     }
 
-    fn nodes_recursive(root: &SymbolicBDD) -> Vec<Box<SymbolicBDD>> {
-        let this_node = vec![Box::new(root.clone())];
+    fn nodes_recursive(root: &SymbolicBDD) -> Vec<SymbolicBDD> {
+        let this_node = vec![root.clone()];
 
         match root {
             SymbolicBDD::BinaryOp(_, l, r) => {
@@ -39,7 +38,7 @@ impl SymbolicParseTree {
                 new_nodes.into_iter().chain(this_node).collect()
             }
             SymbolicBDD::CountableConst(_, f, _) => {
-                let mut new_nodes: Vec<Box<SymbolicBDD>> = this_node;
+                let mut new_nodes: Vec<SymbolicBDD> = this_node;
 
                 for subtree in f {
                     new_nodes.extend(SymbolicParseTree::nodes_recursive(subtree).into_iter());
@@ -48,7 +47,7 @@ impl SymbolicParseTree {
                 new_nodes
             }
             SymbolicBDD::CountableVariable(_, a, b) => {
-                let mut new_nodes: Vec<Box<SymbolicBDD>> = this_node;
+                let mut new_nodes: Vec<SymbolicBDD> = this_node;
 
                 for subtree in a {
                     new_nodes.extend(SymbolicParseTree::nodes_recursive(subtree).into_iter());
@@ -61,7 +60,7 @@ impl SymbolicParseTree {
                 new_nodes
             }
             SymbolicBDD::Ite(c, t, e) => {
-                let mut new_nodes: Vec<Box<SymbolicBDD>> = this_node;
+                let mut new_nodes: Vec<SymbolicBDD> = this_node;
 
                 new_nodes.extend(SymbolicParseTree::nodes_recursive(c).into_iter());
                 new_nodes.extend(SymbolicParseTree::nodes_recursive(t).into_iter());
@@ -94,7 +93,7 @@ impl<'a> dot::Labeller<'a, GraphNode, GraphEdge> for SymbolicParseTree {
     }
 
     fn node_label(&self, n: &GraphNode) -> dot::LabelText<'a> {
-        match self.nodes[*n].as_ref() {
+        match &self.nodes[*n] {
             SymbolicBDD::BinaryOp(ref op, _, _) => dot::LabelText::label(format!("{:?}", op)),
             SymbolicBDD::Quantifier(op, ref v, _) => {
                 dot::LabelText::label(format!("{:?} {:?}", op, v))
@@ -127,24 +126,24 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
         let mut edges: Vec<GraphEdge> = Vec::new();
 
         for (i, node) in self.nodes.iter().enumerate() {
-            match node.as_ref() {
+            match node {
                 SymbolicBDD::BinaryOp(_, l, r) => {
                     edges.push((
                         i,
                         "L".to_string(),
-                        self.nodes.iter().position(|n| n == l).unwrap(),
+                        self.nodes.iter().position(|n| n == l.as_ref()).unwrap(),
                     ));
                     edges.push((
                         i,
                         "R".to_string(),
-                        self.nodes.iter().position(|n| n == r).unwrap(),
+                        self.nodes.iter().position(|n| n == r.as_ref()).unwrap(),
                     ));
                 }
                 SymbolicBDD::Quantifier(_, _, f) | SymbolicBDD::Not(f) => {
                     edges.push((
                         i,
                         "".to_string(),
-                        self.nodes.iter().position(|n| n == f).unwrap(),
+                        self.nodes.iter().position(|n| n == f.as_ref()).unwrap(),
                     ));
                 }
                 SymbolicBDD::CountableConst(_, f, _) => {
@@ -152,10 +151,7 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                         edges.push((
                             i,
                             format!("{{{}}}", j),
-                            self.nodes
-                                .iter()
-                                .position(|n| n.as_ref() == subtree)
-                                .unwrap(),
+                            self.nodes.iter().position(|n| n == subtree).unwrap(),
                         ));
                     }
                 }
@@ -164,20 +160,14 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                         edges.push((
                             i,
                             format!("L{{{}}}", j),
-                            self.nodes
-                                .iter()
-                                .position(|n| n.as_ref() == subtree)
-                                .unwrap(),
+                            self.nodes.iter().position(|n| n == subtree).unwrap(),
                         ));
                     }
                     for (j, subtree) in b.iter().enumerate() {
                         edges.push((
                             i,
                             format!("R{{{}}}", j),
-                            self.nodes
-                                .iter()
-                                .position(|n| n.as_ref() == subtree)
-                                .unwrap(),
+                            self.nodes.iter().position(|n| n == subtree).unwrap(),
                         ));
                     }
                 }
@@ -185,17 +175,17 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                     edges.push((
                         i,
                         "If".to_string(),
-                        self.nodes.iter().position(|n| n == c).unwrap(),
+                        self.nodes.iter().position(|n| n == c.as_ref()).unwrap(),
                     ));
                     edges.push((
                         i,
                         "Then".to_string(),
-                        self.nodes.iter().position(|n| n == t).unwrap(),
+                        self.nodes.iter().position(|n| n == t.as_ref()).unwrap(),
                     ));
                     edges.push((
                         i,
                         "Else".to_string(),
-                        self.nodes.iter().position(|n| n == e).unwrap(),
+                        self.nodes.iter().position(|n| n == e.as_ref()).unwrap(),
                     ));
                 }
                 _ => {}
