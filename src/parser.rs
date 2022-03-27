@@ -94,6 +94,8 @@ pub struct ParsedFormula {
     pub vars: Vec<String>,
     // all variables not bound by a quantifier in the parse tree
     pub free_vars: Vec<String>,
+    // lookup table for converting a raw variable to a variable in the 'free' set
+    pub raw2free: Vec<Option<usize>>,
     // the parse tree
     pub bdd: SymbolicBDD,
     // the environment
@@ -103,9 +105,8 @@ pub struct ParsedFormula {
 type TokenReader<'a> = Peekable<Iter<'a, SymbolicBDDToken>>;
 
 impl ParsedFormula {
-    /// todo: implement lookup for free variables
-    pub fn to_free_index(ns: NamedSymbol) -> usize {
-        unimplemented!()
+    pub fn to_free_index(&self, ns: &NamedSymbol) -> usize {
+        self.raw2free[ns.id].unwrap_or_else(|| panic!("{} is not a free variable", ns))
     }
 
     pub fn new(contents: &mut dyn BufRead) -> io::Result<Self> {
@@ -122,13 +123,27 @@ impl ParsedFormula {
             .unique()
             .collect();
 
+        let mut free_vars = Vec::new();
+        let mut raw2free = Vec::with_capacity(vars.len());
+
+        let mut vi = 0;
+
+        for v in &vars {
+            raw2free.push(if formula.var_is_free(v) {
+                free_vars.push(v.clone());
+                let result = vi;
+                vi += 1;
+
+                Some(result)
+            } else {
+                None
+            });
+        }
+
         Ok(ParsedFormula {
-            vars: vars.clone(),
-            free_vars: vars
-                .iter()
-                .filter(|v| formula.var_is_free(v))
-                .cloned()
-                .collect(),
+            vars,
+            free_vars,
+            raw2free,
             bdd: formula,
             env: RefCell::new(BDDEnv::new()),
         })
