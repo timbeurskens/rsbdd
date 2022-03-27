@@ -103,6 +103,7 @@ fn main() {
                 .map(|_| TruthTableEntry::Any)
                 .collect(),
             filter,
+            &input_parsed,
         );
     }
 
@@ -115,6 +116,7 @@ fn main() {
                 .map(|_| TruthTableEntry::Any)
                 .collect(),
             &input_parsed.free_vars,
+            &input_parsed,
         );
     }
 
@@ -193,18 +195,19 @@ fn print_true_vars_recursive(
     root: &Rc<BDD<NamedSymbol>>,
     values: Vec<TruthTableEntry>,
     vars: &[String],
+    parsed: &ParsedFormula,
 ) {
     match root.as_ref() {
         BDD::Choice(ref l, s, ref r) => {
             // first visit the false subtree
             let mut r_vals = values.clone();
-            r_vals[s.id] = TruthTableEntry::False;
-            print_true_vars_recursive(r, r_vals, vars);
+            r_vals[parsed.to_free_index(s)] = TruthTableEntry::False;
+            print_true_vars_recursive(r, r_vals, vars, parsed);
 
             // then visit the true subtree
             let mut l_vals = values;
-            l_vals[s.id] = TruthTableEntry::True;
-            print_true_vars_recursive(l, l_vals, vars);
+            l_vals[parsed.to_free_index(s)] = TruthTableEntry::True;
+            print_true_vars_recursive(l, l_vals, vars, parsed);
         }
         BDD::True => {
             let mut vars_str = Vec::new();
@@ -226,18 +229,19 @@ fn print_truth_table_recursive(
     root: &Rc<BDD<NamedSymbol>>,
     vars: Vec<TruthTableEntry>,
     filter: TruthTableEntry,
+    parsed: &ParsedFormula,
 ) {
     match root.as_ref() {
         BDD::Choice(ref l, s, ref r) => {
             // first visit the false subtree
             let mut r_vars = vars.clone();
-            r_vars[s.id] = TruthTableEntry::False;
-            print_truth_table_recursive(r, r_vars, filter);
+            r_vars[parsed.to_free_index(s)] = TruthTableEntry::False;
+            print_truth_table_recursive(r, r_vars, filter, parsed);
 
             // then visit the true subtree
             let mut l_vars = vars;
-            l_vars[s.id] = TruthTableEntry::True;
-            print_truth_table_recursive(l, l_vars, filter);
+            l_vars[parsed.to_free_index(s)] = TruthTableEntry::True;
+            print_truth_table_recursive(l, l_vars, filter, parsed);
         }
         c if (filter == TruthTableEntry::Any)
             || (filter == TruthTableEntry::True && *c == BDD::True)
