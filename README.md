@@ -1,5 +1,7 @@
 # RsBDD
 
+[![Rust](https://github.com/timbeurskens/rsbdd/actions/workflows/rust.yml/badge.svg)](https://github.com/timbeurskens/rsbdd/actions/workflows/rust.yml) 
+
 _Solving satisfiability problems in Rust_
 
 ## Syntax
