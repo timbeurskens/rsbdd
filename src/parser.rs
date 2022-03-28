@@ -310,10 +310,10 @@ impl SymbolicBDD {
             Some(SymbolicBDDToken::True) => {
                 expect(SymbolicBDDToken::True, tokens)?;
                 Ok(SymbolicBDD::True)
-            },
+            }
             Some(SymbolicBDDToken::Ident(_)) => {
                 // either a variable, or a constant, or a rewrite rule
-                let name = SymbolicBDD::parse_variable_name(tokens)?;
+                let name = SymbolicBDD::parse_ident(tokens)?;
 
                 if check(SymbolicBDDToken::OpenParen, tokens).is_ok() {
                     expect(SymbolicBDDToken::OpenParen, tokens)?;
@@ -326,22 +326,22 @@ impl SymbolicBDD {
                         expect(SymbolicBDDToken::Rewrite, tokens)?;
                         let inside = SymbolicBDD::parse_sub_formula(tokens)?;
 
-                        SymbolicBDD::RewriteRule(apply, Box::new(inside))
+                        Ok(SymbolicBDD::RewriteRule(apply, Box::new(inside)))
                     } else {
-                        SymbolicBDD::RuleApplication(apply)
+                        Ok(SymbolicBDD::RuleApplication(apply))
                     }
                 } else {
-                    SymbolicBDD::Var(name)
+                    Ok(SymbolicBDD::Var(name))
                 }
-            },
+            }
             Some(SymbolicBDDToken::Not) => SymbolicBDD::parse_negation(tokens),
             Some(SymbolicBDDToken::Exists) => SymbolicBDD::parse_existence_quantifier(tokens),
             Some(SymbolicBDDToken::Forall) => SymbolicBDD::parse_universal_quantifier(tokens),
             Some(SymbolicBDDToken::If) => SymbolicBDD::parse_ite(tokens),
-            Some(SymbolicBDDToken::Sum) => SymbolicBDD::parse_summation(tokens)?,
+            Some(SymbolicBDDToken::Sum) => SymbolicBDD::parse_summation(tokens),
             None | Some(SymbolicBDDToken::Eof) => {
                 Err(io::Error::new(io::ErrorKind::InvalidData, "Unexpected EOF"))
-            },
+            }
             Some(other) => Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!("Unexpected token {:?}", other),

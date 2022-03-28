@@ -71,7 +71,7 @@ impl SymbolicParseTree {
                 new_nodes
             }
             SymbolicBDD::RewriteRule(_, f) => {
-                let mut new_nodes: Vec<Box<SymbolicBDD>> = this_node;
+                let mut new_nodes: Vec<SymbolicBDD> = this_node;
 
                 new_nodes.extend(SymbolicParseTree::nodes_recursive(f).into_iter());
 
@@ -206,7 +206,7 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                     edges.push((
                         i,
                         "".to_string(),
-                        self.nodes.iter().position(|n| n == f).unwrap(),
+                        self.nodes.iter().position(|n| n == f.as_ref()).unwrap(),
                     ));
                 }
                 _ => {}
