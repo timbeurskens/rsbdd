@@ -1,0 +1,27 @@
+"for a graph with 4 vertices and 3 colors, in which every vertex has a single color"
+[a1, a2, a3] = 1 &
+[b1, b2, b3] = 1 &
+[c1, c2, c3] = 1 &
+[d1, d2, d3] = 1 &
+
+"
+the following vertices are connected (undirected planar graph)
+a <-> b
+b <-> c
+b <-> d
+c <-> d
+
+the connected vertices must not have the same color
+"
+
+"a <-> b"
+-(a1 & b1) & -(a2 & b2) & -(a3 & b3) &
+
+"b <-> c"
+-(b1 & c1) & -(b2 & c2) & -(b3 & c3) &
+
+"b <-> d"
+-(b1 & d1) & -(b2 & d2) & -(b3 & d3) &
+
+"c <-> d"
+-(c1 & d1) & -(c2 & d2) & -(c3 & d3)

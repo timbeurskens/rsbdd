@@ -1,0 +1,54 @@
+"The graph (in dot format) below is encoded to a clique problem"
+
+"
+graph G {
+    a -- b
+    a -- c
+    b -- c
+    a -- d
+    c -- d
+    a -- e
+    d -- e
+    b -- f
+    c -- f
+    d -- f
+    b -- g
+    e -- g
+    e -- f
+    d -- g
+    f -- g
+}
+"
+
+"a clique is a sub-set of vertices such that every vertex in the clique has an edge to every other vertex in the clique"
+
+"
+for every pair of vertices (x, y), (x & y) => true if (x,y) in E; else (x & y) => false.
+
+above property can be reduced to true if (x,y) in E and -(x & y) if (x,y) not in E.
+only the complement of E is denoted below.
+
+The cliques problem shows an interesting similarity to the graph-coloring problem:
+graph coloring can be encoded as a clique in a graph of vertices VxC where V is the set of vertices in the graph to be colored, and C is the set of colors.
+a vertex pair in the clique graph is connected by an edge if the original vertices are adjacent, and they do not share the same color.
+"
+
+-(a & f) &
+-(a & g) &
+
+-(b & d) &
+-(b & e) &
+
+-(c & e) &
+-(c & g) &
+
+"only find the max clique:"
+"for every clique we can find, the output clique is at least as big"
+forall _a,_b,_c,_d,_e,_f,_g # (
+    -(_a & _f) &
+    -(_a & _g) &
+    -(_b & _d) &
+    -(_b & _e) &
+    -(_c & _e) &
+    -(_c & _g)
+) => [a,b,c,d,e,f,g] >= [_a,_b,_c,_d,_e,_f,_g]

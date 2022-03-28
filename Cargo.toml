@@ -1,6 +1,6 @@
 [package]
 name = "rsbdd"
-version = "0.2.2"
+version = "0.6.6"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -11,3 +11,6 @@ itertools = "0.10.3"
 clap = "2.33.3"
 lazy_static = "1.4.0"
 regex = "1"
+csv = "1.1.6"
+rand = "0.8.5"
+rustc-hash = "1.1.0"

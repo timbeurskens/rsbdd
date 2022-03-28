@@ -13,7 +13,7 @@ use std::string::String;
 use std::vec::Vec;
 
 lazy_static! {
-    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|<=>|<=|\||\^|#|\*|\+|>=|=|>|<|\[|\]|,|\(|\)|->|-)|(?P<countable>\d+)|(?P<identifier>\w+)|(?P<comment>"[^"]*")|(?P<eof>$)"#).unwrap();
+    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+|>=|=|>|<|\[|\]|,|\(|\)|->|-)|(?P<countable>\d+)|(?P<identifier>\w+)|(?P<eof>$)|(?P<comment>"[^"]*")"#).unwrap();
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -112,18 +112,31 @@ pub enum SymbolicBDD {
 
 #[derive(Debug, Clone)]
 pub struct ParsedFormula {
+    // all variables in the parse tree
     pub vars: Vec<String>,
+    // all variables not bound by a quantifier in the parse tree
+    pub free_vars: Vec<String>,
+    // lookup table for converting a raw variable to a variable in the 'free' set
+    pub raw2free: Vec<Option<usize>>,
+    // the parse tree
     pub bdd: SymbolicBDD,
+    // the environment
     pub env: RefCell<BDDEnv<NamedSymbol>>,
 }
 
 type TokenReader<'a> = Peekable<Iter<'a, SymbolicBDDToken>>;
 
 impl ParsedFormula {
+    pub fn to_free_index(&self, ns: &NamedSymbol) -> usize {
+        self.raw2free[ns.id].unwrap_or_else(|| panic!("{} is not a free variable", ns))
+    }
+
     pub fn new(contents: &mut dyn BufRead) -> io::Result<Self> {
         let tokens = SymbolicBDD::tokenize(contents)?;
 
-        let vars = tokens
+        let formula = SymbolicBDD::parse_formula(&mut tokens.iter().peekable())?;
+
+        let vars: Vec<String> = tokens
             .iter()
             .filter_map(|t| match t {
                 SymbolicBDDToken::Ident(v) => Some(v.clone()),
@@ -132,10 +145,27 @@ impl ParsedFormula {
             .unique()
             .collect();
 
-        let formula = SymbolicBDD::parse_formula(&mut tokens.iter().peekable())?;
+        let mut free_vars = Vec::new();
+        let mut raw2free = Vec::with_capacity(vars.len());
+
+        let mut vi = 0;
+
+        for v in &vars {
+            raw2free.push(if formula.var_is_free(v) {
+                free_vars.push(v.clone());
+                let result = vi;
+                vi += 1;
+
+                Some(result)
+            } else {
+                None
+            });
+        }
 
         Ok(ParsedFormula {
             vars,
+            free_vars,
+            raw2free,
             bdd: formula,
             env: RefCell::new(BDDEnv::new()),
         })
@@ -152,15 +182,16 @@ impl ParsedFormula {
             SymbolicBDD::Var(v) => self.env.borrow().var(self.name2var(v)),
             SymbolicBDD::Not(b) => self.env.borrow().not(self.eval_recursive(b)),
             SymbolicBDD::Quantifier(QuantifierType::Exists, v, b) => self.env.borrow().exists(
-                v.into_iter().map(|i| self.name2var(i)).collect(),
+                v.iter().map(|i| self.name2var(i)).collect(),
                 self.eval_recursive(b),
             ),
             SymbolicBDD::Quantifier(QuantifierType::Forall, v, b) => self.env.borrow().all(
-                v.into_iter().map(|i| self.name2var(i)).collect(),
+                v.iter().map(|i| self.name2var(i)).collect(),
                 self.eval_recursive(b),
             ),
             SymbolicBDD::CountableConst(op, bs, n) => {
-                let branches = bs.iter().map(|b| self.eval_recursive(b)).collect();
+                let branches: Vec<Rc<BDD<NamedSymbol>>> =
+                    bs.iter().map(|b| self.eval_recursive(b)).collect();
 
                 match op {
                     CountableOperator::AtMost => self.env.borrow().amn(&branches, *n as i64),
@@ -171,8 +202,10 @@ impl ParsedFormula {
                 }
             }
             SymbolicBDD::CountableVariable(op, l, r) => {
-                let l_branches = l.iter().map(|b| self.eval_recursive(b)).collect();
-                let r_branches = r.iter().map(|b| self.eval_recursive(b)).collect();
+                let l_branches: Vec<Rc<BDD<NamedSymbol>>> =
+                    l.iter().map(|b| self.eval_recursive(b)).collect();
+                let r_branches: Vec<Rc<BDD<NamedSymbol>>> =
+                    r.iter().map(|b| self.eval_recursive(b)).collect();
 
                 match op {
                     CountableOperator::AtMost => {
@@ -242,21 +275,45 @@ impl SymbolicBDD {
         Ok(result)
     }
 
-    fn parse_sub_formula(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
-        let left = match tokens.peek() {
-            Some(SymbolicBDDToken::OpenParen) => SymbolicBDD::parse_parentized_formula(tokens)?,
-            Some(SymbolicBDDToken::OpenSquare) => SymbolicBDD::parse_countable_formula(tokens)?,
+    // check whether a given variable is bound by a quantifier in the formula
+    pub fn var_is_free(&self, var: &str) -> bool {
+        match self {
+            SymbolicBDD::Var(v) if v == var => true,
+            SymbolicBDD::Quantifier(_, vars, f) => {
+                if !vars.contains(&String::from(var)) {
+                    f.var_is_free(var)
+                } else {
+                    false
+                }
+            }
+            SymbolicBDD::Ite(a, b, c) => {
+                a.var_is_free(var) || b.var_is_free(var) || c.var_is_free(var)
+            }
+            SymbolicBDD::Not(f) => f.var_is_free(var),
+            SymbolicBDD::BinaryOp(_, a, b) => a.var_is_free(var) || b.var_is_free(var),
+            SymbolicBDD::CountableConst(_, sub, _) => sub.iter().any(|f| f.var_is_free(var)),
+            SymbolicBDD::CountableVariable(_, l, r) => {
+                l.iter().any(|f| f.var_is_free(var)) || r.iter().any(|f| f.var_is_free(var))
+            }
+            _ => false,
+        }
+    }
+
+    fn parse_simple_sub_formula(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
+        match tokens.peek() {
+            Some(SymbolicBDDToken::OpenParen) => SymbolicBDD::parse_parentized_formula(tokens),
+            Some(SymbolicBDDToken::OpenSquare) => SymbolicBDD::parse_countable_formula(tokens),
             Some(SymbolicBDDToken::False) => {
                 expect(SymbolicBDDToken::False, tokens)?;
-                SymbolicBDD::False
+                Ok(SymbolicBDD::False)
             }
             Some(SymbolicBDDToken::True) => {
                 expect(SymbolicBDDToken::True, tokens)?;
-                SymbolicBDD::True
-            }
+                Ok(SymbolicBDD::True)
+            },
             Some(SymbolicBDDToken::Ident(_)) => {
                 // either a variable, or a constant, or a rewrite rule
-                let name = SymbolicBDD::parse_ident(tokens)?;
+                let name = SymbolicBDD::parse_variable_name(tokens)?;
 
                 if check(SymbolicBDDToken::OpenParen, tokens).is_ok() {
                     expect(SymbolicBDDToken::OpenParen, tokens)?;
@@ -276,22 +333,24 @@ impl SymbolicBDD {
                 } else {
                     SymbolicBDD::Var(name)
                 }
-            }
-            Some(SymbolicBDDToken::Not) => SymbolicBDD::parse_negation(tokens)?,
-            Some(SymbolicBDDToken::Exists) => SymbolicBDD::parse_existence_quantifier(tokens)?,
-            Some(SymbolicBDDToken::Forall) => SymbolicBDD::parse_universal_quantifier(tokens)?,
+            },
+            Some(SymbolicBDDToken::Not) => SymbolicBDD::parse_negation(tokens),
+            Some(SymbolicBDDToken::Exists) => SymbolicBDD::parse_existence_quantifier(tokens),
+            Some(SymbolicBDDToken::Forall) => SymbolicBDD::parse_universal_quantifier(tokens),
+            Some(SymbolicBDDToken::If) => SymbolicBDD::parse_ite(tokens),
             Some(SymbolicBDDToken::Sum) => SymbolicBDD::parse_summation(tokens)?,
-            Some(SymbolicBDDToken::If) => SymbolicBDD::parse_ite(tokens)?,
             None | Some(SymbolicBDDToken::Eof) => {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, "Unexpected EOF"))
-            }
-            Some(other) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Unexpected token {:?}", other),
-                ))
-            }
-        };
+                Err(io::Error::new(io::ErrorKind::InvalidData, "Unexpected EOF"))
+            },
+            Some(other) => Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Unexpected token {:?}", other),
+            )),
+        }
+    }
+
+    fn parse_sub_formula(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
+        let left = SymbolicBDD::parse_simple_sub_formula(tokens)?;
 
         // either a binary operator or end of sub-formula
         match tokens.peek() {
@@ -539,8 +598,17 @@ impl SymbolicBDD {
 
     fn parse_negation(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
         expect(SymbolicBDDToken::Not, tokens)?;
-        let negated = SymbolicBDD::parse_sub_formula(tokens)?;
-        Ok(SymbolicBDD::Not(Box::new(negated)))
+
+        let sf = SymbolicBDD::parse_simple_sub_formula(tokens);
+
+        if let Ok(sf_ok) = sf {
+            Ok(SymbolicBDD::Not(Box::new(sf_ok)))
+        } else {
+            // failover if the next part is not a simple formula
+            Ok(SymbolicBDD::Not(Box::new(SymbolicBDD::parse_sub_formula(
+                tokens,
+            )?)))
+        }
     }
 
     fn parse_parentized_formula(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
@@ -610,9 +678,9 @@ impl SymbolicBDD {
             } else if let Some(number) = c.name("countable") {
                 let parsed_number = number.as_str().parse().expect("Failed to parse number");
                 result.push(SymbolicBDDToken::Countable(parsed_number));
-            } else if let Some(_) = c.name("eof") {
+            } else if c.name("eof").is_some() {
                 result.push(SymbolicBDDToken::Eof);
-            } else if let Some(_) = c.name("comment") {
+            } else if c.name("comment").is_some() {
                 // ignore comments
             } else {
                 return Err(io::Error::new(io::ErrorKind::InvalidData, "Unknown token"));
@@ -630,7 +698,7 @@ impl SymbolicBDD {
 
 fn expect(token: SymbolicBDDToken, tokens: &mut TokenReader) -> io::Result<()> {
     match &tokens.next() {
-        &Some(t) if *t == token => return Ok(()),
+        &Some(t) if *t == token => Ok(()),
         t => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,

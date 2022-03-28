@@ -4,7 +4,8 @@ use rsbdd::parser::*;
 use rsbdd::parser_io::*;
 use rsbdd::plot::*;
 use std::fs::File;
-use std::io::BufReader;
+use std::io;
+use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
@@ -22,9 +23,11 @@ fn main() {
         (@arg show_truth_table: -t --truthtable !takes_value "print the truth-table to stdout")
         (@arg show_dot: -d --dot +takes_value "write the bdd to a dot graphviz file")
         (@arg model: -m --model !takes_value "use a model of the bdd as output (instead of the satisfying assignment)")
-        (@arg expect: -e --expect +takes_value "only show true or false entries in the truth-table")
+        (@arg vars: -v --vars !takes_value "print all true variables leading to a truth evaluation")
+        (@arg filter: -f --filter +takes_value "only show true or false entries in the truth-table")
         (@arg benchmark: -b --benchmark +takes_value "Repeat the solving process n times for more accurate performance reports")
         (@arg show_plot: --plot !takes_value "show a distribution plot of the runtime")
+        (@arg evaluate: -e --eval +takes_value "Inline evaluate the given formula")
     )
     .get_matches();
 
@@ -34,81 +37,103 @@ fn main() {
         .parse::<usize>()
         .expect("Could not parse benchmark value as usize");
 
-    if let Some(input_filename) = args.value_of("input") {
-        let input_file = File::open(input_filename).expect("Could not open input file");
+    let inline_eval = args.value_of("evaluate");
+    let input_filename = args.value_of("input");
 
-        let input_parsed = ParsedFormula::new(&mut BufReader::new(input_file))
-            .expect("Could not parse input file");
-
-        if let Some(parsetree_filename) = args.value_of("show_parsetree") {
-            let mut f =
-                File::create(parsetree_filename).expect("Could not create parsetree dot file");
-
-            let graph = SymbolicParseTree::new(&input_parsed.bdd);
-
-            graph
-                .render_dot(&mut f)
-                .expect("Could not write parsetree to dot file");
-        }
-
-        let mut result: Rc<BDD<NamedSymbol>> = Rc::default();
-        let mut exec_times = Vec::new();
-
-        for _ in 0..repeat {
-            let tick = Instant::now();
-            result = input_parsed.eval();
-            exec_times.push(tick.elapsed());
-        }
-
-        // only print performance results when the benchmark flag is available, and more than 1 run has completed
-        if args.is_present("benchmark") && repeat > 0 {
-            print_performance_results(&exec_times);
-
-            if args.is_present("show_plot") {
-                plot_performance_results(&exec_times);
-            }
-        }
-
-        if args.is_present("model") {
-            result = input_parsed.env.borrow().model(result);
-        }
-
-        if args.is_present("show_truth_table") {
-            let filter = match args.value_of("expect") {
-                Some("true") => TruthTableEntry::True,
-                Some("false") => TruthTableEntry::False,
-                _ => TruthTableEntry::Any,
-            };
-
-            println!("{:?}", input_parsed.vars);
-            print_truth_table_recursive(
-                &result,
-                input_parsed
-                    .vars
-                    .iter()
-                    .map(|_| TruthTableEntry::Any)
-                    .collect(),
-                &input_parsed,
-                filter,
-            );
-        }
-
-        if let Some(dot_filename) = args.value_of("show_dot") {
-            let mut f = File::create(dot_filename).expect("Could not create dot file");
-
-            let graph = BDDGraph::new(&Rc::new(input_parsed.env.borrow().clone()), &result);
-
-            graph
-                .render_dot(&mut f)
-                .expect("Could not write BDD to dot file");
-        }
+    let mut reader = if let Some(inline_str) = inline_eval {
+        Box::new(BufReader::new(inline_str.as_bytes())) as Box<dyn BufRead>
+    } else if let Some(some_input_filename) = input_filename {
+        let file = File::open(some_input_filename).expect("Could not open input file");
+        Box::new(BufReader::new(file)) as Box<dyn BufRead>
     } else {
-        println!("No input file specified");
+        Box::new(BufReader::new(io::stdin())) as Box<dyn BufRead>
+    };
+
+    let input_parsed = ParsedFormula::new(&mut reader).expect("Could not parse input file");
+
+    if let Some(parsetree_filename) = args.value_of("show_parsetree") {
+        let mut f = File::create(parsetree_filename).expect("Could not create parsetree dot file");
+
+        let graph = SymbolicParseTree::new(&input_parsed.bdd);
+
+        graph
+            .render_dot(&mut f)
+            .expect("Could not write parsetree to dot file");
+    }
+
+    let mut result: Rc<BDD<NamedSymbol>> = Rc::default();
+    let mut exec_times = Vec::new();
+
+    // Benchmark: repeat n times and log runtime per iteration
+    for i in 0..repeat {
+        let tick = Instant::now();
+        result = input_parsed.eval();
+        exec_times.push(tick.elapsed());
+
+        eprintln!("finished {}/{} runs", i + 1, repeat);
+    }
+
+    // only print performance results when the benchmark flag is available, and more than 1 run has completed
+    if args.is_present("benchmark") && repeat > 0 {
+        print_performance_results(&exec_times);
+
+        if args.is_present("show_plot") {
+            plot_performance_results(&exec_times);
+        }
+    }
+
+    // reduce the bdd to a single path from root to a single 'true' node
+    if args.is_present("model") {
+        result = input_parsed.env.borrow().model(result);
+    }
+
+    let filter = match args.value_of("filter") {
+        Some("true" | "True" | "t" | "T" | "1") => TruthTableEntry::True,
+        Some("false" | "False" | "f" | "F" | "0") => TruthTableEntry::False,
+        _ => TruthTableEntry::Any,
+    };
+
+    if args.is_present("show_truth_table") {
+        println!("{:?}", input_parsed.free_vars);
+        print_truth_table_recursive(
+            &result,
+            input_parsed
+                .free_vars
+                .iter()
+                .map(|_| TruthTableEntry::Any)
+                .collect(),
+            filter,
+            &input_parsed,
+        );
+    }
+
+    if args.is_present("vars") {
+        print_true_vars_recursive(
+            &result,
+            input_parsed
+                .free_vars
+                .iter()
+                .map(|_| TruthTableEntry::Any)
+                .collect(),
+            &input_parsed.free_vars,
+            &input_parsed,
+        );
+    }
+
+    if let Some(dot_filename) = args.value_of("show_dot") {
+        let mut f = File::create(dot_filename).expect("Could not create dot file");
+
+        let graph = BDDGraph::new(&result, filter);
+
+        graph
+            .render_dot(&mut f)
+            .expect("Could not write BDD to dot file");
     }
 }
 
-fn stats(results: &Vec<Duration>) -> (f64, f64, f64, f64, f64) {
-    let mut sresults = results.clone();
+// compute run-time statistics: minimum, maximum, median, mean, standard-deviation
+fn stats(results: &[Duration]) -> (f64, f64, f64, f64, f64) {
+    let mut sresults = results.to_vec();
     sresults.sort();
 
     let median = sresults[sresults.len() / 2].as_secs_f64();
@@ -127,7 +152,9 @@ fn stats(results: &Vec<Duration>) -> (f64, f64, f64, f64, f64) {
 
     (min, max, median, mean, stddev)
 }
-fn print_performance_results(results: &Vec<Duration>) {
+
+// print performance results to stderr
+fn print_performance_results(results: &[Duration]) {
     let (min, max, median, mean, stddev) = stats(results);
 
     eprintln!("Runtime report for {} iterations:", results.len());
@@ -138,7 +165,8 @@ fn print_performance_results(results: &Vec<Duration>) {
     eprintln!("Standard deviation: {:.4}s", stddev);
 }
 
-fn plot_performance_results(results: &Vec<Duration>) {
+// invoke gnuplot to show the run-time distribution plot
+fn plot_performance_results(results: &[Duration]) {
     let (_, _, _, mean, stddev) = stats(results);
 
     let mut gnuplot_cmd = Command::new("gnuplot")
@@ -147,8 +175,6 @@ fn plot_performance_results(results: &Vec<Duration>) {
         .stdin(Stdio::piped())
         .spawn()
         .expect("Could not spawn gnuplot");
-
-    // let mut writer = BufWriter::new(gnuplot_cmd.stdin.as_mut().unwrap());
 
     let stdin = gnuplot_cmd.stdin.as_mut().unwrap();
     write_gnuplot_normal_distribution(
@@ -159,41 +185,70 @@ fn plot_performance_results(results: &Vec<Duration>) {
         stddev,
     )
     .expect("Could not write to gnuplot command");
-    drop(stdin);
 
     gnuplot_cmd
         .wait()
         .expect("Could not wait for gnuplot to finish");
 }
 
-#[derive(Debug, Clone, PartialEq)]
-enum TruthTableEntry {
-    True,
-    False,
-    Any,
+fn print_true_vars_recursive(
+    root: &Rc<BDD<NamedSymbol>>,
+    values: Vec<TruthTableEntry>,
+    vars: &[String],
+    parsed: &ParsedFormula,
+) {
+    match root.as_ref() {
+        BDD::Choice(ref l, s, ref r) => {
+            // first visit the false subtree
+            let mut r_vals = values.clone();
+            r_vals[parsed.to_free_index(s)] = TruthTableEntry::False;
+            print_true_vars_recursive(r, r_vals, vars, parsed);
+
+            // then visit the true subtree
+            let mut l_vals = values;
+            l_vals[parsed.to_free_index(s)] = TruthTableEntry::True;
+            print_true_vars_recursive(l, l_vals, vars, parsed);
+        }
+        BDD::True => {
+            let mut vars_str = Vec::new();
+            for (i, v) in values.iter().enumerate() {
+                if *v == TruthTableEntry::True {
+                    vars_str.push(vars[i].clone());
+                } else if *v == TruthTableEntry::Any {
+                    vars_str.push(vars[i].clone() + "*");
+                }
+            }
+            println!("{};", vars_str.join(", "));
+        }
+        _ => {}
+    }
 }
 
+// recursively walk through the bdd and assign values to the variables until every permutation is assigned a true or false value
 fn print_truth_table_recursive(
     root: &Rc<BDD<NamedSymbol>>,
     vars: Vec<TruthTableEntry>,
-    e: &ParsedFormula,
     filter: TruthTableEntry,
+    parsed: &ParsedFormula,
 ) {
     match root.as_ref() {
         BDD::Choice(ref l, s, ref r) => {
             // first visit the false subtree
             let mut r_vars = vars.clone();
-            r_vars[s.id] = TruthTableEntry::False;
-            print_truth_table_recursive(r, r_vars, e, filter.clone());
+            r_vars[parsed.to_free_index(s)] = TruthTableEntry::False;
+            print_truth_table_recursive(r, r_vars, filter, parsed);
 
             // then visit the true subtree
-            let mut l_vars = vars.clone();
-            l_vars[s.id] = TruthTableEntry::True;
-            print_truth_table_recursive(l, l_vars, e, filter.clone());
+            let mut l_vars = vars;
+            l_vars[parsed.to_free_index(s)] = TruthTableEntry::True;
+            print_truth_table_recursive(l, l_vars, filter, parsed);
         }
-        c if filter == TruthTableEntry::Any => println!("{:?} {:?}", vars, c),
-        c if filter == TruthTableEntry::True && *c == BDD::True => println!("{:?} {:?}", vars, c),
-        c if filter == TruthTableEntry::False && *c == BDD::False => println!("{:?} {:?}", vars, c),
+        c if (filter == TruthTableEntry::Any)
+            || (filter == TruthTableEntry::True && *c == BDD::True)
+            || (filter == TruthTableEntry::False && *c == BDD::False) =>
+        {
+            println!("{:?} {:?}", vars, c)
+        }
         _ => {}
     }
 }

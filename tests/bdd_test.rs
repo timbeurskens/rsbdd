@@ -23,14 +23,11 @@ fn test_equivalence() {
     assert_ne!(e.mk_const(true), e.mk_const(false));
     assert_ne!(e.mk_const(false), e.mk_const(true));
 
-    assert_eq!(e.and(_true.clone(), _true.clone()), _true.clone());
+    assert_eq!(e.and(_true.clone(), _true.clone()), _true);
     assert_ne!(e.and(e.var(0), e.var(1)), e.and(e.var(1), e.var(2)));
     assert_eq!(e.and(e.var(0), e.var(1)), e.and(e.var(1), e.var(0)));
 
-    assert_eq!(
-        e.not(e.var(0)),
-        e.mk_choice(_false.clone(), 0, _true.clone())
-    )
+    assert_eq!(e.not(e.var(0)), e.mk_choice(_false, 0, _true))
 }
 
 #[test]
@@ -68,7 +65,15 @@ fn test_simple_duplicates() {
     assert_eq!(e.duplicates(e.and(e.mk_const(true), e.var(0))), 0);
 
     assert_eq!(
-        e.duplicates(e.amn(&vec![1, 2].iter().map(|&i| e.var(i)).collect(), 1)),
+        e.duplicates(
+            e.amn(
+                &vec![1, 2]
+                    .iter()
+                    .map(|&i| e.var(i))
+                    .collect::<Vec<Rc<BDD>>>(),
+                1
+            )
+        ),
         0
     );
 }
@@ -197,11 +202,20 @@ fn test_exn() {
     assert_eq!(e.exn(&vec![], 0), e.mk_const(true));
     assert_eq!(e.exn(&vec![], 1), e.mk_const(false));
     assert_eq!(
-        e.exn(&vec![0].iter().map(|&i| e.var(i)).collect(), 1),
+        e.exn(
+            &vec![0].iter().map(|&i| e.var(i)).collect::<Vec<Rc<BDD>>>(),
+            1
+        ),
         e.var(0)
     );
     assert_eq!(
-        e.exn(&vec![0, 1].iter().map(|&i| e.var(i)).collect(), 1),
+        e.exn(
+            &vec![0, 1]
+                .iter()
+                .map(|&i| e.var(i))
+                .collect::<Vec<Rc<BDD>>>(),
+            1
+        ),
         e.or(
             e.and(e.not(e.var(0)), e.var(1)),
             e.and(e.not(e.var(1)), e.var(0))
@@ -215,19 +229,37 @@ fn test_aln() {
 
     assert_eq!(e.aln(&vec![], 0), e.mk_const(true));
     assert_eq!(
-        e.aln(&vec![0].iter().map(|&i| e.var(i)).collect(), 0),
+        e.aln(
+            &vec![0].iter().map(|&i| e.var(i)).collect::<Vec<Rc<BDD>>>(),
+            0
+        ),
         e.mk_const(true)
     );
     assert_eq!(
-        e.aln(&vec![0].iter().map(|&i| e.var(i)).collect(), 1),
+        e.aln(
+            &vec![0].iter().map(|&i| e.var(i)).collect::<Vec<Rc<BDD>>>(),
+            1
+        ),
         e.var(0)
     );
     assert_eq!(
-        e.aln(&vec![0, 1].iter().map(|&i| e.var(i)).collect(), 1),
+        e.aln(
+            &vec![0, 1]
+                .iter()
+                .map(|&i| e.var(i))
+                .collect::<Vec<Rc<BDD>>>(),
+            1
+        ),
         e.or(e.var(0), e.var(1))
     );
     assert_eq!(
-        e.aln(&vec![0, 1, 2].iter().map(|&i| e.var(i)).collect(), 1),
+        e.aln(
+            &vec![0, 1, 2]
+                .iter()
+                .map(|&i| e.var(i))
+                .collect::<Vec<Rc<BDD>>>(),
+            1
+        ),
         e.or(e.or(e.var(0), e.var(1)), e.var(2))
     );
 }
@@ -239,15 +271,27 @@ fn test_amn() {
     assert_eq!(e.amn(&vec![], 1), e.mk_const(true));
     assert_eq!(e.amn(&vec![], 0), e.mk_const(true));
     assert_eq!(
-        e.amn(&vec![0].iter().map(|&i| e.var(i)).collect(), 0),
+        e.amn(
+            &vec![0].iter().map(|&i| e.var(i)).collect::<Vec<Rc<BDD>>>(),
+            0
+        ),
         e.not(e.var(0))
     );
     assert_eq!(
-        e.amn(&vec![0].iter().map(|&i| e.var(i)).collect(), 1),
+        e.amn(
+            &vec![0].iter().map(|&i| e.var(i)).collect::<Vec<Rc<BDD>>>(),
+            1
+        ),
         e.mk_const(true)
     );
     assert_eq!(
-        e.amn(&vec![0, 1].iter().map(|&i| e.var(i)).collect(), 1),
+        e.amn(
+            &vec![0, 1]
+                .iter()
+                .map(|&i| e.var(i))
+                .collect::<Vec<Rc<BDD>>>(),
+            1
+        ),
         e.or(
             e.and(e.not(e.var(0)), e.not(e.var(1))),
             e.or(
@@ -257,7 +301,13 @@ fn test_amn() {
         )
     );
     assert_ne!(
-        e.amn(&vec![0, 1, 2].iter().map(|&i| e.var(i)).collect(), 1),
+        e.amn(
+            &vec![0, 1, 2]
+                .iter()
+                .map(|&i| e.var(i))
+                .collect::<Vec<Rc<BDD>>>(),
+            1
+        ),
         e.mk_const(false)
     );
 }
@@ -275,13 +325,31 @@ fn test_amn_quantifiers() {
 
     // amn([0, 1, 2], 2) != amn([3, 4, 5], 2)
     assert_ne!(
-        e.amn(&vec![0, 1, 2].iter().map(|&i| e.var(i)).collect(), 2),
-        e.amn(&vec![3, 4, 5].iter().map(|&i| e.var(i)).collect(), 2)
+        e.amn(
+            &vec![0, 1, 2]
+                .iter()
+                .map(|&i| e.var(i))
+                .collect::<Vec<Rc<BDD>>>(),
+            2
+        ),
+        e.amn(
+            &vec![3, 4, 5]
+                .iter()
+                .map(|&i| e.var(i))
+                .collect::<Vec<Rc<BDD>>>(),
+            2
+        )
     );
 
     // amn([0, 1, 2], 2) == exists([3, 4, 5], 0 == 3 && 1 == 4 && 2 == 5 && amn([3, 4, 5], 2))
     assert_eq!(
-        e.amn(&vec![0, 1, 2].iter().map(|&i| e.var(i)).collect(), 2),
+        e.amn(
+            &vec![0, 1, 2]
+                .iter()
+                .map(|&i| e.var(i))
+                .collect::<Vec<Rc<BDD>>>(),
+            2
+        ),
         e.exists(
             vec![3],
             e.exists(
@@ -294,7 +362,13 @@ fn test_amn_quantifiers() {
                             e.eq(e.var(1), e.var(4)),
                             e.and(
                                 e.eq(e.var(2), e.var(5)),
-                                e.amn(&vec![3, 4, 5].iter().map(|&i| e.var(i)).collect(), 2)
+                                e.amn(
+                                    &vec![3, 4, 5]
+                                        .iter()
+                                        .map(|&i| e.var(i))
+                                        .collect::<Vec<Rc<BDD>>>(),
+                                    2
+                                )
                             )
                         )
                     )
@@ -315,7 +389,7 @@ fn test_model() {
 
     assert_eq!(e.implies(model.clone(), e.var(0)), e.mk_const(true));
     assert_eq!(e.implies(model.clone(), e.var(1)), e.mk_const(true));
-    assert_ne!(e.implies(model.clone(), e.var(2)), e.mk_const(true));
+    assert_ne!(e.implies(model, e.var(2)), e.mk_const(true));
 }
 
 #[test]
@@ -325,8 +399,8 @@ fn test_exn_model() {
     // semi-exhaustive test for exactly n
     for n in 0..15 {
         for c in 0..=n {
-            let vars = (0..n).map(|i| e.var(i)).collect();
-            let expr = e.exn(&vars, c);
+            let vars: Vec<Rc<BDD>> = (0..n).map(|i| e.var(i)).collect();
+            let expr = e.exn(&vars, c.try_into().unwrap());
             let model = e.model(expr);
 
             let mut count = 0;
@@ -351,11 +425,11 @@ fn test_exn_interference_model() {
             for c in 0..=n {
                 println!("n: {}, o: {}, c: {}", n, o, c);
 
-                let vars = (0..n).map(|i| e.var(i)).collect();
-                let vars_interference = (n - o..(2 * n)).map(|i| e.var(i)).collect();
+                let vars: Vec<Rc<BDD>> = (0..n).map(|i| e.var(i)).collect();
+                let vars_interference: Vec<Rc<BDD>> = (n - o..(2 * n)).map(|i| e.var(i)).collect();
 
-                let expr = e.exn(&vars, c);
-                let expr_interference = e.exn(&vars_interference, c);
+                let expr = e.exn(&vars, c.try_into().unwrap());
+                let expr_interference = e.exn(&vars_interference, c.try_into().unwrap());
 
                 let expr_comb = e.and(expr, expr_interference);
 
@@ -390,8 +464,8 @@ fn test_amn_model() {
     // non-exhaustive test for at most n
     for n in 0..15 {
         for c in 0..=n {
-            let vars = (0..n).map(|i| e.var(i)).collect();
-            let expr = e.amn(&vars, c);
+            let vars: Vec<Rc<BDD>> = (0..n).map(|i| e.var(i)).collect();
+            let expr = e.amn(&vars, c.try_into().unwrap());
             let model = e.model(expr);
 
             let mut count = 0;
@@ -412,7 +486,7 @@ fn test_aln_model() {
     // non-exhaustive test for at least n
     for n in 0..15 {
         for c in 0..=n {
-            let vars = (0..n).map(|i| e.var(i)).collect();
+            let vars: Vec<Rc<BDD>> = (0..n).map(|i| e.var(i)).collect();
             let expr = e.aln(&vars, c as i64);
             let model = e.model(expr);
 
@@ -538,7 +612,7 @@ fn test_queens() {
         diag_expr_vr,
     ];
 
-    let expr_comb = expr_list.iter().fold(e.mk_const(true), |ref acc, ref k| {
+    let expr_comb = expr_list.iter().fold(e.mk_const(true), |ref acc, k| {
         e.and(Rc::clone(acc), Rc::clone(k))
     });
 
@@ -560,7 +634,7 @@ fn test_queens() {
 
     let mut f = File::create(format!("n_queens_{}.dot", n)).unwrap();
 
-    let graph = BDDGraph::new(&Rc::new(e), &expr_comb);
+    let graph = BDDGraph::new(&expr_comb, TruthTableEntry::Any);
 
     graph.render_dot(&mut f).expect("failed to render dot");
 }

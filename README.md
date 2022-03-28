@@ -1,5 +1,7 @@
 # RsBDD
 
+[![Rust](https://github.com/timbeurskens/rsbdd/actions/workflows/rust.yml/badge.svg)](https://github.com/timbeurskens/rsbdd/actions/workflows/rust.yml) 
+
 _Solving satisfiability problems in Rust_
 
 ## Syntax
@@ -336,8 +338,10 @@ The explosive nature of the problem makes n=9 an infeasable problem. Further opt
 
 ## CLI Usage
 
+### rsbdd
+
 ```
-Solver 0.2.0
+Solver 0.6.2
 Tim Beurskens
 A BDD-based SAT solver
 
@@ -347,12 +351,64 @@ USAGE:
 FLAGS:
     -h, --help          Prints help information
     -m, --model         use a model of the bdd as output (instead of the satisfying assignment)
+        --plot          show a distribution plot of the runtime
     -t, --truthtable    print the truth-table to stdout
+    -v, --vars          print all true variables leading to a truth evaluation
     -V, --version       Prints version information
 
 OPTIONS:
-    -e, --expect <expect>               only show true or false entries in the truth-table
+    -b, --benchmark <benchmark>         Repeat the solving process n times for more accurate performance reports
+    -e, --eval <evaluate>               Inline evaluate the given formula
+    -f, --filter <filter>               only show true or false entries in the truth-table
     -i, --input <input>                 logic input file
     -d, --dot <show_dot>                write the bdd to a dot graphviz file
     -p, --parsetree <show_parsetree>    write the parse tree in dot format to this file
+
+```
+
+### max_clique_gen
+
+```
+CliqueGenerator 0.6.2
+Tim Beurskens
+Converts a graph into a max-clique specification
+
+USAGE:
+    max_clique_gen [FLAGS] [OPTIONS]
+
+FLAGS:
+    -a, --all           Construct a BDD satisfying all cliques, not just the maximum clique(s)
+    -h, --help          Prints help information
+    -u, --undirected    Use undirected edges (test for both directions in the set complement operation)
+    -V, --version       Prints version information
+
+OPTIONS:
+    -i, --input <input>      Input file (graph in csv edge-list format)
+    -o, --output <output>    The output file
+
+```
+
+### random_graph_gen
+
+```
+RandomGraphGenerator 0.6.2
+Tim Beurskens
+Generates a random edge list formatted graph
+
+USAGE:
+    random_graph_gen [FLAGS] [OPTIONS]
+
+FLAGS:
+    -d, --dot           Output in dot format
+    -h, --help          Prints help information
+    -u, --undirected    Use undirected edges (test for both directions in the set complement operation)
+    -V, --version       Prints version information
+
+OPTIONS:
+    -c, --colors <colors>        Convert the graph to a graph-coloring specification
+    -i, --input <convert>        Do not generate a new graph, but convert an existing edge list
+    -e, --edges <edges>          Number of edges
+    -o, --output <output>        The output file
+    -v, --vertices <vertices>    Number of vertices
+
 ```

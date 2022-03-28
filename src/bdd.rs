@@ -1,7 +1,7 @@
 use itertools::Itertools;
+use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::collections::hash_map::DefaultHasher;
-use std::collections::HashMap;
 use std::fmt;
 use std::fmt::{Debug, Display};
 use std::hash::{Hash, Hasher};
@@ -49,6 +49,12 @@ impl PartialOrd for NamedSymbol {
     }
 }
 
+impl From<NamedSymbol> for usize {
+    fn from(ns: NamedSymbol) -> Self {
+        ns.id
+    }
+}
+
 // todo: place bdd items in a collection (hashmap?)
 // when constructing a new bdd, check if it already exists in the collection.
 // if it does, return a reference to the existing bdd.
@@ -62,40 +68,34 @@ pub enum BDD<Symbol: BDDSymbol> {
     Choice(Rc<BDD<Symbol>>, Symbol, Rc<BDD<Symbol>>),
 }
 
+impl From<BDD<NamedSymbol>> for BDD<usize> {
+    fn from(bdd: BDD<NamedSymbol>) -> BDD<usize> {
+        match bdd {
+            BDD::False => BDD::False,
+            BDD::True => BDD::True,
+            BDD::Choice(true_subtree, symbol, false_subtree) => BDD::Choice(
+                Rc::new(BDD::from(true_subtree.as_ref().clone())),
+                symbol.into(),
+                Rc::new(BDD::from(false_subtree.as_ref().clone())),
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TruthTableEntry {
+    True,
+    False,
+    Any,
+}
+
 impl<S: BDDSymbol> Default for BDD<S> {
     fn default() -> Self {
         BDD::False
     }
 }
 
-// impl<S: BDDSymbol> Hash for BDD<S> {
-//     fn hash<H: Hasher>(&self, state: &mut H) {
-//         match self {
-//             &BDD::Choice(ref l, s, ref r) => {
-//                 l.short_hash(state);
-//                 s.hash(state);
-//                 r.short_hash(state);
-//             },
-//             &BDD::True | &BDD::False => self.short_hash(state)
-//         }
-//     }
-// }
-
 impl<S: BDDSymbol> BDD<S> {
-    // fn short_hash<H: Hasher>(&self, state: &mut H) {
-    //     match self {
-    //         &BDD::Choice(_, s, _) => {
-    //             s.hash(state);
-    //         },
-    //         &BDD::True => {
-    //             true.hash(state);
-    //         },
-    //         &BDD::False => {
-    //             false.hash(state);
-    //         }
-    //     }
-    // }
-
     pub fn get_hash(&self) -> u64 {
         let mut s = DefaultHasher::new();
         self.hash(&mut s);
@@ -105,7 +105,13 @@ impl<S: BDDSymbol> BDD<S> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BDDEnv<Symbol: BDDSymbol> {
-    pub nodes: RefCell<HashMap<BDD<Symbol>, Rc<BDD<Symbol>>>>,
+    pub nodes: RefCell<FxHashMap<BDD<Symbol>, Rc<BDD<Symbol>>>>,
+}
+
+impl<S: BDDSymbol> Default for BDDEnv<S> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<S: BDDSymbol> BDDEnv<S> {
@@ -133,20 +139,19 @@ impl<S: BDDSymbol> BDDEnv<S> {
         // todo: conclusion: hashes are stricter than pointers
         // try to rephrase the equivalence check, such hash a == hash b <=> a == b
 
-        let unique_hashes: Vec<Rc<BDD<S>>> = all_nodes
-            .clone()
+        let unique_hashes = all_nodes
             .iter()
             .map(|n| self.find(n))
             .unique_by(|n| n.get_hash())
-            .collect();
-        let unique_pointers: Vec<Rc<BDD<S>>> = all_nodes
-            .clone()
+            .count();
+
+        let unique_pointers = all_nodes
             .iter()
             .unique_by(|&n| Rc::into_raw(Rc::clone(n)) as u32)
             .cloned()
-            .collect();
+            .count();
 
-        unique_pointers.len() - unique_hashes.len()
+        unique_pointers - unique_hashes
     }
 
     pub fn node_list(&self, root: Rc<BDD<S>>) -> Vec<Rc<BDD<S>>> {
@@ -162,7 +167,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
                     .cloned()
                     .collect()
             }
-            &BDD::True | &BDD::False => vec![Rc::clone(&root)].into(),
+            &BDD::True | &BDD::False => vec![Rc::clone(&root)],
         }
     }
 
@@ -177,13 +182,15 @@ impl<S: BDDSymbol> BDDEnv<S> {
         // early simplification step
         let ins = self.simplify(&Rc::new(BDD::Choice(true_subtree, symbol, false_subtree)));
 
-        if self.nodes.borrow().contains_key(&ins) {
-            self.find(&ins)
+        // pre-borrow the nodes as mutable
+        let mut nodes_borrow = self.nodes.borrow_mut();
+
+        // if the node already exists, return a reference to it
+        if let Some(subtree) = nodes_borrow.get(&ins) {
+            Rc::clone(subtree)
         } else {
             // only insert if it is not already in the lookup table
-            self.nodes
-                .borrow_mut()
-                .insert(ins.as_ref().clone(), Rc::clone(&ins));
+            nodes_borrow.insert(ins.as_ref().clone(), Rc::clone(&ins));
             Rc::clone(&ins)
         }
     }
@@ -203,7 +210,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
     }
 
     pub fn new() -> Self {
-        let mut nodes = HashMap::new();
+        let mut nodes = FxHashMap::default();
 
         nodes.insert(BDD::True, Rc::new(BDD::True));
         nodes.insert(BDD::False, Rc::new(BDD::False));
@@ -245,10 +252,10 @@ impl<S: BDDSymbol> BDDEnv<S> {
     }
 
     pub fn not(&self, a: Rc<BDD<S>>) -> Rc<BDD<S>> {
-        match a.as_ref() {
-            &BDD::False => self.mk_const(true),
-            &BDD::True => self.mk_const(false),
-            &BDD::Choice(ref at, ref va, ref af) => {
+        match *a.as_ref() {
+            BDD::False => self.mk_const(true),
+            BDD::True => self.mk_const(false),
+            BDD::Choice(ref at, ref va, ref af) => {
                 self.mk_choice(self.not(Rc::clone(at)), va.clone(), self.not(Rc::clone(af)))
             }
         }
@@ -302,8 +309,8 @@ impl<S: BDDSymbol> BDDEnv<S> {
         self.mk_choice(self.mk_const(true), s, self.mk_const(false))
     }
 
-    pub fn aln(&self, branches: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
-        if branches.len() == 0 {
+    pub fn aln(&self, branches: &[Rc<BDD<S>>], n: i64) -> Rc<BDD<S>> {
+        if branches.is_empty() {
             if n > 0 {
                 self.mk_const(false)
             } else {
@@ -321,8 +328,8 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    pub fn amn(&self, branches: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
-        if branches.len() == 0 {
+    pub fn amn(&self, branches: &[Rc<BDD<S>>], n: i64) -> Rc<BDD<S>> {
+        if branches.is_empty() {
             if n >= 0 {
                 self.mk_const(true)
             } else {
@@ -340,20 +347,20 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    pub fn exn(&self, branches: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
+    pub fn exn(&self, branches: &[Rc<BDD<S>>], n: i64) -> Rc<BDD<S>> {
         self.and(self.amn(branches, n), self.aln(branches, n))
     }
 
-    pub fn count_leq(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>) -> Rc<BDD<S>> {
+    pub fn count_leq(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>]) -> Rc<BDD<S>> {
         self.count_leq_recursive(a, b, 0)
     }
 
-    pub fn count_lt(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>) -> Rc<BDD<S>> {
+    pub fn count_lt(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>]) -> Rc<BDD<S>> {
         self.count_leq_recursive(a, b, 1)
     }
 
-    fn count_leq_recursive(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
-        if a.len() == 0 {
+    fn count_leq_recursive(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>], n: i64) -> Rc<BDD<S>> {
+        if a.is_empty() {
             self.aln(b, n)
         } else {
             let first = &a[0];
@@ -367,16 +374,16 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    pub fn count_gt(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>) -> Rc<BDD<S>> {
+    pub fn count_gt(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>]) -> Rc<BDD<S>> {
         self.count_geq_recursive(a, b, -1)
     }
 
-    pub fn count_geq(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>) -> Rc<BDD<S>> {
+    pub fn count_geq(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>]) -> Rc<BDD<S>> {
         self.count_geq_recursive(a, b, 0)
     }
 
-    fn count_geq_recursive(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>, n: i64) -> Rc<BDD<S>> {
-        if a.len() == 0 {
+    fn count_geq_recursive(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>], n: i64) -> Rc<BDD<S>> {
+        if a.is_empty() {
             self.amn(b, n)
         } else {
             let first = &a[0];
@@ -390,12 +397,12 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    pub fn count_eq(&self, a: &Vec<Rc<BDD<S>>>, b: &Vec<Rc<BDD<S>>>) -> Rc<BDD<S>> {
+    pub fn count_eq(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>]) -> Rc<BDD<S>> {
         self.and(self.count_leq(a, b), self.count_geq(a, b))
     }
 
     pub fn exists(&self, s: Vec<S>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
-        if s.len() == 0 {
+        if s.is_empty() {
             b
         } else {
             let first = &s[0];
@@ -413,7 +420,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
             &BDD::Choice(ref t, ref v, ref f) => self.mk_choice(
                 self.exists_impl(s.clone(), Rc::clone(t)),
                 v.clone(),
-                self.exists_impl(s.clone(), Rc::clone(f)),
+                self.exists_impl(s, Rc::clone(f)),
             ),
         }
     }
@@ -474,10 +481,6 @@ impl<S: BDDSymbol> BDDEnv<S> {
             &BDD::Choice(ref t, _, ref f) if t.as_ref() == f.as_ref() => t,
             _ => a,
         };
-
-        // let dups = self.duplicates(result.clone());
-
-        // assert_eq!(dups.len(), 0);
 
         Rc::clone(result)
     }
