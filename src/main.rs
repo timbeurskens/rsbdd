@@ -3,6 +3,7 @@ use rsbdd::bdd_io::*;
 use rsbdd::parser::*;
 use rsbdd::parser_io::*;
 use rsbdd::plot::*;
+use std::cmp::max;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader};
@@ -93,8 +94,24 @@ fn main() {
         _ => TruthTableEntry::Any,
     };
 
+    let widths: Vec<usize> = input_parsed
+        .free_vars
+        .iter()
+        .map(|v| max(5, v.len()) as usize)
+        .collect();
+
     if args.is_present("show_truth_table") {
-        println!("{:?}", input_parsed.free_vars);
+        print!("|");
+        for free_var in &input_parsed.free_vars {
+            let len = 1 + max(5, free_var.len());
+            print!(" {:indent$}|", free_var, indent = len);
+        }
+        println!();
+        for width in &widths {
+            print!("|{:->width$}", "", width = *width + 2);
+        }
+        println!("|");
+        // println!("{:?}", input_parsed.free_vars.join("|"));
         print_truth_table_recursive(
             &result,
             input_parsed
@@ -104,6 +121,7 @@ fn main() {
                 .collect(),
             filter,
             &input_parsed,
+            &widths,
         );
     }
 
@@ -191,6 +209,7 @@ fn plot_performance_results(results: &[Duration]) {
         .expect("Could not wait for gnuplot to finish");
 }
 
+// print all variables which can take a 'true' value in the bdd
 fn print_true_vars_recursive(
     root: &Rc<BDD<NamedSymbol>>,
     values: Vec<TruthTableEntry>,
@@ -230,24 +249,29 @@ fn print_truth_table_recursive(
     vars: Vec<TruthTableEntry>,
     filter: TruthTableEntry,
     parsed: &ParsedFormula,
+    sizes: &[usize],
 ) {
     match root.as_ref() {
         BDD::Choice(ref l, s, ref r) => {
             // first visit the false subtree
             let mut r_vars = vars.clone();
             r_vars[parsed.to_free_index(s)] = TruthTableEntry::False;
-            print_truth_table_recursive(r, r_vars, filter, parsed);
+            print_truth_table_recursive(r, r_vars, filter, parsed, sizes);
 
             // then visit the true subtree
             let mut l_vars = vars;
             l_vars[parsed.to_free_index(s)] = TruthTableEntry::True;
-            print_truth_table_recursive(l, l_vars, filter, parsed);
+            print_truth_table_recursive(l, l_vars, filter, parsed, sizes);
         }
         c if (filter == TruthTableEntry::Any)
             || (filter == TruthTableEntry::True && *c == BDD::True)
             || (filter == TruthTableEntry::False && *c == BDD::False) =>
         {
-            println!("{:?} {:?}", vars, c)
+            print!("|");
+            for (i, var) in vars.iter().enumerate() {
+                print!(" {:indent$} |", var, indent = sizes[i]);
+            }
+            println!(" {:?}", c);
         }
         _ => {}
     }
