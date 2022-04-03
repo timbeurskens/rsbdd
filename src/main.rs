@@ -94,15 +94,14 @@ fn main() {
         _ => TruthTableEntry::Any,
     };
 
-    let widths: Vec<usize> = input_parsed
-        .free_vars
-        .iter()
-        .map(|v| max(5, v.len()) as usize)
-        .collect();
+    let mut headers = input_parsed.free_vars.clone();
+    headers.push("*".to_string());
+
+    let widths: Vec<usize> = headers.iter().map(|v| max(5, v.len()) as usize).collect();
 
     if args.is_present("show_truth_table") {
         print!("|");
-        for free_var in &input_parsed.free_vars {
+        for free_var in &headers {
             let len = 1 + max(5, free_var.len());
             print!(" {:indent$}|", free_var, indent = len);
         }
@@ -271,7 +270,15 @@ fn print_truth_table_recursive(
             for (i, var) in vars.iter().enumerate() {
                 print!(" {:indent$} |", var, indent = sizes[i]);
             }
-            println!(" {:?}", c);
+            println!(
+                " {:indent$} |",
+                match c {
+                    BDD::True => "True",
+                    BDD::False => "False",
+                    _ => unreachable!(),
+                },
+                indent = sizes[vars.len()]
+            );
         }
         _ => {}
     }
