@@ -96,8 +96,12 @@ fn main() -> io::Result<()> {
     )?;
     writeln!(writer)?;
 
-    for complement in &edges_complement {
-        writeln!(writer, "-({} & {}) &", complement.0, complement.1)?;
+    if edges_complement.is_empty() {
+        writeln!(writer, "true &");
+    } else {
+        for complement in &edges_complement {
+            writeln!(writer, "-({} & {}) &", complement.0, complement.1)?;
+        }
     }
 
     writeln!(writer)?;
@@ -121,11 +125,15 @@ fn main() -> io::Result<()> {
         writeln!(
             writer,
             "{}",
-            edges_complement
-                .iter()
-                .map(|(from, to)| format!("  -(v_{} & v_{})", from, to))
-                .collect::<Vec<String>>()
-                .join(" &\n")
+            if edges_complement.is_empty() {
+                "  true".to_string()
+            } else {
+                edges_complement
+                    .iter()
+                    .map(|(from, to)| format!("  -(v_{} & v_{})", from, to))
+                    .collect::<Vec<String>>()
+                    .join(" &\n")
+            }
         )?;
 
         writeln!(
