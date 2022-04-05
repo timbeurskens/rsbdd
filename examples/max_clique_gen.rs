@@ -97,7 +97,7 @@ fn main() -> io::Result<()> {
     writeln!(writer)?;
 
     if edges_complement.is_empty() {
-        writeln!(writer, "true &");
+        writeln!(writer, "true &")?;
     } else {
         for complement in &edges_complement {
             writeln!(writer, "-({} & {}) &", complement.0, complement.1)?;
