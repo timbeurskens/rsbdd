@@ -80,3 +80,18 @@ forall state_is_off_1, state_is_on_1, state_is_emergency_1 #
     "The machine remains on"
     state_is_on_1
 )
+
+"
+Result:
+The property is satisfiable in every situation except the following: state=on & event=danger.
+In this situation the next state will be 'emergency' and not 'on', so the property is not satisfied.
+
+| state_is_off_0 | state_is_on_0 | state_is_emergency_0 | event_danger_0 | event_mitigate_0 | event_turn_on_0 | event_turn_off_0 | *     |
+|----------------|---------------|----------------------|----------------|------------------|-----------------|------------------|-------|
+| False          | False         | Any                  | Any            | Any              | Any             | Any              | True  |
+| False          | True          | False                | False          | Any              | Any             | Any              | True  |
+| False          | True          | False                | True           | Any              | Any             | False            | False |
+| False          | True          | False                | True           | Any              | Any             | True             | True  |
+| False          | True          | True                 | Any            | Any              | Any             | Any              | True  |
+| True           | Any           | Any                  | Any            | Any              | Any             | Any              | True  |
+"
