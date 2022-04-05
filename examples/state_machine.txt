@@ -1,0 +1,82 @@
+"
+State machine behaviour:
+
+There are 3 states: off, on, emergency.
+There are 4 events: turn_on, turn_off, danger, mitigate
+
+The machine updates the state in a fixed interval, with initial state 'off'.
+
+- In state off, when turn_on is active, and danger is not active, the system should go to 'on'.
+- In any state, when danger is active, the system should go to 'emergency'.
+- In state 'emergency', when danger is not active, and mitigate is active, the system should go to 'off'.
+- In state 'on', when turn_off is active and danger is not active, the system should go to 'off'.
+- A state change only occurs when one of the above conditions are met
+
+The structure below allows us to verify invariants on this state machine:
+Given a starting state, can we enter a state that is undesirable?
+
+This system is best described using the rewrite rules and constructors, but this implementation uses the base syntax.
+A nice first step would be to implement functions: apply a logic operation given a simple rewrite rule.
+
+"
+
+"Every possible output state satisfies the requirements"
+
+forall state_is_off_1, state_is_on_1, state_is_emergency_1 # 
+(
+    "Only one state is enabled"
+    [state_is_off_0, state_is_on_0, state_is_emergency_0] = 1 &
+    [state_is_off_1, state_is_on_1, state_is_emergency_1] = 1 &
+
+    "Transitions from state 0"
+
+    (event_danger_0 => (
+        (state_is_off_1 eq false) &
+        (state_is_on_1 eq false) & 
+        (state_is_emergency_1 eq true)
+    )) &
+
+    ((-event_danger_0 & event_mitigate_0 & state_is_emergency_0) => (
+        (state_is_off_1 eq true) &
+        (state_is_on_1 eq false) & 
+        (state_is_emergency_1 eq false)
+    )) &
+
+    ((event_turn_on_0 & -event_danger_0 & state_is_off_0) => (
+        (state_is_off_1 eq false) &
+        (state_is_on_1 eq true) & 
+        (state_is_emergency_1 eq false)
+    )) &
+
+    ((event_turn_off_0 & -event_danger_0 & state_is_on_0) => (
+        (state_is_off_1 eq false) &
+        (state_is_on_1 eq true) & 
+        (state_is_emergency_1 eq false)
+    )) & 
+
+    "State remains the same when the switching conditions are not met"
+
+    ((state_is_on_0 & -event_turn_off_0 & -event_danger_0) => (
+        (state_is_off_1 eq false) &
+        (state_is_on_1 eq true) & 
+        (state_is_emergency_1 eq false)
+    )) &
+
+    ((state_is_off_0 & -event_turn_on_0 & -event_danger_0) => (
+        (state_is_off_1 eq true) &
+        (state_is_on_1 eq false) & 
+        (state_is_emergency_1 eq false)
+    )) &
+
+    ((state_is_emergency_0 & -event_mitigate_0) => (
+        (state_is_off_1 eq false) &
+        (state_is_on_1 eq false) & 
+        (state_is_emergency_1 eq true)
+    ))
+) => (
+    "If the machine is turned on and no danger exists, and no turn_off event is active"
+    (-event_turn_off_0 & state_is_on_0) =>
+
+    "The machine remains on"
+    state_is_on_1
+)
