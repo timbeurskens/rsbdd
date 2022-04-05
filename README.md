@@ -170,6 +170,17 @@ The explosive nature of the problem makes n=9 an infeasable problem. Further opt
 [_3x0] <= 1
 ```
 
+Running this example with the following arguments yields a truth-table showing the queen configuration(s) on a 4x4 chess board.
+
+```bash
+rsbdd -i examples/4_queens.txt -t -ft
+```
+
+| _0x0  | _0x1  | _0x2  | _0x3  | _1x0  | _1x1  | _1x2  | _1x3  | _2x0  | _2x1  | _2x2  | _2x3  | _3x0  | _3x1  | _3x2  | _3x3  | *     |
+|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
+| False | False | True  | False | True  | False | False | False | False | False | False | True  | False | True  | False | False | True  |
+| False | True  | False | False | False | False | False | True  | True  | False | False | False | False | False | True  | False | True  |
+
 ## CLI Usage
 
 ### rsbdd
