@@ -89,6 +89,16 @@ pub enum TruthTableEntry {
     Any,
 }
 
+impl Display for TruthTableEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.pad(match self {
+            TruthTableEntry::True => "True",
+            TruthTableEntry::False => "False",
+            TruthTableEntry::Any => "Any",
+        })
+    }
+}
+
 impl<S: BDDSymbol> Default for BDD<S> {
     fn default() -> Self {
         BDD::False
