@@ -55,11 +55,6 @@ impl From<NamedSymbol> for usize {
     }
 }
 
-// todo: place bdd items in a collection (hashmap?)
-// when constructing a new bdd, check if it already exists in the collection.
-// if it does, return a reference to the existing bdd.
-// otherwise, create a new bdd and return a reference to it.
-
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum BDD<Symbol: BDDSymbol> {
     False,
