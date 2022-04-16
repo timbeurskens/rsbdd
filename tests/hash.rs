@@ -2,6 +2,7 @@
 use itertools::Itertools;
 use rsbdd::bdd;
 use rsbdd::bdd::BDDEnv;
+use rsbdd::bdd::BDDNode;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::vec::Vec;
@@ -138,4 +139,12 @@ fn test_duplicates() {
             assert_eq!(l, 1);
         }
     }
+}
+
+#[test]
+fn test_hash_populated_equals_unpopulated() {
+    let populated = BDD::new(&BDDNode::True);
+    let unpopulated = BDD::new_unoptimized(&BDDNode::True);
+
+    assert_eq!(populated.get_hash(), unpopulated.get_hash());
 }

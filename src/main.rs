@@ -215,8 +215,8 @@ fn print_true_vars_recursive(
     vars: &[String],
     parsed: &ParsedFormula,
 ) {
-    match root.as_ref() {
-        BDD::Choice(ref l, s, ref r) => {
+    match &root.as_ref().node {
+        BDDNode::Choice(ref l, s, ref r) => {
             // first visit the false subtree
             let mut r_vals = values.clone();
             r_vals[parsed.to_free_index(s)] = TruthTableEntry::False;
@@ -227,7 +227,7 @@ fn print_true_vars_recursive(
             l_vals[parsed.to_free_index(s)] = TruthTableEntry::True;
             print_true_vars_recursive(l, l_vals, vars, parsed);
         }
-        BDD::True => {
+        BDDNode::True => {
             let mut vars_str = Vec::new();
             for (i, v) in values.iter().enumerate() {
                 if *v == TruthTableEntry::True {
@@ -250,8 +250,8 @@ fn print_truth_table_recursive(
     parsed: &ParsedFormula,
     sizes: &[usize],
 ) {
-    match root.as_ref() {
-        BDD::Choice(ref l, s, ref r) => {
+    match &root.as_ref().node {
+        BDDNode::Choice(ref l, s, ref r) => {
             // first visit the false subtree
             let mut r_vars = vars.clone();
             r_vars[parsed.to_free_index(s)] = TruthTableEntry::False;
@@ -263,8 +263,8 @@ fn print_truth_table_recursive(
             print_truth_table_recursive(l, l_vars, filter, parsed, sizes);
         }
         c if (filter == TruthTableEntry::Any)
-            || (filter == TruthTableEntry::True && *c == BDD::True)
-            || (filter == TruthTableEntry::False && *c == BDD::False) =>
+            || (filter == TruthTableEntry::True && *c == BDDNode::True)
+            || (filter == TruthTableEntry::False && *c == BDDNode::False) =>
         {
             print!("|");
             for (i, var) in vars.iter().enumerate() {
@@ -273,8 +273,8 @@ fn print_truth_table_recursive(
             println!(
                 " {:indent$} |",
                 match c {
-                    BDD::True => "True",
-                    BDD::False => "False",
+                    BDDNode::True => "True",
+                    BDDNode::False => "False",
                     _ => unreachable!(),
                 },
                 indent = sizes[vars.len()]
