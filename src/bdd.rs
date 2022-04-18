@@ -249,9 +249,10 @@ impl<S: BDDSymbol> BDDEnv<S> {
     // find the true or false node in the lookup table and return a reference to it
     pub fn mk_const(&self, v: bool) -> Rc<BDD<S>> {
         if v {
-            Rc::clone(self.nodes.borrow().get(&BDD::new_unoptimized(&BDDNode::True)).unwrap())
+            // todo: return unoptimized node
+            Rc::clone(self.nodes.borrow().get(&BDD::new(&BDDNode::True)).unwrap())
         } else {
-            Rc::clone(self.nodes.borrow().get(&BDD::new_unoptimized(&BDDNode::False)).unwrap())
+            Rc::clone(self.nodes.borrow().get(&BDD::new(&BDDNode::False)).unwrap())
         }
     }
 
