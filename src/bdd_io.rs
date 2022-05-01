@@ -34,20 +34,20 @@ impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<S>, GraphEdge<S>> for BDDGrap
     }
 
     fn node_id(&self, n: &GraphNode<S>) -> dot::Id<'a> {
-        match n.as_ref() {
+        match n.as_ref().node {
             // use grep -v n_true or grep -v n_false to filter nodes adjacent to true or false
-            BDD::True => dot::Id::new("n_true".to_string()).unwrap(),
-            BDD::False => dot::Id::new("n_false".to_string()).unwrap(),
+            BDDNode::True => dot::Id::new("n_true".to_string()).unwrap(),
+            BDDNode::False => dot::Id::new("n_false".to_string()).unwrap(),
             _ => dot::Id::new(format!("n_{:p}", Rc::into_raw(n.clone()))).unwrap(),
             // _ => dot::Id::new(format!("n_{}", n.get_hash())).unwrap(), // use the hash for optimal sharing, use (above) pointers to test issue with duplicates
         }
     }
 
     fn node_label(&self, n: &GraphNode<S>) -> dot::LabelText<'a> {
-        match n.as_ref() {
-            BDD::True => dot::LabelText::label("true"),
-            BDD::False => dot::LabelText::label("false"),
-            &BDD::Choice(_, ref v, _) => dot::LabelText::label(format!("{}", v)),
+        match n.as_ref().node {
+            BDDNode::True => dot::LabelText::label("true"),
+            BDDNode::False => dot::LabelText::label("false"),
+            BDDNode::Choice(_, ref v, _) => dot::LabelText::label(format!("{}", v)),
         }
     }
 
@@ -80,8 +80,8 @@ impl<'a, S: BDDSymbol> dot::GraphWalk<'a, GraphNode<S>, GraphEdge<S>> for BDDGra
 
 impl<'a, S: BDDSymbol> BDDGraph<S> {
     fn nodes_recursive(&self, root: Rc<BDD<S>>) -> dot::Nodes<'a, GraphNode<S>> {
-        match root.as_ref() {
-            &BDD::Choice(ref l, _, ref r) => {
+        match &root.as_ref().node {
+            BDDNode::Choice(ref l, _, ref r) => {
                 let l_nodes = self.nodes_recursive(l.clone());
                 let r_nodes = self.nodes_recursive(r.clone());
 
@@ -94,8 +94,8 @@ impl<'a, S: BDDSymbol> BDDGraph<S> {
                     .collect()
             }
             c if (self.filter == TruthTableEntry::Any)
-                || (self.filter == TruthTableEntry::True && *c == BDD::True)
-                || (self.filter == TruthTableEntry::False && *c == BDD::False) =>
+                || (self.filter == TruthTableEntry::True && *c == BDDNode::True)
+                || (self.filter == TruthTableEntry::False && *c == BDDNode::False) =>
             {
                 vec![root.clone()].into()
             }
@@ -104,25 +104,25 @@ impl<'a, S: BDDSymbol> BDDGraph<S> {
     }
 
     fn edges_recursive(&self, root: Rc<BDD<S>>) -> dot::Edges<'a, GraphEdge<S>> {
-        match root.as_ref() {
-            &BDD::Choice(ref l, _, ref r) => {
+        match root.as_ref().node {
+            BDDNode::Choice(ref l, _, ref r) => {
                 let l_edges = self.edges_recursive(l.clone());
                 let r_edges = self.edges_recursive(r.clone());
 
                 let mut self_edges = Vec::with_capacity(2);
 
                 if (self.filter == TruthTableEntry::Any)
-                    || (l.as_ref() != &BDD::True && l.as_ref() != &BDD::False)
-                    || (l.as_ref() == &BDD::True && self.filter == TruthTableEntry::True)
-                    || (l.as_ref() == &BDD::False && self.filter == TruthTableEntry::False)
+                    || (l.as_ref().node != BDDNode::True && l.as_ref().node != BDDNode::False)
+                    || (l.as_ref().node == BDDNode::True && self.filter == TruthTableEntry::True)
+                    || (l.as_ref().node == BDDNode::False && self.filter == TruthTableEntry::False)
                 {
                     self_edges.push((root.clone(), true, l.clone()));
                 }
 
                 if (self.filter == TruthTableEntry::Any)
-                    || (r.as_ref() != &BDD::True && r.as_ref() != &BDD::False)
-                    || (r.as_ref() == &BDD::True && self.filter == TruthTableEntry::True)
-                    || (r.as_ref() == &BDD::False && self.filter == TruthTableEntry::False)
+                    || (r.as_ref().node != BDDNode::True && r.as_ref().node != BDDNode::False)
+                    || (r.as_ref().node == BDDNode::True && self.filter == TruthTableEntry::True)
+                    || (r.as_ref().node == BDDNode::False && self.filter == TruthTableEntry::False)
                 {
                     self_edges.push((root.clone(), false, r.clone()));
                 }

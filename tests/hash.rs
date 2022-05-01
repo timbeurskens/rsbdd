@@ -2,7 +2,9 @@
 use itertools::Itertools;
 use rsbdd::bdd;
 use rsbdd::bdd::BDDEnv;
-use std::collections::HashMap;
+use rsbdd::bdd::BDDNode;
+use rustc_hash::{FxHasher, FxHashMap};
+use std::hash::Hash;
 use std::rc::Rc;
 use std::vec::Vec;
 
@@ -94,7 +96,7 @@ fn test_duplicates() {
 
     // b contains a small example with duplicate nodes
 
-    let mut hm: HashMap<u64, Vec<Rc<BDD>>> = HashMap::new();
+    let mut hm: FxHashMap<u64, Vec<Rc<BDD>>> = FxHashMap::default();
 
     let mut max_size: usize = 0;
 
@@ -138,4 +140,22 @@ fn test_duplicates() {
             assert_eq!(l, 1);
         }
     }
+}
+
+#[test]
+fn test_hash_populated_equals_unpopulated() {
+    let populated = BDD::new(&BDDNode::True);
+    let unpopulated = BDD::new_unoptimized(&BDDNode::True);
+
+    assert_eq!(populated.get_hash(), unpopulated.get_hash());
+}
+
+#[test]
+fn test_hash_objects_compute_same_hash() {
+    let object_to_hash: usize = 42;
+
+    let mut hasher1 = FxHasher::default();
+    let mut hasher2 = FxHasher::default();
+
+    assert_eq!(object_to_hash.hash(&mut hasher1), object_to_hash.hash(&mut hasher2));
 }
