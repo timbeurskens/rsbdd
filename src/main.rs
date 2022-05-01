@@ -50,7 +50,15 @@ fn main() {
         Box::new(BufReader::new(io::stdin())) as Box<dyn BufRead>
     };
 
-    let input_parsed = ParsedFormula::new(&mut reader).expect("Could not parse input file");
+    let input_parsed_result = ParsedFormula::new(&mut reader);
+
+    if input_parsed_result.is_err() {
+        eprintln!("Could not parse formula:");
+        eprintln!("{}", input_parsed_result.err().unwrap());
+        return;
+    }
+
+    let input_parsed = input_parsed_result.unwrap();
 
     if let Some(parsetree_filename) = args.value_of("show_parsetree") {
         let mut f = File::create(parsetree_filename).expect("Could not create parsetree dot file");
