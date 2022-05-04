@@ -1,0 +1,58 @@
+digraph FTAG {
+    rankdir="BT"
+
+    // Basic events
+    node [shape=ellipse];
+
+    E1 [label="E1"];
+    E2 [label="E2"];
+    E3 [label="E3"];
+    E4 [label="E4"];
+    E5 [label="E5"];
+    E6 [label="E6"];
+
+
+    // Intermediate events
+    node [shape=rect];
+
+    I1 [label="I1"];
+    I2 [label="I2"];
+    I3 [label="I3"];
+    I4 [label="I4"];
+    I5 [label="I5"];
+
+    // AND Gates
+    node [shape=square, label="&", style=filled, fillcolor=lightgrey];
+
+    AND1
+    AND2
+
+    node [shape=square, label="||", style=filled, fillcolor=lightgrey];
+
+    OR1
+    OR2
+    OR3
+
+    // Connections
+    E1 -> OR1
+    E2 -> OR1
+    E3 -> OR2
+    E4 -> AND1
+    E5 -> AND1
+    E6 -> AND2
+
+    OR1 -> I1
+    I1 -> AND2
+
+    AND1 -> I2
+    I2 -> OR2
+
+    AND2 -> I3
+    I3 -> OR3
+
+    OR2 -> I4
+    I4 -> OR3
+
+    OR3 -> I5
+
+}
