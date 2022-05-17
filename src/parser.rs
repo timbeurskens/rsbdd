@@ -12,7 +12,7 @@ use std::string::String;
 use std::vec::Vec;
 
 lazy_static! {
-    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+|>=|=|>|<|\[|\]|,|\(|\))|(?P<countable>\d+)|(?P<identifier>\w+)|(?P<eof>$)|(?P<comment>"[^"]*")"#).unwrap();
+    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+|>=|=|>|<|\[|\]|,|\(|\))|(?P<countable>\d+)|(?P<identifier>[\w']+)|(?P<eof>$)|(?P<comment>"[^"]*")"#).unwrap();
 }
 
 #[derive(Debug, Clone, PartialEq)]
