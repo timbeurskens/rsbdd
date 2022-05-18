@@ -29,6 +29,7 @@ fn main() {
         (@arg benchmark: -b --benchmark +takes_value "Repeat the solving process n times for more accurate performance reports")
         (@arg show_plot: --plot !takes_value "show a distribution plot of the runtime")
         (@arg evaluate: -e --eval +takes_value "Inline evaluate the given formula")
+        (@arg ordering: -o --ordering +takes_value "Provide a custom variable ordering")
     )
     .get_matches();
 
@@ -94,7 +95,7 @@ fn main() {
         _ => TruthTableEntry::Any,
     };
 
-    let mut headers = input_parsed.free_vars.clone();
+    let mut headers = input_parsed.free_vars.iter().map(|v| v.name.as_ref()).cloned().collect::<Vec<String>>();
     headers.push("*".to_string());
 
     let widths: Vec<usize> = headers.iter().map(|v| max(5, v.len()) as usize).collect();
@@ -132,7 +133,7 @@ fn main() {
                 .iter()
                 .map(|_| TruthTableEntry::Any)
                 .collect(),
-            &input_parsed.free_vars,
+            &headers,
             &input_parsed,
         );
     }
