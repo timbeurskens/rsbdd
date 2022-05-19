@@ -111,20 +111,25 @@ impl ParsedFormula {
         self.raw2free[ns.id].unwrap_or_else(|| panic!("{} is not a free variable", ns))
     }
 
-    pub fn new(contents: &mut dyn BufRead) -> io::Result<Self> {
-        let tokens = SymbolicBDD::tokenize(contents)?;
-
-        let vars: Vec<NamedSymbol> = tokens
+    pub fn extract_vars(tokens: &[SymbolicBDDToken]) -> Vec<NamedSymbol> {
+        tokens
             .iter()
             .filter_map(|t| match t {
                 SymbolicBDDToken::Var(v) => Some(v.clone()),
                 _ => None,
             })
             .unique()
-            .collect();
+            .collect()
+    }
+
+    pub fn new(contents: &mut dyn BufRead, variable_ordering: Option<Vec<NamedSymbol>>) -> io::Result<Self> {
+        let tokens = SymbolicBDD::tokenize(contents, variable_ordering)?;
+
+        let mut vars: Vec<NamedSymbol> = Self::extract_vars(&tokens);
+        vars.sort_by(|a, b| a.id.partial_cmp(&b.id).unwrap());
 
         let formula = SymbolicBDD::parse_formula(&mut tokens.iter().peekable())?;
-      
+
         let mut free_vars = Vec::new();
         let mut raw2free = Vec::with_capacity(vars.len());
 
@@ -161,14 +166,12 @@ impl ParsedFormula {
             SymbolicBDD::True => self.env.borrow().mk_const(true),
             SymbolicBDD::Var(v) => self.env.borrow().var(v.clone()),
             SymbolicBDD::Not(b) => self.env.borrow().not(self.eval_recursive(b)),
-            SymbolicBDD::Quantifier(QuantifierType::Exists, v, b) => self.env.borrow().exists(
-                v.clone(),
-                self.eval_recursive(b),
-            ),
-            SymbolicBDD::Quantifier(QuantifierType::Forall, v, b) => self.env.borrow().all(
-                v.clone(),
-                self.eval_recursive(b),
-            ),
+            SymbolicBDD::Quantifier(QuantifierType::Exists, v, b) => {
+                self.env.borrow().exists(v.clone(), self.eval_recursive(b))
+            }
+            SymbolicBDD::Quantifier(QuantifierType::Forall, v, b) => {
+                self.env.borrow().all(v.clone(), self.eval_recursive(b))
+            }
             SymbolicBDD::CountableConst(op, bs, n) => {
                 let branches: Vec<Rc<BDD<NamedSymbol>>> =
                     bs.iter().map(|b| self.eval_recursive(b)).collect();
@@ -227,10 +230,6 @@ impl ParsedFormula {
             }
         }
     }
-
-    // pub fn var2usize(&self, var: &str) -> usize {
-    //     self.vars.iter().position(|v| v == var).unwrap()
-    // }
 
     pub fn usize2var(&self, usize: usize) -> &NamedSymbol {
         &self.vars[usize]
@@ -537,12 +536,24 @@ impl SymbolicBDD {
         Ok(subform)
     }
 
-    pub fn tokenize(contents: &mut dyn BufRead) -> io::Result<Vec<SymbolicBDDToken>> {
+    pub fn tokenize(
+        contents: &mut dyn BufRead,
+        variable_ordering: Option<Vec<NamedSymbol>>,
+    ) -> io::Result<Vec<SymbolicBDDToken>> {
         let mut src: String = String::new();
         let mut result = Vec::new();
 
-        let mut variable_indexes : FxHashMap<String, usize> = FxHashMap::default();
+        let mut variable_indexes: FxHashMap<String, usize> = FxHashMap::default();
         let mut var_id_counter: usize = 0;
+
+        if let Some(variables) = variable_ordering {
+            for var in variables {
+                variable_indexes.insert(var.name.as_ref().clone(), var.id);
+                if var.id > var_id_counter {
+                    var_id_counter = var.id;
+                }
+            }
+        }
 
         contents.read_to_string(&mut src)?;
 
@@ -594,7 +605,7 @@ impl SymbolicBDD {
                     "else" => result.push(SymbolicBDDToken::Else),
                     var => {
                         let var_str = var.to_string();
-                        let var_id : usize;
+                        let var_id: usize;
 
                         if let Some(id) = variable_indexes.get(&var_str) {
                             var_id = *id;
@@ -605,11 +616,11 @@ impl SymbolicBDD {
                             variable_indexes.insert(var_str.clone(), var_id);
                         }
 
-                        result.push(SymbolicBDDToken::Var(NamedSymbol{
+                        result.push(SymbolicBDDToken::Var(NamedSymbol {
                             name: Rc::new(var_str),
                             id: var_id,
                         }))
-                    },
+                    }
                 }
             } else if let Some(number) = c.name("countable") {
                 let parsed_number = number.as_str().parse().expect("Failed to parse number");

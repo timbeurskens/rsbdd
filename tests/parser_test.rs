@@ -28,9 +28,10 @@ fn test_basic_tokens() -> io::Result<()> {
 
     for test_str in test_strs {
         dbg!(test_str);
-        dbg!(SymbolicBDD::tokenize(&mut BufReader::new(
-            test_str.as_bytes()
-        ))?);
+        dbg!(SymbolicBDD::tokenize(
+            &mut BufReader::new(test_str.as_bytes()),
+            None
+        )?);
     }
 
     Ok(())
@@ -57,7 +58,7 @@ fn test_parser() -> io::Result<()> {
 
     for test_str in test_strs {
         dbg!(test_str);
-        let result = ParsedFormula::new(&mut BufReader::new(test_str.as_bytes()))?;
+        let result = ParsedFormula::new(&mut BufReader::new(test_str.as_bytes()), None)?;
         dbg!(&result);
 
         dbg!(result.eval());
@@ -67,7 +68,7 @@ fn test_parser() -> io::Result<()> {
 }
 
 fn parse_and_evaluate(test_str: &str) -> io::Result<Rc<BDD<usize>>> {
-    let result = ParsedFormula::new(&mut BufReader::new(test_str.as_bytes()))?;
+    let result = ParsedFormula::new(&mut BufReader::new(test_str.as_bytes()), None)?;
     Ok(Rc::new(BDD::<usize>::from(result.eval().as_ref().clone())))
 }
 
@@ -105,7 +106,7 @@ fn test_4_queens_file() -> io::Result<()> {
     let input_file = File::open("examples/4_queens.txt").expect("Could not open input file");
 
     let input_parsed =
-        ParsedFormula::new(&mut BufReader::new(input_file)).expect("Could not parse input file");
+        ParsedFormula::new(&mut BufReader::new(input_file), None).expect("Could not parse input file");
 
     let input_evaluated = input_parsed.eval();
 
@@ -117,10 +118,7 @@ fn test_4_queens_file() -> io::Result<()> {
             input_parsed
                 .env
                 .borrow()
-                .infer(
-                    model.clone(),
-                    input_parsed.vars[i].clone(),
-                )
+                .infer(model.clone(), input_parsed.vars[i].clone())
                 .1
         })
         .count();
@@ -135,7 +133,7 @@ fn test_cliques_file() -> io::Result<()> {
     let input_file = File::open("examples/cliques.txt").expect("Could not open input file");
 
     let input_parsed =
-        ParsedFormula::new(&mut BufReader::new(input_file)).expect("Could not parse input file");
+        ParsedFormula::new(&mut BufReader::new(input_file), None).expect("Could not parse input file");
 
     let input_evaluated = input_parsed.eval();
 
@@ -147,10 +145,7 @@ fn test_cliques_file() -> io::Result<()> {
         .map(|v| {
             (
                 v.clone(),
-                input_parsed
-                    .env
-                    .borrow()
-                    .infer(model.clone(), v.clone()),
+                input_parsed.env.borrow().infer(model.clone(), v.clone()),
             )
         })
         .collect();

@@ -30,6 +30,7 @@ fn main() {
         (@arg show_plot: --plot !takes_value "show a distribution plot of the runtime")
         (@arg evaluate: -e --eval +takes_value "Inline evaluate the given formula")
         (@arg ordering: -o --ordering +takes_value "Provide a custom variable ordering")
+        (@arg export_ordering: -r --ordering !takes_value "Print the variable ordering to stdout")
     )
     .get_matches();
 
@@ -51,7 +52,17 @@ fn main() {
         Box::new(BufReader::new(io::stdin())) as Box<dyn BufRead>
     };
 
-    let input_parsed = ParsedFormula::new(&mut reader).expect("Could not parse input file");
+    let pre_variable_ordering = if let Some(ord_filename) = args.value_of("ordering") {
+        let file = File::open(ord_filename).expect("Could not open variable ordering file");
+        let mut contents = Box::new(BufReader::new(file)) as Box<dyn BufRead>;
+        let tokens = SymbolicBDD::tokenize(&mut contents, None).expect("Could not extract tokens from variable ordering");
+        let vars = ParsedFormula::extract_vars(&tokens);
+        Some(vars)
+    } else {
+        None
+    };
+
+    let input_parsed = ParsedFormula::new(&mut reader, pre_variable_ordering).expect("Could not parse input file");
 
     if let Some(parsetree_filename) = args.value_of("show_parsetree") {
         let mut f = File::create(parsetree_filename).expect("Could not create parsetree dot file");
@@ -95,7 +106,30 @@ fn main() {
         _ => TruthTableEntry::Any,
     };
 
-    let mut headers = input_parsed.free_vars.iter().map(|v| v.name.as_ref()).cloned().collect::<Vec<String>>();
+    // show ordered variable list
+
+    if args.is_present("export_ordering") {
+        let mut ordered_variables = input_parsed.vars.clone();
+        ordered_variables.sort_by(|a, b| a.id.partial_cmp(&b.id).unwrap());
+        let ordered_variable_names = ordered_variables
+            .iter()
+            .map(|v| v.name.as_ref())
+            .cloned()
+            .collect::<Vec<String>>();
+
+        for v in &ordered_variable_names {
+            println!("{}", v);
+        }
+    }
+
+    // show truth table
+
+    let mut headers = input_parsed
+        .free_vars
+        .iter()
+        .map(|v| v.name.as_ref())
+        .cloned()
+        .collect::<Vec<String>>();
     headers.push("*".to_string());
 
     let widths: Vec<usize> = headers.iter().map(|v| max(5, v.len()) as usize).collect();
