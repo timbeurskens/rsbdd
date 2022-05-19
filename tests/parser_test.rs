@@ -105,8 +105,8 @@ fn test_4_queens_file() -> io::Result<()> {
 
     let input_file = File::open("examples/4_queens.txt").expect("Could not open input file");
 
-    let input_parsed =
-        ParsedFormula::new(&mut BufReader::new(input_file), None).expect("Could not parse input file");
+    let input_parsed = ParsedFormula::new(&mut BufReader::new(input_file), None)
+        .expect("Could not parse input file");
 
     let input_evaluated = input_parsed.eval();
 
@@ -132,8 +132,8 @@ fn test_4_queens_file() -> io::Result<()> {
 fn test_cliques_file() -> io::Result<()> {
     let input_file = File::open("examples/cliques.txt").expect("Could not open input file");
 
-    let input_parsed =
-        ParsedFormula::new(&mut BufReader::new(input_file), None).expect("Could not parse input file");
+    let input_parsed = ParsedFormula::new(&mut BufReader::new(input_file), None)
+        .expect("Could not parse input file");
 
     let input_evaluated = input_parsed.eval();
 

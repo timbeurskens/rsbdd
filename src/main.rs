@@ -55,14 +55,16 @@ fn main() {
     let pre_variable_ordering = if let Some(ord_filename) = args.value_of("ordering") {
         let file = File::open(ord_filename).expect("Could not open variable ordering file");
         let mut contents = Box::new(BufReader::new(file)) as Box<dyn BufRead>;
-        let tokens = SymbolicBDD::tokenize(&mut contents, None).expect("Could not extract tokens from variable ordering");
+        let tokens = SymbolicBDD::tokenize(&mut contents, None)
+            .expect("Could not extract tokens from variable ordering");
         let vars = ParsedFormula::extract_vars(&tokens);
         Some(vars)
     } else {
         None
     };
 
-    let input_parsed = ParsedFormula::new(&mut reader, pre_variable_ordering).expect("Could not parse input file");
+    let input_parsed =
+        ParsedFormula::new(&mut reader, pre_variable_ordering).expect("Could not parse input file");
 
     if let Some(parsetree_filename) = args.value_of("show_parsetree") {
         let mut f = File::create(parsetree_filename).expect("Could not create parsetree dot file");

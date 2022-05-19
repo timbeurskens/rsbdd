@@ -158,7 +158,6 @@ impl<S: BDDSymbol> BDDEnv<S> {
         let unique_pointers = all_nodes
             .iter()
             .unique_by(|&n| Rc::into_raw(Rc::clone(n)) as u32)
-            .cloned()
             .count();
 
         unique_pointers - unique_hashes

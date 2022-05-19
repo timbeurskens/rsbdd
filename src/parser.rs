@@ -122,7 +122,10 @@ impl ParsedFormula {
             .collect()
     }
 
-    pub fn new(contents: &mut dyn BufRead, variable_ordering: Option<Vec<NamedSymbol>>) -> io::Result<Self> {
+    pub fn new(
+        contents: &mut dyn BufRead,
+        variable_ordering: Option<Vec<NamedSymbol>>,
+    ) -> io::Result<Self> {
         let tokens = SymbolicBDD::tokenize(contents, variable_ordering)?;
 
         let mut vars: Vec<NamedSymbol> = Self::extract_vars(&tokens);
