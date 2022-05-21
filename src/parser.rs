@@ -291,7 +291,7 @@ impl SymbolicBDD {
                 } else {
                     SymbolicBDD::FixedPoint(
                         v.clone(),
-                        i.clone(),
+                        *i,
                         Box::new(f.replace_var(var, replacement)),
                     )
                 }
@@ -646,8 +646,8 @@ impl SymbolicBDD {
         if let Some(variables) = variable_ordering {
             for var in variables {
                 variable_indexes.insert(var.name.as_ref().clone(), var.id);
-                if var.id > var_id_counter {
-                    var_id_counter = var.id;
+                if var.id >= var_id_counter {
+                    var_id_counter = var.id + 1;
                 }
             }
         }
