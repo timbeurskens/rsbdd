@@ -70,7 +70,10 @@ impl SymbolicParseTree {
 
                 new_nodes
             }
-            SymbolicBDD::True | SymbolicBDD::False | SymbolicBDD::Var(_) => this_node,
+            SymbolicBDD::True
+            | SymbolicBDD::False
+            | SymbolicBDD::Var(_)
+            | SymbolicBDD::Subtree(_) => this_node,
         }
     }
 
@@ -118,6 +121,7 @@ impl<'a> dot::Labeller<'a, GraphNode, GraphEdge> for SymbolicParseTree {
             SymbolicBDD::False => dot::LabelText::label("False".to_string()),
             SymbolicBDD::True => dot::LabelText::label("True".to_string()),
             SymbolicBDD::Var(v) => dot::LabelText::label(format!("Var {}", v)),
+            SymbolicBDD::Subtree(_) => dot::LabelText::label("BDD".to_string()),
         }
     }
 
@@ -199,7 +203,10 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                         self.nodes.iter().position(|n| n == e.as_ref()).unwrap(),
                     ));
                 }
-                SymbolicBDD::False | SymbolicBDD::True | SymbolicBDD::Var(_) => {}
+                SymbolicBDD::False
+                | SymbolicBDD::True
+                | SymbolicBDD::Var(_)
+                | SymbolicBDD::Subtree(_) => {}
             }
         }
 

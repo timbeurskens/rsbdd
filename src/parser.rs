@@ -52,7 +52,7 @@ pub enum SymbolicBDDToken {
     Eof,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BinaryOperator {
     And,
     Or,
@@ -64,7 +64,7 @@ pub enum BinaryOperator {
     Iff,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CountableOperator {
     AtMost,
     LessThan,
@@ -73,7 +73,7 @@ pub enum CountableOperator {
     Exactly,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum QuantifierType {
     Exists,
     Forall,
@@ -92,6 +92,7 @@ pub enum SymbolicBDD {
     FixedPoint(NamedSymbol, bool, Box<SymbolicBDD>),
     Ite(Box<SymbolicBDD>, Box<SymbolicBDD>, Box<SymbolicBDD>),
     BinaryOp(BinaryOperator, Box<SymbolicBDD>, Box<SymbolicBDD>),
+    Subtree(Rc<BDD<NamedSymbol>>),
 }
 
 #[derive(Debug, Clone)]
@@ -236,10 +237,13 @@ impl ParsedFormula {
                 }
             }
             SymbolicBDD::FixedPoint(var, initial, transformer) => {
-                let initial_bdd = self.env.borrow().mk_const(*initial);
-                // self.env.borrow().fp(initial_bdd, |x| I)
-                todo!("FixedPoint eval")
+                let env = self.env.borrow();
+
+                env.fp(env.mk_const(*initial), |x| {
+                    self.eval_recursive(&transformer.replace_var(var, &SymbolicBDD::Subtree(x)))
+                })
             }
+            SymbolicBDD::Subtree(t) => Rc::clone(t),
         }
     }
 
@@ -266,6 +270,60 @@ impl SymbolicBDD {
         Ok(result)
     }
 
+    // replace a variable in the formula with a new sub-formula
+    pub fn replace_var(&self, var: &NamedSymbol, replacement: &Self) -> Self {
+        match self {
+            SymbolicBDD::Var(v) if v == var => replacement.clone(),
+            SymbolicBDD::Quantifier(q, v, f) => {
+                if v.contains(var) {
+                    self.clone()
+                } else {
+                    SymbolicBDD::Quantifier(
+                        *q,
+                        v.clone(),
+                        Box::new(f.replace_var(var, replacement)),
+                    )
+                }
+            }
+            SymbolicBDD::FixedPoint(v, i, f) => {
+                if v == var {
+                    self.clone()
+                } else {
+                    SymbolicBDD::FixedPoint(
+                        v.clone(),
+                        i.clone(),
+                        Box::new(f.replace_var(var, replacement)),
+                    )
+                }
+            }
+            SymbolicBDD::Ite(a, b, c) => SymbolicBDD::Ite(
+                Box::new(a.replace_var(var, replacement)),
+                Box::new(b.replace_var(var, replacement)),
+                Box::new(c.replace_var(var, replacement)),
+            ),
+            SymbolicBDD::Not(f) => SymbolicBDD::Not(Box::new(f.replace_var(var, replacement))),
+            SymbolicBDD::BinaryOp(op, l, r) => SymbolicBDD::BinaryOp(
+                *op,
+                Box::new(l.replace_var(var, replacement)),
+                Box::new(r.replace_var(var, replacement)),
+            ),
+            SymbolicBDD::CountableConst(op, n, sz) => SymbolicBDD::CountableConst(
+                *op,
+                n.iter().map(|v| v.replace_var(var, replacement)).collect(),
+                *sz,
+            ),
+            SymbolicBDD::CountableVariable(op, l, r) => SymbolicBDD::CountableVariable(
+                *op,
+                l.iter().map(|v| v.replace_var(var, replacement)).collect(),
+                r.iter().map(|v| v.replace_var(var, replacement)).collect(),
+            ),
+            SymbolicBDD::True
+            | SymbolicBDD::False
+            | SymbolicBDD::Subtree(_)
+            | SymbolicBDD::Var(_) => self.clone(),
+        }
+    }
+
     // check whether a given variable is bound by a quantifier in the formula
     pub fn var_is_free(&self, var: &NamedSymbol) -> bool {
         match self {
@@ -287,7 +345,7 @@ impl SymbolicBDD {
                 l.iter().any(|f| f.var_is_free(var)) || r.iter().any(|f| f.var_is_free(var))
             }
             SymbolicBDD::FixedPoint(v, _, f) => v != var && f.var_is_free(var),
-            SymbolicBDD::True | SymbolicBDD::False => false,
+            SymbolicBDD::True | SymbolicBDD::False | SymbolicBDD::Subtree(_) => false,
         }
     }
 
@@ -633,16 +691,14 @@ impl SymbolicBDD {
                     "nor" => result.push(SymbolicBDDToken::Nor),
                     "nand" => result.push(SymbolicBDDToken::Nand),
                     "implies" => result.push(SymbolicBDDToken::Implies),
-                    "iff" => result.push(SymbolicBDDToken::Iff),
-                    "eq" => result.push(SymbolicBDDToken::Iff),
+                    "iff" | "eq" => result.push(SymbolicBDDToken::Iff),
                     "exists" => result.push(SymbolicBDDToken::Exists),
-                    "forall" => result.push(SymbolicBDDToken::Forall),
-                    "all" => result.push(SymbolicBDDToken::Forall),
+                    "forall" | "all" => result.push(SymbolicBDDToken::Forall),
                     "if" => result.push(SymbolicBDDToken::If),
                     "then" => result.push(SymbolicBDDToken::Then),
                     "else" => result.push(SymbolicBDDToken::Else),
-                    "gfp" => result.push(SymbolicBDDToken::GFP),
-                    "lfp" => result.push(SymbolicBDDToken::LFP),
+                    "gfp" | "nu" => result.push(SymbolicBDDToken::GFP),
+                    "lfp" | "mu" => result.push(SymbolicBDDToken::LFP),
                     var => {
                         let var_str = var.to_string();
                         let var_id: usize;
