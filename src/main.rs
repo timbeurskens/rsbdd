@@ -27,9 +27,9 @@ fn main() {
         (@arg vars: -v --vars !takes_value "print all true variables leading to a truth evaluation")
         (@arg filter: -f --filter +takes_value "only show true or false entries in the truth-table")
         (@arg benchmark: -b --benchmark +takes_value "Repeat the solving process n times for more accurate performance reports")
-        (@arg show_plot: --plot !takes_value "show a distribution plot of the runtime")
+        (@arg show_plot: -g --plot !takes_value "show a distribution plot of the runtime")
         (@arg evaluate: -e --eval +takes_value "Inline evaluate the given formula")
-        (@arg ordering: -o --ordering +takes_value "Provide a custom variable ordering")
+        (@arg ordering: -o --order +takes_value "Provide a custom variable ordering")
         (@arg export_ordering: -r --ordering !takes_value "Print the variable ordering to stdout")
     )
     .get_matches();
