@@ -46,6 +46,8 @@ pub enum SymbolicBDDToken {
     Comma,
     False,
     True,
+    LFP,
+    GFP,
     Hash,
     Eof,
 }
@@ -86,15 +88,17 @@ pub enum SymbolicBDD {
     Quantifier(QuantifierType, Vec<NamedSymbol>, Box<SymbolicBDD>),
     CountableConst(CountableOperator, Vec<SymbolicBDD>, usize),
     CountableVariable(CountableOperator, Vec<SymbolicBDD>, Vec<SymbolicBDD>),
+    // the fixed-point operator with a single transformer variable, initial value (as bool), and the transformer function as a symbolic bdd description
+    FixedPoint(NamedSymbol, bool, Box<SymbolicBDD>),
     Ite(Box<SymbolicBDD>, Box<SymbolicBDD>, Box<SymbolicBDD>),
     BinaryOp(BinaryOperator, Box<SymbolicBDD>, Box<SymbolicBDD>),
 }
 
 #[derive(Debug, Clone)]
 pub struct ParsedFormula {
-    // all variables in the parse tree
+    // all variables in the parse tree, sorted according to the variable ordering
     pub vars: Vec<NamedSymbol>,
-    // all variables not bound by a quantifier in the parse tree
+    // all variables not bound by a quantifier in the parse tree, sorted according to the variable ordering
     pub free_vars: Vec<NamedSymbol>,
     // lookup table for converting a raw variable to a variable in the 'free' set
     pub raw2free: Vec<Option<usize>>,
@@ -231,6 +235,11 @@ impl ParsedFormula {
                     BinaryOperator::Iff => self.env.borrow().eq(l, r),
                 }
             }
+            SymbolicBDD::FixedPoint(var, initial, transformer) => {
+                let initial_bdd = self.env.borrow().mk_const(*initial);
+                // self.env.borrow().fp(initial_bdd, |x| I)
+                todo!("FixedPoint eval")
+            }
         }
     }
 
@@ -260,7 +269,7 @@ impl SymbolicBDD {
     // check whether a given variable is bound by a quantifier in the formula
     pub fn var_is_free(&self, var: &NamedSymbol) -> bool {
         match self {
-            SymbolicBDD::Var(v) if v == var => true,
+            SymbolicBDD::Var(v) => v == var,
             SymbolicBDD::Quantifier(_, vars, f) => {
                 if !vars.contains(var) {
                     f.var_is_free(var)
@@ -277,7 +286,8 @@ impl SymbolicBDD {
             SymbolicBDD::CountableVariable(_, l, r) => {
                 l.iter().any(|f| f.var_is_free(var)) || r.iter().any(|f| f.var_is_free(var))
             }
-            _ => false,
+            SymbolicBDD::FixedPoint(v, _, f) => v != var && f.var_is_free(var),
+            SymbolicBDD::True | SymbolicBDD::False => false,
         }
     }
 
@@ -299,6 +309,8 @@ impl SymbolicBDD {
             Some(SymbolicBDDToken::Not) => SymbolicBDD::parse_negation(tokens),
             Some(SymbolicBDDToken::Exists) => SymbolicBDD::parse_existence_quantifier(tokens),
             Some(SymbolicBDDToken::Forall) => SymbolicBDD::parse_universal_quantifier(tokens),
+            Some(SymbolicBDDToken::GFP) => SymbolicBDD::parse_fixed_point(tokens, true),
+            Some(SymbolicBDDToken::LFP) => SymbolicBDD::parse_fixed_point(tokens, false),
             Some(SymbolicBDDToken::If) => SymbolicBDD::parse_ite(tokens),
             None | Some(SymbolicBDDToken::Eof) => {
                 Err(io::Error::new(io::ErrorKind::InvalidData, "Unexpected EOF"))
@@ -445,6 +457,29 @@ impl SymbolicBDD {
         }
 
         Ok(vars)
+    }
+
+    fn parse_fixed_point(tokens: &mut TokenReader, initial: bool) -> io::Result<SymbolicBDD> {
+        expect(
+            if initial {
+                SymbolicBDDToken::GFP
+            } else {
+                SymbolicBDDToken::LFP
+            },
+            tokens,
+        )?;
+
+        let transformer_var = SymbolicBDD::parse_variable_name(tokens)?;
+
+        expect(SymbolicBDDToken::Hash, tokens)?;
+
+        let formula = SymbolicBDD::parse_sub_formula(tokens)?;
+
+        Ok(SymbolicBDD::FixedPoint(
+            transformer_var,
+            initial,
+            Box::new(formula),
+        ))
     }
 
     fn parse_existence_quantifier(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
@@ -606,6 +641,8 @@ impl SymbolicBDD {
                     "if" => result.push(SymbolicBDDToken::If),
                     "then" => result.push(SymbolicBDDToken::Then),
                     "else" => result.push(SymbolicBDDToken::Else),
+                    "gfp" => result.push(SymbolicBDDToken::GFP),
+                    "lfp" => result.push(SymbolicBDDToken::LFP),
                     var => {
                         let var_str = var.to_string();
                         let var_id: usize;
