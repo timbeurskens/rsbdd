@@ -32,7 +32,9 @@ impl SymbolicParseTree {
                     .chain(this_node)
                     .collect()
             }
-            SymbolicBDD::Quantifier(_, _, f) | SymbolicBDD::Not(f) => {
+            SymbolicBDD::Quantifier(_, _, f)
+            | SymbolicBDD::Not(f)
+            | SymbolicBDD::FixedPoint(_, _, f) => {
                 let new_nodes = SymbolicParseTree::nodes_recursive(f);
 
                 new_nodes.into_iter().chain(this_node).collect()
@@ -68,7 +70,10 @@ impl SymbolicParseTree {
 
                 new_nodes
             }
-            _ => this_node,
+            SymbolicBDD::True
+            | SymbolicBDD::False
+            | SymbolicBDD::Var(_)
+            | SymbolicBDD::Subtree(_) => this_node,
         }
     }
 
@@ -105,10 +110,18 @@ impl<'a> dot::Labeller<'a, GraphNode, GraphEdge> for SymbolicParseTree {
             SymbolicBDD::CountableVariable(ref v, _, _) => {
                 dot::LabelText::label(format!("{:?}", v))
             }
+            SymbolicBDD::FixedPoint(ref v, init, _) => {
+                if *init {
+                    dot::LabelText::label(format!("GFP {}", v))
+                } else {
+                    dot::LabelText::label(format!("LFP {}", v))
+                }
+            }
             SymbolicBDD::Ite(_, _, _) => dot::LabelText::label("Ite".to_string()),
             SymbolicBDD::False => dot::LabelText::label("False".to_string()),
             SymbolicBDD::True => dot::LabelText::label("True".to_string()),
             SymbolicBDD::Var(v) => dot::LabelText::label(format!("Var {}", v)),
+            SymbolicBDD::Subtree(_) => dot::LabelText::label("BDD".to_string()),
         }
     }
 
@@ -139,7 +152,9 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                         self.nodes.iter().position(|n| n == r.as_ref()).unwrap(),
                     ));
                 }
-                SymbolicBDD::Quantifier(_, _, f) | SymbolicBDD::Not(f) => {
+                SymbolicBDD::Quantifier(_, _, f)
+                | SymbolicBDD::Not(f)
+                | SymbolicBDD::FixedPoint(_, _, f) => {
                     edges.push((
                         i,
                         "".to_string(),
@@ -188,7 +203,10 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                         self.nodes.iter().position(|n| n == e.as_ref()).unwrap(),
                     ));
                 }
-                _ => {}
+                SymbolicBDD::False
+                | SymbolicBDD::True
+                | SymbolicBDD::Var(_)
+                | SymbolicBDD::Subtree(_) => {}
             }
         }
 
