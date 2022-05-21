@@ -345,7 +345,8 @@ impl SymbolicBDD {
                 l.iter().any(|f| f.var_is_free(var)) || r.iter().any(|f| f.var_is_free(var))
             }
             SymbolicBDD::FixedPoint(v, _, f) => v != var && f.var_is_free(var),
-            SymbolicBDD::True | SymbolicBDD::False | SymbolicBDD::Subtree(_) => false,
+            SymbolicBDD::Subtree(_t) => unimplemented!(),
+            SymbolicBDD::True | SymbolicBDD::False => false,
         }
     }
 
@@ -690,7 +691,7 @@ impl SymbolicBDD {
                     "xor" => result.push(SymbolicBDDToken::Xor),
                     "nor" => result.push(SymbolicBDDToken::Nor),
                     "nand" => result.push(SymbolicBDDToken::Nand),
-                    "implies" => result.push(SymbolicBDDToken::Implies),
+                    "implies" | "in" => result.push(SymbolicBDDToken::Implies),
                     "iff" | "eq" => result.push(SymbolicBDDToken::Iff),
                     "exists" => result.push(SymbolicBDDToken::Exists),
                     "forall" | "all" => result.push(SymbolicBDDToken::Forall),
