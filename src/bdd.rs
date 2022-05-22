@@ -271,7 +271,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
     }
 
     pub fn implies(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
-        self.or(self.not(Rc::clone(&a)), Rc::clone(&b))
+        self.or(self.not(a), b)
     }
 
     /// ite computes if a then b else c
@@ -286,31 +286,31 @@ impl<S: BDDSymbol> BDDEnv<S> {
     pub fn eq(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         self.and(
             self.implies(Rc::clone(&a), Rc::clone(&b)),
-            self.implies(Rc::clone(&b), Rc::clone(&a)),
+            self.implies(b, a),
         )
     }
 
     // disjunction
     pub fn or(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
-        self.not(self.and(self.not(a), self.not(b)))
+        self.not(self.nor(a, b))
     }
 
     // exclusive disjunction
     pub fn xor(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         self.or(
             self.and(self.not(Rc::clone(&a)), Rc::clone(&b)),
-            self.and(Rc::clone(&a), self.not(Rc::clone(&b))),
+            self.and(a, self.not(b)),
         )
     }
 
     // joint denial (nor)
     pub fn nor(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
-        self.not(self.or(Rc::clone(&a), Rc::clone(&b)))
+        self.and(self.not(a), self.not(b))
     }
 
     // alternative denial (nand)
     pub fn nand(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
-        self.not(self.and(Rc::clone(&a), Rc::clone(&b)))
+        self.not(self.and(a, b))
     }
 
     /// var constructs a new BDD for a given variable.
