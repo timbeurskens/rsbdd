@@ -134,6 +134,12 @@ gfp/lfp X # true    <=> true
 gfp/lfp X # false   <=> false
 ```
 
+### Parse-tree display
+
+Adding the `-p {path}` argument to `rsbdd` constructs a graphviz graph of the parse-tree. This can be used to for introspection of the intended formula, or for reporting purposes. An example of the parse-tree output for `exists b,c # a | (b ^ c)` is displayed below.
+
+![parse tree](docs/images/parsetree.svg)
+
 ### Experimental and/or upcoming features
 
 Currently the RsBDD language relies heavily on logical primitives. Integer arithmetic could be expressed by manually introducing the primitive 'bits' of a number. Rewrite rules could significantly simplify this process by introducting domains other than boolean variables. Embedding rewrite rules in the BDD could prove to be a challenge.
