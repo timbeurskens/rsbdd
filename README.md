@@ -129,6 +129,9 @@ Its basic properties are defined as follows.
 gfp X # X           <=> true
 lfp X # X           <=> false
 
+nu X # ...          <=> gfp X # ...
+mu X # ...          <=> lfp X # ...
+
 gfp/lfp X # a       <=> a
 gfp/lfp X # true    <=> true
 gfp/lfp X # false   <=> false
