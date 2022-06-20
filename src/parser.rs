@@ -2,6 +2,7 @@ use crate::bdd::{BDDEnv, NamedSymbol, BDD};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
+use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::fmt::Display;
 use std::io;
@@ -267,6 +268,9 @@ impl ParsedFormula {
                 })
             }
             SymbolicBDD::Subtree(t) => Rc::clone(t),
+            SymbolicBDD::Summation(_, _) => todo!(),
+            SymbolicBDD::RuleApplication(_) => todo!(),
+            SymbolicBDD::RewriteRule(_, _) => todo!(),
         }
     }
 
@@ -344,6 +348,9 @@ impl SymbolicBDD {
             | SymbolicBDD::False
             | SymbolicBDD::Subtree(_)
             | SymbolicBDD::Var(_) => self.clone(),
+            SymbolicBDD::Summation(_, _) => todo!(),
+            SymbolicBDD::RuleApplication(_) => todo!(),
+            SymbolicBDD::RewriteRule(_, _) => todo!(),
         }
     }
 
@@ -370,6 +377,9 @@ impl SymbolicBDD {
             SymbolicBDD::FixedPoint(v, _, f) => v != var && f.var_is_free(var),
             SymbolicBDD::Subtree(_t) => unimplemented!(),
             SymbolicBDD::True | SymbolicBDD::False => false,
+            SymbolicBDD::Summation(_, _) => todo!(),
+            SymbolicBDD::RuleApplication(_) => todo!(),
+            SymbolicBDD::RewriteRule(_, _) => todo!(),
         }
     }
 
@@ -555,7 +565,7 @@ impl SymbolicBDD {
         }
     }
 
-    fn parse_variable_name(tokens: &mut TokenReader) -> io::Result<NamedSymbol> {
+    fn parse_ident(tokens: &mut TokenReader) -> io::Result<NamedSymbol> {
         match tokens.next() {
             Some(SymbolicBDDToken::Ident(var)) => Ok(var.clone()),
             other => {
