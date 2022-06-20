@@ -1,0 +1,5 @@
+nu X # 
+[a in X, b in X, c in X] > 0 & 
+(if (all a # a in X) then (X & -a) else X) & 
+(if (all b # b in X) then (X & -b) else X) & 
+(if (all c # c in X) then (X & -c) else X)
