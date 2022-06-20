@@ -4,6 +4,29 @@
 
 _Solving satisfiability problems in Rust_
 
+## Installation
+
+1) Make sure to install the [Rust toolchain](https://www.rust-lang.org/tools/install).
+
+2) Clone the latest version of this repository:
+```
+$ git clone git@github.com:timbeurskens/rsbdd.git
+```
+
+3) Build and install the RsBDD tools:
+```
+$ cd rsbdd
+$ cargo install --bins --path .
+```
+
+The following tools will be available after installing the RsBDD package:
+
+- `max_clique_gen`
+- `n_queens_gen`
+- `random_graph_gen`
+- `rsbdd`
+- `sudoku_gen`
+
 ## Syntax
 
 ### Comments
@@ -47,15 +70,15 @@ RsBDD supports the most common, and some uncommon binary operators, such as conj
 
 Most operators have a symbolic and textual representation, e.g. `and` or `&`.
 
-| Operator           | Option 1      | Option 2 |
-|--------------------|---------------|----------|
-| Conjunction        | `and`         | `&`      |
-| Disjunction        | `or`          | `\|`     |
-| Implication        | `implies`     | `=>`     |
-| Bi-implication     | `iff` or `eq` | `<=>`    |
-| Exlusive or        | `xor`         | `^`      |
-| Joint denial       | `nor`         | N.A.     |
-| Alternative denial | `nand`        | N.A.     |
+| Operator           | Option 1          | Option 2 |
+|--------------------|-------------------|----------|
+| Conjunction        | `and`             | `&`      |
+| Disjunction        | `or`              | `\|`     |
+| Implication        | `implies` or `in` | `=>`     |
+| Bi-implication     | `iff` or `eq`     | `<=>`    |
+| Exlusive or        | `xor`             | `^`      |
+| Joint denial       | `nor`             | N.A.     |
+| Alternative denial | `nand`            | N.A.     |
 
 ```
 true or false
@@ -117,9 +140,33 @@ A counting comparison can either be made by comparing a set of expressions to a 
 [a, b, c] < [d, e, f]
 ```
 
-### Experimental and/or upcoming features
+### Fixed points
 
-The RsBDD library supports the use of fixed-point equations. At this moment the expressiveness of the language is too limited to benefit from fixed-points, so it is not yet available in the language. The recent introduction of counting operators provides a framework for fixed-point problem definitions which will be explored in the future.
+The rsbdd language supports least-fixpoint (`lfp` / `mu`) and greatest-fixpoint (`gfp` / `nu`) operations to find a respectively minimal or maximal solution by repeatedly applying a given transformer function until the solution is stable.
+
+Only monotonic transformer functions are guaranteed to terminate. Termination of fixed point operations are not checked and will run indefinatedly if not handled correctly.
+
+Its basic properties are defined as follows.
+
+```
+gfp X # X           <=> true
+lfp X # X           <=> false
+
+nu X # ...          <=> gfp X # ...
+mu X # ...          <=> lfp X # ...
+
+gfp/lfp X # a       <=> a
+gfp/lfp X # true    <=> true
+gfp/lfp X # false   <=> false
+```
+
+### Parse-tree display
+
+Adding the `-p {path}` argument to `rsbdd` constructs a graphviz graph of the parse-tree. This can be used to for introspection of the intended formula, or for reporting purposes. An example of the parse-tree output for `exists b,c # a | (b ^ c)` is displayed below.
+
+![parse tree](docs/images/parsetree.svg)
+
+### Experimental and/or upcoming features
 
 Currently the RsBDD language relies heavily on logical primitives. Integer arithmetic could be expressed by manually introducing the primitive 'bits' of a number. Rewrite rules could significantly simplify this process by introducting domains other than boolean variables. Embedding rewrite rules in the BDD could prove to be a challenge.
 
@@ -347,12 +394,13 @@ rsbdd -i examples/4_queens.txt -t -ft
 | False | False | True  | False | True  | False | False | False | False | False | False | True  | False | True  | False | False | True  |
 | False | True  | False | False | False | False | False | True  | True  | False | False | False | False | False | True  | False | True  |
 
+
 ## CLI Usage
 
 ### rsbdd
 
 ```
-Solver 0.6.2
+Solver 0.9.0
 Tim Beurskens
 A BDD-based SAT solver
 
@@ -360,9 +408,10 @@ USAGE:
     rsbdd [FLAGS] [OPTIONS]
 
 FLAGS:
+    -r, --ordering      Print the variable ordering to stdout
     -h, --help          Prints help information
     -m, --model         use a model of the bdd as output (instead of the satisfying assignment)
-        --plot          show a distribution plot of the runtime
+    -g, --plot          show a distribution plot of the runtime
     -t, --truthtable    print the truth-table to stdout
     -v, --vars          print all true variables leading to a truth evaluation
     -V, --version       Prints version information
@@ -372,6 +421,7 @@ OPTIONS:
     -e, --eval <evaluate>               Inline evaluate the given formula
     -f, --filter <filter>               only show true or false entries in the truth-table
     -i, --input <input>                 logic input file
+    -o, --order <ordering>              Provide a custom variable ordering
     -d, --dot <show_dot>                write the bdd to a dot graphviz file
     -p, --parsetree <show_parsetree>    write the parse tree in dot format to this file
 
@@ -421,5 +471,45 @@ OPTIONS:
     -e, --edges <edges>          Number of edges
     -o, --output <output>        The output file
     -v, --vertices <vertices>    Number of vertices
+
+```
+
+### n_queens_gen
+
+```
+QueenGenerator 0.9.0
+Tim Beurskens
+Generates n-queen formulae for the SAT solver
+
+USAGE:
+    n_queens_gen [OPTIONS]
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+OPTIONS:
+    -o, --output <output>    The output file
+    -n, --queens <queens>    The number of queens
+
+```
+
+### sudoku_gen
+
+```
+SudokuGenerator 0.9.0
+Tim Beurskens
+Converts sudoku problems into RsBDD formulas
+
+USAGE:
+    sudoku_gen [OPTIONS]
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+OPTIONS:
+    -i, --input <input>      The input sudoku file
+    -o, --output <output>    The output rsbdd file
 
 ```

@@ -1,0 +1,8 @@
+mu X # 
+
+"initially add 'a' to the set X"
+(a | X) | 
+
+"sequentially add b and c to the set X"
+(if (all a # a in X) then (X | b) else X) | 
+(if (all b # b in X) then (X | c) else X)

@@ -28,9 +28,10 @@ fn test_basic_tokens() -> io::Result<()> {
 
     for test_str in test_strs {
         dbg!(test_str);
-        dbg!(SymbolicBDD::tokenize(&mut BufReader::new(
-            test_str.as_bytes()
-        ))?);
+        dbg!(SymbolicBDD::tokenize(
+            &mut BufReader::new(test_str.as_bytes()),
+            None
+        )?);
     }
 
     Ok(())
@@ -57,7 +58,7 @@ fn test_parser() -> io::Result<()> {
 
     for test_str in test_strs {
         dbg!(test_str);
-        let result = ParsedFormula::new(&mut BufReader::new(test_str.as_bytes()))?;
+        let result = ParsedFormula::new(&mut BufReader::new(test_str.as_bytes()), None)?;
         dbg!(&result);
 
         dbg!(result.eval());
@@ -67,7 +68,7 @@ fn test_parser() -> io::Result<()> {
 }
 
 fn parse_and_evaluate(test_str: &str) -> io::Result<Rc<BDD<usize>>> {
-    let result = ParsedFormula::new(&mut BufReader::new(test_str.as_bytes()))?;
+    let result = ParsedFormula::new(&mut BufReader::new(test_str.as_bytes()), None)?;
     Ok(Rc::new(BDD::<usize>::from(result.eval().as_ref().clone())))
 }
 
@@ -104,8 +105,8 @@ fn test_4_queens_file() -> io::Result<()> {
 
     let input_file = File::open("examples/4_queens.txt").expect("Could not open input file");
 
-    let input_parsed =
-        ParsedFormula::new(&mut BufReader::new(input_file)).expect("Could not parse input file");
+    let input_parsed = ParsedFormula::new(&mut BufReader::new(input_file), None)
+        .expect("Could not parse input file");
 
     let input_evaluated = input_parsed.eval();
 
@@ -117,10 +118,7 @@ fn test_4_queens_file() -> io::Result<()> {
             input_parsed
                 .env
                 .borrow()
-                .infer(
-                    model.clone(),
-                    input_parsed.name2var(input_parsed.vars[i].as_str()),
-                )
+                .infer(model.clone(), input_parsed.vars[i].clone())
                 .1
         })
         .count();
@@ -134,37 +132,34 @@ fn test_4_queens_file() -> io::Result<()> {
 fn test_cliques_file() -> io::Result<()> {
     let input_file = File::open("examples/cliques.txt").expect("Could not open input file");
 
-    let input_parsed =
-        ParsedFormula::new(&mut BufReader::new(input_file)).expect("Could not parse input file");
+    let input_parsed = ParsedFormula::new(&mut BufReader::new(input_file), None)
+        .expect("Could not parse input file");
 
     let input_evaluated = input_parsed.eval();
 
     let model = input_parsed.env.borrow().model(input_evaluated);
 
-    let var_map: Vec<(String, (bool, bool))> = input_parsed
+    let var_map: Vec<(NamedSymbol, (bool, bool))> = input_parsed
         .free_vars
         .iter()
         .map(|v| {
             (
                 v.clone(),
-                input_parsed
-                    .env
-                    .borrow()
-                    .infer(model.clone(), input_parsed.name2var(v)),
+                input_parsed.env.borrow().infer(model.clone(), v.clone()),
             )
         })
         .collect();
 
     dbg!(&var_map);
 
-    let reference: Vec<(String, (bool, bool))> = vec![
-        ("a".to_string(), (false, false)),
-        ("f".to_string(), (true, true)),
-        ("g".to_string(), (true, true)),
-        ("b".to_string(), (false, false)),
-        ("d".to_string(), (true, true)),
-        ("e".to_string(), (true, true)),
-        ("c".to_string(), (false, false)),
+    let reference: Vec<(NamedSymbol, (bool, bool))> = vec![
+        (input_parsed.name2var("a").unwrap(), (false, false)),
+        (input_parsed.name2var("f").unwrap(), (true, true)),
+        (input_parsed.name2var("g").unwrap(), (true, true)),
+        (input_parsed.name2var("b").unwrap(), (false, false)),
+        (input_parsed.name2var("d").unwrap(), (true, true)),
+        (input_parsed.name2var("e").unwrap(), (true, true)),
+        (input_parsed.name2var("c").unwrap(), (false, false)),
     ];
 
     assert_eq!(var_map, reference);
