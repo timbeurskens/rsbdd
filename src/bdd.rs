@@ -260,6 +260,40 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
+    // disjunction
+    pub fn or(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
+        // self.not(self.nor(a, b))
+
+        match (a.as_ref(), b.as_ref()) {
+            (&BDD::True, _) | (_, &BDD::True) => self.mk_const(true),
+            (&BDD::False, _) => Rc::clone(&b),
+            (_, &BDD::False) => Rc::clone(&a),
+            // todo:
+            (&BDD::Choice(ref at, ref va, ref af), &BDD::Choice(_, ref vb, _)) if va < vb => self
+                .mk_choice(
+                    self.or(Rc::clone(at), Rc::clone(&b)),
+                    va.clone(),
+                    self.or(Rc::clone(af), Rc::clone(&b)),
+                ),
+            (&BDD::Choice(_, ref va, _), &BDD::Choice(ref bt, ref vb, ref bf)) if vb < va => self
+                .mk_choice(
+                    self.or(Rc::clone(bt), Rc::clone(&a)),
+                    vb.clone(),
+                    self.or(Rc::clone(bf), Rc::clone(&a)),
+                ),
+            (&BDD::Choice(ref at, ref va, ref af), &BDD::Choice(ref bt, ref vb, ref bf))
+                if va == vb =>
+            {
+                self.mk_choice(
+                    self.or(Rc::clone(at), Rc::clone(bt)),
+                    va.clone(),
+                    self.or(Rc::clone(af), Rc::clone(bf)),
+                )
+            }
+            _ => panic!("unsupported match: {:?} {:?}", a, b),
+        }
+    }
+
     pub fn not(&self, a: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match *a.as_ref() {
             BDD::False => self.mk_const(true),
@@ -288,11 +322,6 @@ impl<S: BDDSymbol> BDDEnv<S> {
             self.implies(Rc::clone(&a), Rc::clone(&b)),
             self.implies(b, a),
         )
-    }
-
-    // disjunction
-    pub fn or(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
-        self.not(self.nor(a, b))
     }
 
     // exclusive disjunction
