@@ -199,8 +199,8 @@ fn test_ite() {
 fn test_exn() {
     let e = BDDEnv::new();
 
-    assert_eq!(e.exn(&vec![], 0), e.mk_const(true));
-    assert_eq!(e.exn(&vec![], 1), e.mk_const(false));
+    assert_eq!(e.exn(&[], 0), e.mk_const(true));
+    assert_eq!(e.exn(&[], 1), e.mk_const(false));
     assert_eq!(
         e.exn(
             &vec![0].iter().map(|&i| e.var(i)).collect::<Vec<Rc<BDD>>>(),
@@ -227,7 +227,7 @@ fn test_exn() {
 fn test_aln() {
     let e = BDDEnv::new();
 
-    assert_eq!(e.aln(&vec![], 0), e.mk_const(true));
+    assert_eq!(e.aln(&[], 0), e.mk_const(true));
     assert_eq!(
         e.aln(
             &vec![0].iter().map(|&i| e.var(i)).collect::<Vec<Rc<BDD>>>(),
@@ -268,8 +268,8 @@ fn test_aln() {
 fn test_amn() {
     let e = BDDEnv::new();
 
-    assert_eq!(e.amn(&vec![], 1), e.mk_const(true));
-    assert_eq!(e.amn(&vec![], 0), e.mk_const(true));
+    assert_eq!(e.amn(&[], 1), e.mk_const(true));
+    assert_eq!(e.amn(&[], 0), e.mk_const(true));
     assert_eq!(
         e.amn(
             &vec![0].iter().map(|&i| e.var(i)).collect::<Vec<Rc<BDD>>>(),
@@ -504,40 +504,37 @@ fn test_aln_model() {
 #[test]
 fn test_count_geq_leq_eq() {
     let e = BDDEnv::new();
-    assert_eq!(e.count_eq(&vec![], &vec![]), e.mk_const(true));
+    assert_eq!(e.count_eq(&[], &[]), e.mk_const(true));
+
+    assert_eq!(e.count_eq(&[e.var(0)], &[e.var(0)]), e.mk_const(true));
+
+    assert_eq!(e.count_eq(&[e.var(0)], &[]), e.not(e.var(0)));
 
     assert_eq!(
-        e.count_eq(&vec![e.var(0)], &vec![e.var(0)]),
-        e.mk_const(true)
-    );
-
-    assert_eq!(e.count_eq(&vec![e.var(0)], &vec![]), e.not(e.var(0)));
-
-    assert_eq!(
-        e.count_eq(&vec![e.var(0)], &vec![e.var(1)]),
+        e.count_eq(&[e.var(0)], &[e.var(1)]),
         e.eq(e.var(0), e.var(1))
     );
 
     assert_eq!(
-        e.count_eq(&vec![e.var(0), e.var(1)], &vec![e.var(1), e.var(0)]),
+        e.count_eq(&[e.var(0), e.var(1)], &[e.var(1), e.var(0)]),
         e.mk_const(true)
     );
 
-    assert_eq!(e.count_leq(&vec![], &vec![]), e.mk_const(true));
-    assert_eq!(e.count_leq(&vec![], &vec![e.var(0)]), e.mk_const(true));
-    assert_eq!(e.count_leq(&vec![e.var(0)], &vec![]), e.not(e.var(0)));
+    assert_eq!(e.count_leq(&[], &[]), e.mk_const(true));
+    assert_eq!(e.count_leq(&[], &[e.var(0)]), e.mk_const(true));
+    assert_eq!(e.count_leq(&[e.var(0)], &[]), e.not(e.var(0)));
 
-    assert_eq!(e.count_geq(&vec![], &vec![]), e.mk_const(true));
-    assert_eq!(e.count_geq(&vec![e.var(0)], &vec![]), e.mk_const(true));
+    assert_eq!(e.count_geq(&[], &[]), e.mk_const(true));
+    assert_eq!(e.count_geq(&[e.var(0)], &[]), e.mk_const(true));
 
-    assert_eq!(e.count_geq(&vec![], &vec![e.var(0)]), e.not(e.var(0)));
+    assert_eq!(e.count_geq(&[], &[e.var(0)]), e.not(e.var(0)));
 }
 
 #[test]
 fn test_queens() {
     let e = BDDEnv::new();
 
-    let n_str = env::var("QUEENS").unwrap_or("4".into());
+    let n_str = env::var("QUEENS").unwrap_or_else(|_| "4".into());
 
     let n: usize = n_str.parse().unwrap();
 

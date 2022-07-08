@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate clap;
 
-use std::collections::HashSet;
+use rustc_hash::FxHashSet;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
@@ -36,7 +36,7 @@ fn main() -> io::Result<()> {
         .from_reader(reader);
 
     let mut edges: Vec<(String, String)> = Vec::new();
-    let mut vertices: HashSet<String> = HashSet::new();
+    let mut vertices: FxHashSet<String> = FxHashSet::default();
 
     for edge_record in csv_reader.records() {
         let edge = edge_record?;

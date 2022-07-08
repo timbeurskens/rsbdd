@@ -2,7 +2,7 @@
 use itertools::Itertools;
 use rsbdd::bdd;
 use rsbdd::bdd::BDDEnv;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use std::vec::Vec;
 
@@ -94,7 +94,7 @@ fn test_duplicates() {
 
     // b contains a small example with duplicate nodes
 
-    let mut hm: HashMap<u64, Vec<Rc<BDD>>> = HashMap::new();
+    let mut hm: FxHashMap<u64, Vec<Rc<BDD>>> = FxHashMap::default();
 
     let mut max_size: usize = 0;
 
@@ -117,7 +117,7 @@ fn test_duplicates() {
 
     dbg!(e.duplicates(expr_comb_clean));
 
-    for (_, nvec) in &hm {
+    for nvec in hm.values() {
         for i in nvec {
             let l = hm
                 .get(&i.get_hash())

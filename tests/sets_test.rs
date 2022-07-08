@@ -18,56 +18,32 @@ fn test_set_ops() {
     dbg!(BDDSet::from_element(3, bits, &env));
     dbg!(BDDSet::from_element(4, bits, &env));
 
-    assert_eq!(BDDSet::from_element(2, bits, &env).contains(2), true);
+    assert!(BDDSet::from_element(2, bits, &env).contains(2));
 
-    assert_eq!(
-        BDDSet::from_element(2, bits, &env)
-            .union(&BDDSet::from_element(5, bits, &env))
-            .contains(3),
-        false
-    );
-    assert_eq!(
-        BDDSet::from_element(2, bits, &env)
-            .union(&BDDSet::from_element(5, bits, &env))
-            .contains(1),
-        false
-    );
-    assert_eq!(
-        BDDSet::from_element(2, bits, &env)
-            .union(&BDDSet::from_element(5, bits, &env))
-            .contains(4),
-        false
-    );
-    assert_eq!(
-        BDDSet::from_element(2, bits, &env)
-            .union(&BDDSet::from_element(5, bits, &env))
-            .contains(6),
-        false
-    );
-    assert_eq!(
-        BDDSet::from_element(2, bits, &env)
-            .union(&BDDSet::from_element(5, bits, &env))
-            .contains(7),
-        false
-    );
-    assert_eq!(
-        BDDSet::from_element(2, bits, &env)
-            .union(&BDDSet::from_element(5, bits, &env))
-            .contains(8),
-        false
-    );
-    assert_eq!(
-        BDDSet::from_element(2, bits, &env)
-            .union(&BDDSet::from_element(5, bits, &env))
-            .contains(2),
-        true
-    );
-    assert_eq!(
-        BDDSet::from_element(2, bits, &env)
-            .union(&BDDSet::from_element(5, bits, &env))
-            .contains(5),
-        true
-    );
+    assert!(!BDDSet::from_element(2, bits, &env)
+        .union(&BDDSet::from_element(5, bits, &env))
+        .contains(3));
+    assert!(!BDDSet::from_element(2, bits, &env)
+        .union(&BDDSet::from_element(5, bits, &env))
+        .contains(1));
+    assert!(!BDDSet::from_element(2, bits, &env)
+        .union(&BDDSet::from_element(5, bits, &env))
+        .contains(4));
+    assert!(!BDDSet::from_element(2, bits, &env)
+        .union(&BDDSet::from_element(5, bits, &env))
+        .contains(6));
+    assert!(!BDDSet::from_element(2, bits, &env)
+        .union(&BDDSet::from_element(5, bits, &env))
+        .contains(7));
+    assert!(!BDDSet::from_element(2, bits, &env)
+        .union(&BDDSet::from_element(5, bits, &env))
+        .contains(8));
+    assert!(BDDSet::from_element(2, bits, &env)
+        .union(&BDDSet::from_element(5, bits, &env))
+        .contains(2));
+    assert!(BDDSet::from_element(2, bits, &env)
+        .union(&BDDSet::from_element(5, bits, &env))
+        .contains(5));
 
     let set_template = BDDSet::new(bits);
 
