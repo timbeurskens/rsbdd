@@ -1,0 +1,5 @@
+"
+Demonstrate the transitive property of the >= operator on a set of 4 arbitrary values.
+For any configuration the property should evaluate to true, resulting in a single 'true' node in the BDD.
+"
+([a1,a2,a3,a4] >= [b1,b2,b3,b4] & [b1,b2,b3,b4] >= [c1,c2,c3,c4]) => [a1,a2,a3,a4] >= [c1,c2,c3,c4]

@@ -2,7 +2,9 @@ use crate::bdd::{BDDEnv, NamedSymbol, BDD};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
+use std::borrow::Borrow;
 use std::cell::RefCell;
+use std::fmt::Display;
 use std::io;
 use std::io::BufRead;
 use std::iter::Peekable;
@@ -14,12 +16,12 @@ use std::vec::Vec;
 use rustc_hash::FxHashMap;
 
 lazy_static! {
-    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+|>=|=|>|<|\[|\]|,|\(|\))|(?P<countable>\d+)|(?P<identifier>[\w']+)|(?P<eof>$)|(?P<comment>"[^"]*")"#).unwrap();
+    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+|>=|=|>|<|\[|\]|,|\(|\)|->|-)|(?P<countable>\d+)|(?P<identifier>\w+)|(?P<eof>$)|(?P<comment>"[^"]*")"#).unwrap();
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SymbolicBDDToken {
-    Var(NamedSymbol),
+    Ident(NamedSymbol),
     Countable(usize),
     And,
     Or,
@@ -28,6 +30,7 @@ pub enum SymbolicBDDToken {
     Nor,
     Nand,
     Implies,
+    Rewrite,
     ImpliesInv,
     Iff,
     If,
@@ -35,6 +38,7 @@ pub enum SymbolicBDDToken {
     Else,
     Exists,
     Forall,
+    Sum,
     Eq,
     Geq,
     Gt,
@@ -62,6 +66,7 @@ pub enum BinaryOperator {
     Implies,
     ImpliesInv,
     Iff,
+    Equals,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -80,6 +85,21 @@ pub enum QuantifierType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum DomainConstant {
+    Terminal(String),
+    Application(String, Box<DomainConstant>),
+}
+
+impl Display for DomainConstant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DomainConstant::Terminal(s) => write!(f, "{}", s),
+            DomainConstant::Application(s, c) => write!(f, "{}({})", s, c),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SymbolicBDD {
     False,
     True,
@@ -92,6 +112,9 @@ pub enum SymbolicBDD {
     FixedPoint(NamedSymbol, bool, Box<SymbolicBDD>),
     Ite(Box<SymbolicBDD>, Box<SymbolicBDD>, Box<SymbolicBDD>),
     BinaryOp(BinaryOperator, Box<SymbolicBDD>, Box<SymbolicBDD>),
+    Summation(Vec<String>, Box<SymbolicBDD>),
+    RuleApplication(DomainConstant),
+    RewriteRule(DomainConstant, Box<SymbolicBDD>),
     Subtree(Rc<BDD<NamedSymbol>>),
 }
 
@@ -120,7 +143,7 @@ impl ParsedFormula {
         tokens
             .iter()
             .filter_map(|t| match t {
-                SymbolicBDDToken::Var(v) => Some(v.clone()),
+                SymbolicBDDToken::Ident(v) => Some(v.clone()),
                 _ => None,
             })
             .unique()
@@ -234,6 +257,7 @@ impl ParsedFormula {
                     BinaryOperator::Implies => self.env.borrow().implies(l, r),
                     BinaryOperator::ImpliesInv => self.env.borrow().implies(r, l),
                     BinaryOperator::Iff => self.env.borrow().eq(l, r),
+                    other => panic!("unexpected operator: {:?}", other),
                 }
             }
             SymbolicBDD::FixedPoint(var, initial, transformer) => {
@@ -244,6 +268,9 @@ impl ParsedFormula {
                 })
             }
             SymbolicBDD::Subtree(t) => Rc::clone(t),
+            SymbolicBDD::Summation(_, _) => todo!(),
+            SymbolicBDD::RuleApplication(_) => todo!(),
+            SymbolicBDD::RewriteRule(_, _) => todo!(),
         }
     }
 
@@ -321,6 +348,9 @@ impl SymbolicBDD {
             | SymbolicBDD::False
             | SymbolicBDD::Subtree(_)
             | SymbolicBDD::Var(_) => self.clone(),
+            SymbolicBDD::Summation(_, _) => todo!(),
+            SymbolicBDD::RuleApplication(_) => todo!(),
+            SymbolicBDD::RewriteRule(_, _) => todo!(),
         }
     }
 
@@ -347,6 +377,9 @@ impl SymbolicBDD {
             SymbolicBDD::FixedPoint(v, _, f) => v != var && f.var_is_free(var),
             SymbolicBDD::Subtree(_t) => unimplemented!(),
             SymbolicBDD::True | SymbolicBDD::False => false,
+            SymbolicBDD::Summation(_, _) => todo!(),
+            SymbolicBDD::RuleApplication(_) => todo!(),
+            SymbolicBDD::RewriteRule(_, _) => todo!(),
         }
     }
 
@@ -362,8 +395,28 @@ impl SymbolicBDD {
                 expect(SymbolicBDDToken::True, tokens)?;
                 Ok(SymbolicBDD::True)
             }
-            Some(SymbolicBDDToken::Var(_)) => {
-                Ok(SymbolicBDD::Var(SymbolicBDD::parse_variable_name(tokens)?))
+            Some(SymbolicBDDToken::Ident(_)) => {
+                // either a variable, or a constant, or a rewrite rule
+                let name = SymbolicBDD::parse_ident(tokens)?;
+
+                if check(SymbolicBDDToken::OpenParen, tokens).is_ok() {
+                    expect(SymbolicBDDToken::OpenParen, tokens)?;
+                    let inside = SymbolicBDD::parse_domain_constant(tokens)?;
+                    expect(SymbolicBDDToken::CloseParen, tokens)?;
+
+                    let apply = DomainConstant::Application(name, Box::new(inside));
+
+                    if check(SymbolicBDDToken::Rewrite, tokens).is_ok() {
+                        expect(SymbolicBDDToken::Rewrite, tokens)?;
+                        let inside = SymbolicBDD::parse_sub_formula(tokens)?;
+
+                        Ok(SymbolicBDD::RewriteRule(apply, Box::new(inside)))
+                    } else {
+                        Ok(SymbolicBDD::RuleApplication(apply))
+                    }
+                } else {
+                    Ok(SymbolicBDD::Var(name))
+                }
             }
             Some(SymbolicBDDToken::Not) => SymbolicBDD::parse_negation(tokens),
             Some(SymbolicBDDToken::Exists) => SymbolicBDD::parse_existence_quantifier(tokens),
@@ -371,6 +424,7 @@ impl SymbolicBDD {
             Some(SymbolicBDDToken::GFP) => SymbolicBDD::parse_fixed_point(tokens, true),
             Some(SymbolicBDDToken::LFP) => SymbolicBDD::parse_fixed_point(tokens, false),
             Some(SymbolicBDDToken::If) => SymbolicBDD::parse_ite(tokens),
+            Some(SymbolicBDDToken::Sum) => SymbolicBDD::parse_summation(tokens),
             None | Some(SymbolicBDDToken::Eof) => {
                 Err(io::Error::new(io::ErrorKind::InvalidData, "Unexpected EOF"))
             }
@@ -393,12 +447,39 @@ impl SymbolicBDD {
             | Some(SymbolicBDDToken::Nand)
             | Some(SymbolicBDDToken::Implies)
             | Some(SymbolicBDDToken::ImpliesInv)
-            | Some(SymbolicBDDToken::Iff) => {
+            | Some(SymbolicBDDToken::Iff)
+            | Some(SymbolicBDDToken::Eq) => {
                 let op = SymbolicBDD::parse_binary_operator(tokens)?;
                 let right = SymbolicBDD::parse_sub_formula(tokens)?;
                 Ok(SymbolicBDD::BinaryOp(op, Box::new(left), Box::new(right)))
             }
             _ => Ok(left),
+        }
+    }
+
+    // parse formulas in the shape a(b), a(b(c)), a(b(c(...)))
+    fn parse_rule_application(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
+        let rulename = SymbolicBDD::parse_ident(tokens)?;
+        expect(SymbolicBDDToken::OpenParen, tokens)?;
+        let inside = SymbolicBDD::parse_domain_constant(tokens)?;
+        expect(SymbolicBDDToken::CloseParen, tokens)?;
+
+        Ok(SymbolicBDD::RuleApplication(DomainConstant::Application(
+            rulename,
+            Box::new(inside),
+        )))
+    }
+
+    fn parse_domain_constant(tokens: &mut TokenReader) -> io::Result<DomainConstant> {
+        let constname = SymbolicBDD::parse_ident(tokens)?;
+        if check(SymbolicBDDToken::OpenParen, tokens).is_ok() {
+            expect(SymbolicBDDToken::OpenParen, tokens)?;
+            let inside = SymbolicBDD::parse_domain_constant(tokens)?;
+            expect(SymbolicBDDToken::CloseParen, tokens)?;
+
+            Ok(DomainConstant::Application(constname, Box::new(inside)))
+        } else {
+            Ok(DomainConstant::Terminal(constname))
         }
     }
 
@@ -484,9 +565,9 @@ impl SymbolicBDD {
         }
     }
 
-    fn parse_variable_name(tokens: &mut TokenReader) -> io::Result<NamedSymbol> {
+    fn parse_ident(tokens: &mut TokenReader) -> io::Result<NamedSymbol> {
         match tokens.next() {
-            Some(SymbolicBDDToken::Var(var)) => Ok(var.clone()),
+            Some(SymbolicBDDToken::Ident(var)) => Ok(var.clone()),
             other => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
@@ -501,7 +582,7 @@ impl SymbolicBDD {
 
         loop {
             if check(SymbolicBDDToken::Hash, tokens).is_err() {
-                vars.push(SymbolicBDD::parse_variable_name(tokens)?);
+                vars.push(SymbolicBDD::parse_ident(tokens)?);
 
                 // if no comma is found after the variable, the list should end with a closing hash
                 if check(SymbolicBDDToken::Comma, tokens).is_err() {
@@ -569,6 +650,16 @@ impl SymbolicBDD {
         ))
     }
 
+    fn parse_summation(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
+        expect(SymbolicBDDToken::Sum, tokens)?;
+        let vars = SymbolicBDD::parse_variable_list(tokens)?;
+
+        expect(SymbolicBDDToken::Hash, tokens)?;
+        let formula = SymbolicBDD::parse_sub_formula(tokens)?;
+
+        Ok(SymbolicBDD::Summation(vars, Box::new(formula)))
+    }
+
     fn parse_binary_operator(tokens: &mut TokenReader) -> io::Result<BinaryOperator> {
         match tokens.peek() {
             Some(SymbolicBDDToken::And) => {
@@ -602,6 +693,10 @@ impl SymbolicBDD {
             Some(SymbolicBDDToken::Iff) => {
                 expect(SymbolicBDDToken::Iff, tokens)?;
                 Ok(BinaryOperator::Iff)
+            }
+            Some(SymbolicBDDToken::Eq) => {
+                expect(SymbolicBDDToken::Eq, tokens)?;
+                Ok(BinaryOperator::Equals)
             }
             other => Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -662,6 +757,7 @@ impl SymbolicBDD {
                     "^" => result.push(SymbolicBDDToken::Xor),
                     "-" | "!" => result.push(SymbolicBDDToken::Not),
                     "=>" => result.push(SymbolicBDDToken::Implies),
+                    "->" => result.push(SymbolicBDDToken::Rewrite),
                     "<=" => result.push(SymbolicBDDToken::ImpliesInv),
                     "<=>" => result.push(SymbolicBDDToken::Iff),
                     "#" => result.push(SymbolicBDDToken::Hash),
@@ -698,6 +794,7 @@ impl SymbolicBDD {
                     "if" => result.push(SymbolicBDDToken::If),
                     "then" => result.push(SymbolicBDDToken::Then),
                     "else" => result.push(SymbolicBDDToken::Else),
+                    "sum" => result.push(SymbolicBDDToken::Sum),
                     "gfp" | "nu" => result.push(SymbolicBDDToken::GFP),
                     "lfp" | "mu" => result.push(SymbolicBDDToken::LFP),
                     var => {
