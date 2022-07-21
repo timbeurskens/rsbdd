@@ -193,7 +193,9 @@ For every rewrite application in the formula, the rule application is replaced b
 The environment is updated (recursively), where the rule application is now an assumption / goal.
 Until the formula is closed (no remaining variables), the algorithm tries to match any open rewrite rule to an assumption in the environment.
 If a match has been found for some rewrite rule `x -> y`, `x` is replaced by `true`. If no match can be found for the rule, `x` is replaced by `false`.
-A rewrite rule `false -> y` can be rewritten as `true` by `rewrite elimination`. A rewrite rule `true -> y` can be rewritten as `y` by `rewrite elimination`.
+A rewrite rule `false -> y` can be rewritten to `true` by `rewrite elimination`. A rewrite rule `true -> y` can be rewritten to `y` by `rewrite elimination`.
+
+The rewrite system allows for modularity in theories: the peano axioms can be expressed in a separate `peano.l` theory file, which can be dynamically loaded upon invoking `rsbdd -l peano.l` (or the shorthand `rsbdd -lpeano`). Any evaluations will be subject to the included theories, e.g. `rsbdd -lpeano -e "1+1=2"`.
 
 **Matching:**
 

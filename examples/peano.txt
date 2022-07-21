@@ -9,3 +9,22 @@ Given these 2 properties, can we prove suc(suc(0)) (=2) is a natural number?
 (is_nat(_0) -> true) &
 (sum n # is_nat(suc(n)) -> is_nat(n)) &
 is_nat(suc(suc(_0)))
+
+
+------
+
+
+// cons 0: Nat
+// map s([n: Nat]): Nat
+// map ([a: Nat] = [b: Nat]): Bool;
+
+// all n: Nat # n = n
+// all n: Nat # (n + 0) = n
+// all n: Nat # (x = y) <=> (s(x) = s(y))
+
+goal: 1 + 1 = 2
+subject to: 
+(cons 0: Nat) &
+()
+(1 -> s(0)) &
+(2 -> s(1))
