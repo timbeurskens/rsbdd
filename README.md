@@ -185,6 +185,8 @@ It is therefore possible that the rewrite operator and the implication operator 
 For extra clarity, the rewrite operator `->` differs from the implication operator `=>` in this design document.
 For every formula requiring a rewrite, every rewrite rule must be satisfied (conjunction of all rules).
 
+_this information is outdated_
+
 Rewrite rules should be specified in a separate file with the `-r` or `--rules` parameter _Note: this complicates unix piping unfortunately._ The formula to be evaluated should not contain any rewrite rules. Rewrite rules are allowed in input formulas (and actually encouraged!).
 
 **Rewriting:**
@@ -194,6 +196,7 @@ The environment is updated (recursively), where the rule application is now an a
 Until the formula is closed (no remaining variables), the algorithm tries to match any open rewrite rule to an assumption in the environment.
 If a match has been found for some rewrite rule `x -> y`, `x` is replaced by `true`. If no match can be found for the rule, `x` is replaced by `false`.
 A rewrite rule `false -> y` can be rewritten to `true` by `rewrite elimination`. A rewrite rule `true -> y` can be rewritten to `y` by `rewrite elimination`.
+This approach could result in hidden bugs: if none of the rules match, the formula evaluates to `true` and terminates. In reality, the formula is likely unsolvable. A possible solution: the original formula is kept, subject to the environment of all rewrite rules (and introduced assumption(s) as a rewrite rule mapping to true). This environment is then recursively solved by invoking the SAT solver and rewriter alternatingly. 
 
 The rewrite system allows for modularity in theories: the peano axioms can be expressed in a separate `peano.l` theory file, which can be dynamically loaded upon invoking `rsbdd -l peano.l` (or the shorthand `rsbdd -lpeano`). Any evaluations will be subject to the included theories, e.g. `rsbdd -lpeano -e "1+1=2"`.
 
