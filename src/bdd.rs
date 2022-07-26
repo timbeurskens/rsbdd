@@ -515,11 +515,9 @@ impl<S: BDDSymbol> BDDEnv<S> {
 
     // simplify removes a choice node if both subtrees are equivalent
     pub fn simplify(&self, a: &Rc<BDD<S>>) -> Rc<BDD<S>> {
-        let result = match a.as_ref() {
-            &BDD::Choice(ref t, _, ref f) if t.as_ref() == f.as_ref() => t,
-            _ => a,
-        };
-
-        Rc::clone(result)
+        match a.as_ref() {
+            &BDD::Choice(ref t, _, ref f) if t.as_ref() == f.as_ref() => Rc::clone(t),
+            _ => Rc::clone(a),
+        }
     }
 }
