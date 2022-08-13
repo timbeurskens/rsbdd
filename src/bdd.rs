@@ -2,10 +2,12 @@ use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::collections::hash_map::DefaultHasher;
+use std::error::Error;
 use std::fmt;
 use std::fmt::{Debug, Display};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
+use std::str::FromStr;
 
 pub trait BDDSymbol: Ord + Display + Debug + Clone + Hash {}
 
@@ -87,6 +89,34 @@ pub enum TruthTableEntry {
     True,
     False,
     Any,
+}
+
+#[derive(Debug)]
+pub struct TruthTableEntryParseError {
+    pub input: String,
+}
+
+impl Error for TruthTableEntryParseError {}
+
+impl Display for TruthTableEntryParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Could not parse truth table entry: {}", self.input)
+    }
+}
+
+impl FromStr for TruthTableEntry {
+    type Err = TruthTableEntryParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "true" | "True" | "t" | "T" | "1" => Ok(TruthTableEntry::True),
+            "false" | "False" | "f" | "F" | "0" => Ok(TruthTableEntry::False),
+            "any" | "Any" | "a" | "A" => Ok(TruthTableEntry::Any),
+            _ => Err(TruthTableEntryParseError {
+                input: s.to_string(),
+            }),
+        }
+    }
 }
 
 impl Display for TruthTableEntry {

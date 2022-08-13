@@ -41,8 +41,8 @@ struct Args {
     vars: bool,
 
     /// Only show true or false entries in the output.
-    #[clap(short, long, value_parser)]
-    filter: Option<String>,
+    #[clap(short, long, value_parser, default_value_t = TruthTableEntry::Any)]
+    filter: TruthTableEntry,
 
     /// Repeat the solving process n times for more accurate performance reports.
     #[clap(short, long, value_parser, value_name = "N")]
@@ -132,12 +132,6 @@ fn main() {
         result = input_parsed.env.borrow().model(result);
     }
 
-    let filter = match args.filter.as_deref() {
-        Some("true" | "True" | "t" | "T" | "1") => TruthTableEntry::True,
-        Some("false" | "False" | "f" | "F" | "0") => TruthTableEntry::False,
-        _ => TruthTableEntry::Any,
-    };
-
     // show ordered variable list
 
     if args.export_ordering {
@@ -185,7 +179,7 @@ fn main() {
                 .iter()
                 .map(|_| TruthTableEntry::Any)
                 .collect(),
-            filter,
+            args.filter,
             &input_parsed,
             &widths,
         );
@@ -207,7 +201,7 @@ fn main() {
     if let Some(dot_filename) = args.dot {
         let mut f = File::create(dot_filename).expect("Could not create dot file");
 
-        let graph = BDDGraph::new(&result, filter);
+        let graph = BDDGraph::new(&result, args.filter);
 
         graph
             .render_dot(&mut f)
