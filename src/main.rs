@@ -1,3 +1,4 @@
+use clap::Parser;
 use rsbdd::bdd::*;
 use rsbdd::bdd_io::*;
 use rsbdd::parser::*;
@@ -7,43 +8,72 @@ use std::cmp::max;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-#[macro_use]
-extern crate clap;
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    #[clap(value_parser, value_name = "FILE")]
+    /// The input file containing a logic formula in rsbdd format.
+    input: Option<PathBuf>,
+
+    #[clap(short, long, value_parser)]
+    /// Write the parse tree in dot format to the specified file.
+    parsetree: Option<PathBuf>,
+
+    #[clap(short, long)]
+    /// Print the truth table to stdout.
+    truthtable: bool,
+
+    #[clap(short, long, value_parser)]
+    /// Write the bdd to a dot graphviz file.
+    dot: Option<PathBuf>,
+
+    /// Compute a single satisfying model as output.
+    #[clap(short, long)]
+    model: bool,
+
+    /// Print all satisfying variables leading to a truth value.
+    #[clap(short, long)]
+    vars: bool,
+
+    /// Only show true or false entries in the output.
+    #[clap(short, long, value_parser)]
+    filter: Option<String>,
+
+    /// Repeat the solving process n times for more accurate performance reports.
+    #[clap(short, long, value_parser, value_name = "N")]
+    benchmark: Option<usize>,
+
+    /// Use GNUPlot to plot the runtime distribution.
+    #[clap(short = 'g', long)]
+    plot: bool,
+
+    /// Parse the formula as string.
+    #[clap(short, long, value_parser)]
+    evaluate: Option<String>,
+
+    /// Read a custom variable ordering from file.
+    #[clap(short, long, value_parser)]
+    ordering: Option<PathBuf>,
+
+    /// Export the automatically derived ordering to stdout.
+    #[clap(short = 'r', long)]
+    export_ordering: bool,
+}
 
 fn main() {
-    let args = clap_app!(Solver =>
-        (version: env!("CARGO_PKG_VERSION"))
-        (author: "Tim Beurskens")
-        (about: "A BDD-based SAT solver")
-        (@arg input: -i --input +takes_value "logic input file")
-        (@arg show_parsetree: -p --parsetree +takes_value "write the parse tree in dot format to this file")
-        (@arg show_truth_table: -t --truthtable !takes_value "print the truth-table to stdout")
-        (@arg show_dot: -d --dot +takes_value "write the bdd to a dot graphviz file")
-        (@arg model: -m --model !takes_value "use a model of the bdd as output (instead of the satisfying assignment)")
-        (@arg vars: -v --vars !takes_value "print all true variables leading to a truth evaluation")
-        (@arg filter: -f --filter +takes_value "only show true or false entries in the truth-table")
-        (@arg benchmark: -b --benchmark +takes_value "Repeat the solving process n times for more accurate performance reports")
-        (@arg show_plot: -g --plot !takes_value "show a distribution plot of the runtime")
-        (@arg evaluate: -e --eval +takes_value "Inline evaluate the given formula")
-        (@arg ordering: -o --order +takes_value "Provide a custom variable ordering")
-        (@arg export_ordering: -r --ordering !takes_value "Print the variable ordering to stdout")
-    )
-    .get_matches();
+    let args = Args::parse();
 
-    let repeat = args
-        .value_of("benchmark")
-        .unwrap_or("1")
-        .parse::<usize>()
-        .expect("Could not parse benchmark value as usize");
+    let repeat = args.benchmark.unwrap_or(1);
 
-    let inline_eval = args.value_of("evaluate");
-    let input_filename = args.value_of("input");
+    let inline_eval = args.evaluate;
+    let input_filename = args.input;
 
-    let mut reader = if let Some(inline_str) = inline_eval {
+    let mut reader = if let Some(inline_str) = &inline_eval {
         Box::new(BufReader::new(inline_str.as_bytes())) as Box<dyn BufRead>
     } else if let Some(some_input_filename) = input_filename {
         let file = File::open(some_input_filename).expect("Could not open input file");
@@ -52,7 +82,7 @@ fn main() {
         Box::new(BufReader::new(io::stdin())) as Box<dyn BufRead>
     };
 
-    let pre_variable_ordering = if let Some(ord_filename) = args.value_of("ordering") {
+    let pre_variable_ordering = if let Some(ord_filename) = args.ordering {
         let file = File::open(ord_filename).expect("Could not open variable ordering file");
         let mut contents = Box::new(BufReader::new(file)) as Box<dyn BufRead>;
         let tokens = SymbolicBDD::tokenize(&mut contents, None)
@@ -66,7 +96,7 @@ fn main() {
     let input_parsed =
         ParsedFormula::new(&mut reader, pre_variable_ordering).expect("Could not parse input file");
 
-    if let Some(parsetree_filename) = args.value_of("show_parsetree") {
+    if let Some(parsetree_filename) = args.parsetree {
         let mut f = File::create(parsetree_filename).expect("Could not create parsetree dot file");
 
         let graph = SymbolicParseTree::new(&input_parsed.bdd);
@@ -89,20 +119,20 @@ fn main() {
     }
 
     // only print performance results when the benchmark flag is available, and more than 1 run has completed
-    if args.is_present("benchmark") && repeat > 0 {
+    if args.benchmark.is_some() && repeat > 0 {
         print_performance_results(&exec_times);
 
-        if args.is_present("show_plot") {
+        if args.plot {
             plot_performance_results(&exec_times);
         }
     }
 
     // reduce the bdd to a single path from root to a single 'true' node
-    if args.is_present("model") {
+    if args.model {
         result = input_parsed.env.borrow().model(result);
     }
 
-    let filter = match args.value_of("filter") {
+    let filter = match args.filter.as_deref() {
         Some("true" | "True" | "t" | "T" | "1") => TruthTableEntry::True,
         Some("false" | "False" | "f" | "F" | "0") => TruthTableEntry::False,
         _ => TruthTableEntry::Any,
@@ -110,7 +140,7 @@ fn main() {
 
     // show ordered variable list
 
-    if args.is_present("export_ordering") {
+    if args.export_ordering {
         let mut ordered_variables = input_parsed.vars.clone();
         ordered_variables.sort_by(|a, b| a.id.partial_cmp(&b.id).unwrap());
         let ordered_variable_names = ordered_variables
@@ -136,7 +166,7 @@ fn main() {
 
     let widths: Vec<usize> = headers.iter().map(|v| max(5, v.len()) as usize).collect();
 
-    if args.is_present("show_truth_table") {
+    if args.truthtable {
         print!("|");
         for free_var in &headers {
             let len = 1 + max(5, free_var.len());
@@ -161,7 +191,7 @@ fn main() {
         );
     }
 
-    if args.is_present("vars") {
+    if args.vars {
         print_true_vars_recursive(
             &result,
             input_parsed
@@ -174,7 +204,7 @@ fn main() {
         );
     }
 
-    if let Some(dot_filename) = args.value_of("show_dot") {
+    if let Some(dot_filename) = args.dot {
         let mut f = File::create(dot_filename).expect("Could not create dot file");
 
         let graph = BDDGraph::new(&result, filter);
