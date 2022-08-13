@@ -1,16 +1,18 @@
 [package]
 name = "rsbdd"
-version = "0.9.3"
+version = "0.10.0"
 edition = "2021"
+authors = ["Tim Beurskens <timbeurskens.97@gmail.com>"]
+description = "A BDD-based SAT solver"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 dot = "0.1.4"
 itertools = "0.10.3"
-clap = "2.33.3"
+clap = { version = "3.2.17", features = ["derive"] }
 lazy_static = "1.4.0"
-regex = "1"
+regex = "1.6.0"
 csv = "1.1.6"
 rand = "0.8.5"
 rustc-hash = "1.1.0"
