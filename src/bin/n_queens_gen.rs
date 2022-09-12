@@ -1,33 +1,37 @@
-#[macro_use]
-extern crate clap;
+use clap::Parser;
+use no_panic::no_panic;
 
 use std::fs::File;
 use std::io;
 use std::io::Write;
 use std::io::*;
 
+use std::path::PathBuf;
+
+#[derive(Parser, Debug)]
+#[clap(author, version, about = "Generates n-queen formulae for the SAT solver", long_about = None)]
+struct Args {
+    #[clap(value_parser, value_name = "OUTPUT")]
+    /// The output rsbdd file
+    output: Option<PathBuf>,
+
+    #[clap(short = 'n', long, value_parser, default_value_t = 4)]
+    /// The number of queens
+    queens: u16,
+}
+
 fn main() -> io::Result<()> {
     let version = env!("CARGO_PKG_VERSION");
 
-    let args = clap_app!(QueenGenerator =>
-        (version: version)
-        (author: "Tim Beurskens")
-        (about: "Generates n-queen formulae for the SAT solver")
-        (@arg queens: -n --queens +takes_value "The number of queens")
-        (@arg output: -o --output +takes_value "The output file")
-    )
-    .get_matches();
+    let args = Args::parse();
 
-    let n = args
-        .value_of("queens")
-        .unwrap_or("4")
-        .parse::<usize>()
-        .expect("Invalid number of queens");
+    let n = args.queens;
 
-    let output = args.value_of("output");
-
-    let mut writer = if output.is_some() {
-        let file = File::create(output.unwrap())?;
+    let mut writer = if args.output.is_some() {
+        let file = File::create(
+            args.output
+                .ok_or(io::Error::new(ErrorKind::NotFound, "output is None"))?,
+        )?;
         Box::new(BufWriter::new(file)) as Box<dyn Write>
     } else {
         Box::new(BufWriter::new(io::stdout())) as Box<dyn Write>
@@ -116,7 +120,7 @@ fn main() -> io::Result<()> {
     writeln!(writer, "true")?;
 
     // flush the writer before dropping it
-    writer.flush().expect("Could not flush write buffer");
+    writer.flush()?;
 
     Ok(())
 }

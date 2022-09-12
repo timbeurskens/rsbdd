@@ -10,19 +10,22 @@ use std::io::*;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
-/// Converts a graph into a max-clique specification
+#[clap(author, version, about = "Converts a graph into a max-clique specification", long_about = None)]
 struct Args {
     #[clap(value_parser, value_name = "INPUT")]
+    /// Input file graph in csv edge-list format
     input: Option<PathBuf>,
 
     #[clap(value_parser, value_name = "OUTPUT")]
+    /// The output rsbdd file
     output: Option<PathBuf>,
 
     #[clap(short, long)]
+    /// Use undirected edges (test for both directions in the set-complement operation)
     undirected: bool,
 
     #[clap(short, long)]
+    /// Construct a satisfiable formula for all cliques
     all: bool,
 }
 
