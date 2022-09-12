@@ -1,5 +1,5 @@
-#[macro_use]
-extern crate clap;
+use clap::Command;
+use clap::Parser;
 
 use std::collections::HashSet;
 use std::fs::File;
@@ -7,25 +7,31 @@ use std::io;
 use std::io::prelude::*;
 use std::io::Write;
 use std::io::*;
+use std::path::PathBuf;
+
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+/// Converts a graph into a max-clique specification
+struct Args {
+    #[clap(value_parser, value_name = "INPUT")]
+    input: Option<PathBuf>,
+
+    #[clap(value_parser, value_name = "OUTPUT")]
+    output: Option<PathBuf>,
+
+    #[clap(short, long)]
+    undirected: bool,
+
+    #[clap(short, long)]
+    all: bool,
+}
 
 fn main() -> io::Result<()> {
     let version = env!("CARGO_PKG_VERSION");
+    let args = Args::parse();
 
-    let args = clap_app!(CliqueGenerator =>
-        (version: version)
-        (author: "Tim Beurskens")
-        (about: "Converts a graph into a max-clique specification")
-        (@arg input: -i --input +takes_value "Input file (graph in csv edge-list format)")
-        (@arg output: -o --output +takes_value "The output file")
-        (@arg undirected: -u --undirected !takes_value "Use undirected edges (test for both directions in the set complement operation)")
-        (@arg all: -a --all !takes_value "Construct a BDD satisfying all cliques, not just the maximum clique(s)")
-    )
-    .get_matches();
-
-    let input = args.value_of("input");
-
-    let reader = if input.is_some() {
-        let file = File::open(input.unwrap())?;
+    let reader = if args.input.is_some() {
+        let file = File::open(args.input.unwrap())?;
         Box::new(BufReader::new(file)) as Box<dyn BufRead>
     } else {
         Box::new(BufReader::new(io::stdin())) as Box<dyn BufRead>
@@ -50,8 +56,8 @@ fn main() -> io::Result<()> {
 
     let mut edges_complement: Vec<(String, String)> = Vec::new();
 
-    let is_undirected: bool = args.is_present("undirected");
-    let show_all: bool = args.is_present("all");
+    let is_undirected: bool = args.undirected;
+    let show_all: bool = args.all;
 
     for v1 in &vertices {
         for v2 in &vertices {
@@ -70,10 +76,8 @@ fn main() -> io::Result<()> {
         }
     }
 
-    let output = args.value_of("output");
-
-    let mut writer = if output.is_some() {
-        let file = File::create(output.unwrap())?;
+    let mut writer = if args.output.is_some() {
+        let file = File::create(args.output.unwrap())?;
         Box::new(BufWriter::new(file)) as Box<dyn Write>
     } else {
         Box::new(BufWriter::new(io::stdout())) as Box<dyn Write>
