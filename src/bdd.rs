@@ -163,7 +163,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
     // this function currently has no effect, might be removed later
     pub fn clean(&self, root: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match root.as_ref() {
-            &BDD::Choice(ref l, ref s, ref r) => {
+            BDD::Choice(l, s, r) => {
                 let _l = self.find(l);
                 let _r = self.find(r);
 
@@ -195,7 +195,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
 
     pub fn node_list(&self, root: Rc<BDD<S>>) -> Vec<Rc<BDD<S>>> {
         match root.as_ref() {
-            &BDD::Choice(ref l, _, ref r) => {
+            BDD::Choice(l, _, r) => {
                 let l_nodes = self.node_list(Rc::clone(l));
                 let r_nodes = self.node_list(Rc::clone(r));
 
@@ -206,7 +206,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
                     .cloned()
                     .collect()
             }
-            &BDD::True | &BDD::False => vec![Rc::clone(&root)],
+            BDD::True | BDD::False => vec![Rc::clone(&root)],
         }
     }
 
@@ -262,22 +262,22 @@ impl<S: BDDSymbol> BDDEnv<S> {
     // conjunction
     pub fn and(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match (a.as_ref(), b.as_ref()) {
-            (&BDD::False, _) | (_, &BDD::False) => self.mk_const(false),
-            (&BDD::True, _) => Rc::clone(&b),
-            (_, &BDD::True) => Rc::clone(&a),
-            (&BDD::Choice(ref at, ref va, ref af), &BDD::Choice(_, ref vb, _)) if va < vb => self
+            (BDD::False, _) | (_, &BDD::False) => self.mk_const(false),
+            (BDD::True, _) => Rc::clone(&b),
+            (_, BDD::True) => Rc::clone(&a),
+            (BDD::Choice(at, va, af), BDD::Choice(_, vb, _)) if va < vb => self
                 .mk_choice(
                     self.and(Rc::clone(at), Rc::clone(&b)),
                     va.clone(),
                     self.and(Rc::clone(af), Rc::clone(&b)),
                 ),
-            (&BDD::Choice(_, ref va, _), &BDD::Choice(ref bt, ref vb, ref bf)) if vb < va => self
+            (BDD::Choice(_, va, _), BDD::Choice(bt, vb, bf)) if vb < va => self
                 .mk_choice(
                     self.and(Rc::clone(bt), Rc::clone(&a)),
                     vb.clone(),
                     self.and(Rc::clone(bf), Rc::clone(&a)),
                 ),
-            (&BDD::Choice(ref at, ref va, ref af), &BDD::Choice(ref bt, ref vb, ref bf))
+            (BDD::Choice(at, va, af), BDD::Choice(bt, vb, bf))
                 if va == vb =>
             {
                 self.mk_choice(
@@ -295,23 +295,23 @@ impl<S: BDDSymbol> BDDEnv<S> {
         // self.not(self.nor(a, b))
 
         match (a.as_ref(), b.as_ref()) {
-            (&BDD::True, _) | (_, &BDD::True) => self.mk_const(true),
-            (&BDD::False, _) => Rc::clone(&b),
+            (BDD::True, _) | (_, BDD::True) => self.mk_const(true),
+            (BDD::False, _) => Rc::clone(&b),
             (_, &BDD::False) => Rc::clone(&a),
             // todo:
-            (&BDD::Choice(ref at, ref va, ref af), &BDD::Choice(_, ref vb, _)) if va < vb => self
+            (BDD::Choice(at, va, af), BDD::Choice(_, vb, _)) if va < vb => self
                 .mk_choice(
                     self.or(Rc::clone(at), Rc::clone(&b)),
                     va.clone(),
                     self.or(Rc::clone(af), Rc::clone(&b)),
                 ),
-            (&BDD::Choice(_, ref va, _), &BDD::Choice(ref bt, ref vb, ref bf)) if vb < va => self
+            (BDD::Choice(_, va, _), BDD::Choice(bt, vb, bf)) if vb < va => self
                 .mk_choice(
                     self.or(Rc::clone(bt), Rc::clone(&a)),
                     vb.clone(),
                     self.or(Rc::clone(bf), Rc::clone(&a)),
                 ),
-            (&BDD::Choice(ref at, ref va, ref af), &BDD::Choice(ref bt, ref vb, ref bf))
+            (BDD::Choice(at, va, af), BDD::Choice(bt, vb, bf))
                 if va == vb =>
             {
                 self.mk_choice(
@@ -325,10 +325,10 @@ impl<S: BDDSymbol> BDDEnv<S> {
     }
 
     pub fn not(&self, a: Rc<BDD<S>>) -> Rc<BDD<S>> {
-        match *a.as_ref() {
+        match a.as_ref() {
             BDD::False => self.mk_const(true),
             BDD::True => self.mk_const(false),
-            BDD::Choice(ref at, ref va, ref af) => {
+            BDD::Choice(at, va, af) => {
                 self.mk_choice(self.not(Rc::clone(at)), va.clone(), self.not(Rc::clone(af)))
             }
         }
@@ -483,9 +483,9 @@ impl<S: BDDSymbol> BDDEnv<S> {
     // existential quantification
     pub fn exists_impl(&self, s: &S, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match b.as_ref() {
-            &BDD::False | &BDD::True => b,
-            &BDD::Choice(ref t, ref v, ref f) if v == s => self.or(Rc::clone(t), Rc::clone(f)),
-            &BDD::Choice(ref t, ref v, ref f) => self.mk_choice(
+            BDD::False | &BDD::True => b,
+            BDD::Choice(t, v, f) if v == s => self.or(Rc::clone(t), Rc::clone(f)),
+            BDD::Choice(t, v, f) => self.mk_choice(
                 self.exists_impl(s, Rc::clone(t)),
                 v.clone(),
                 self.exists_impl(s, Rc::clone(f)),
@@ -516,7 +516,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
 
     pub fn model(&self, a: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match a.as_ref() {
-            &BDD::Choice(ref t, ref v, ref f) => {
+            BDD::Choice(t, v, f) => {
                 let lhs = self.model(Rc::clone(t));
                 let rhs = self.model(Rc::clone(f));
                 if lhs != self.mk_const(false) {
@@ -527,7 +527,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
                     self.mk_const(false)
                 }
             }
-            &BDD::True | &BDD::False => a,
+            BDD::True | BDD::False => a,
         }
     }
 
@@ -546,7 +546,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
     // simplify removes a choice node if both subtrees are equivalent
     pub fn simplify(&self, a: &Rc<BDD<S>>) -> Rc<BDD<S>> {
         match a.as_ref() {
-            &BDD::Choice(ref t, _, ref f) if t.as_ref() == f.as_ref() => Rc::clone(t),
+            BDD::Choice(t, _, f) if t.as_ref() == f.as_ref() => Rc::clone(t),
             _ => Rc::clone(a),
         }
     }
