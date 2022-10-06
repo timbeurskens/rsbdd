@@ -32,8 +32,8 @@ fn file_assert_eq<P: AsRef<Path>>(file1: P, file2: P, ordering: &[&str]) {
 fn file_assert_true<P: AsRef<Path>>(file: P) {
     let f1 = File::open(file).unwrap();
 
-    let input_parsed = ParsedFormula::new(&mut BufReader::new(f1), None)
-        .expect("Could not parse input file");
+    let input_parsed =
+        ParsedFormula::new(&mut BufReader::new(f1), None).expect("Could not parse input file");
 
     let input_evaluated = input_parsed.eval();
 

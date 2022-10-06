@@ -201,7 +201,7 @@ fn main() {
     }
 }
 
-fn print_sized_line<'a, B, C, D>(labels: &Vec<D>, widths: &B, result: &BDD<C>)
+fn print_sized_line<B, C, D>(labels: &Vec<D>, widths: &B, result: &BDD<C>)
 where
     B: Index<usize, Output = usize>,
     C: BDDSymbol,
@@ -209,7 +209,7 @@ where
 {
     print!("|");
     let len = labels.len();
-    for (i, label) in labels.into_iter().enumerate() {
+    for (i, label) in labels.iter().enumerate() {
         print!(" {:indent$} |", label, indent = widths[i]);
     }
     println!(
@@ -336,7 +336,7 @@ fn print_true_vars_recursive(
 }
 
 // recursively walk through the bdd and assign values to the variables until every permutation is assigned a true or false value
-fn print_truth_table_recursive<'a, A>(
+fn print_truth_table_recursive<A>(
     root: &Rc<BDD<NamedSymbol>>,
     vars: Vec<TruthTableEntry>,
     filter: TruthTableEntry,

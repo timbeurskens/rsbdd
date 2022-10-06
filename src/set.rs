@@ -19,7 +19,7 @@ impl BDDCategorizable for usize {
     }
 }
 
-impl<'a> BDDSet {
+impl BDDSet {
     pub fn new(bits: usize) -> BDDSet {
         let env = BDDEnv::new();
         Self::with_env(bits, &Rc::new(env))

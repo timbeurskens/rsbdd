@@ -17,7 +17,7 @@ lazy_static! {
     static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+|>=|=|>|<|\[|\]|,|\(|\))|(?P<countable>\d+)|(?P<identifier>[\w']+)|(?P<eof>$)|(?P<comment>"[^"]*")"#).unwrap();
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SymbolicBDDToken {
     Var(NamedSymbol),
     Countable(usize),
@@ -445,12 +445,10 @@ impl SymbolicBDD {
     fn parse_countable(tokens: &mut TokenReader) -> io::Result<usize> {
         match tokens.next() {
             Some(SymbolicBDDToken::Countable(n)) => Ok(*n),
-            other => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Expected number, got {:?}", other),
-                ))
-            }
+            other => Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Expected number, got {:?}", other),
+            )),
         }
     }
 
@@ -487,12 +485,10 @@ impl SymbolicBDD {
     fn parse_variable_name(tokens: &mut TokenReader) -> io::Result<NamedSymbol> {
         match tokens.next() {
             Some(SymbolicBDDToken::Var(var)) => Ok(var.clone()),
-            other => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Expected variable, got {:?}", other),
-                ))
-            }
+            other => Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Expected variable, got {:?}", other),
+            )),
         }
     }
 
@@ -743,12 +739,10 @@ impl SymbolicBDD {
 fn expect(token: SymbolicBDDToken, tokens: &mut TokenReader) -> io::Result<()> {
     match &tokens.next() {
         &Some(t) if *t == token => Ok(()),
-        t => {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Expected {:?}, got {:?}", token, t),
-            ))
-        }
+        t => Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Expected {:?}, got {:?}", token, t),
+        )),
     }
 }
 

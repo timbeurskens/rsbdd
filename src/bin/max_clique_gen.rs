@@ -1,12 +1,13 @@
 #[macro_use]
 extern crate clap;
 
-use std::collections::HashSet;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::io::Write;
 use std::io::*;
+
+use rustc_hash::FxHashSet;
 
 fn main() -> io::Result<()> {
     let version = env!("CARGO_PKG_VERSION");
@@ -36,7 +37,7 @@ fn main() -> io::Result<()> {
         .from_reader(reader);
 
     let mut edges: Vec<(String, String)> = Vec::new();
-    let mut vertices: HashSet<String> = HashSet::new();
+    let mut vertices: FxHashSet<String> = FxHashSet::default();
 
     for edge_record in csv_reader.records() {
         let edge = edge_record?;
@@ -58,8 +59,8 @@ fn main() -> io::Result<()> {
             if v1 != v2 {
                 if is_undirected {
                     if !(edges.contains(&(v1.to_string(), v2.to_string()))
-                        || edges.contains(&(v2.to_string(), v1.to_string())))
-                        && !edges_complement.contains(&(v2.to_string(), v1.to_string()))
+                        || edges.contains(&(v2.to_string(), v1.to_string()))
+                        || edges_complement.contains(&(v2.to_string(), v1.to_string())))
                     {
                         edges_complement.push((v1.to_string(), v2.to_string()));
                     }

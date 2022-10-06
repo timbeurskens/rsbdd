@@ -1,7 +1,6 @@
 use itertools::Itertools;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHasher};
 use std::cell::RefCell;
-use std::collections::hash_map::DefaultHasher;
 use std::error::Error;
 use std::fmt;
 use std::fmt::{Debug, Display};
@@ -79,7 +78,7 @@ impl From<BDD<NamedSymbol>> for BDD<usize> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TruthTableEntry {
     True,
     False,
@@ -132,7 +131,7 @@ impl<S: BDDSymbol> Default for BDD<S> {
 
 impl<S: BDDSymbol> BDD<S> {
     pub fn get_hash(&self) -> u64 {
-        let mut s = DefaultHasher::new();
+        let mut s = FxHasher::default();
         self.hash(&mut s);
         s.finish()
     }
@@ -260,27 +259,21 @@ impl<S: BDDSymbol> BDDEnv<S> {
             (BDD::False, _) | (_, &BDD::False) => self.mk_const(false),
             (BDD::True, _) => Rc::clone(&b),
             (_, BDD::True) => Rc::clone(&a),
-            (BDD::Choice(at, va, af), BDD::Choice(_, vb, _)) if va < vb => self
-                .mk_choice(
-                    self.and(Rc::clone(at), Rc::clone(&b)),
-                    va.clone(),
-                    self.and(Rc::clone(af), Rc::clone(&b)),
-                ),
-            (BDD::Choice(_, va, _), BDD::Choice(bt, vb, bf)) if vb < va => self
-                .mk_choice(
-                    self.and(Rc::clone(bt), Rc::clone(&a)),
-                    vb.clone(),
-                    self.and(Rc::clone(bf), Rc::clone(&a)),
-                ),
-            (BDD::Choice(at, va, af), BDD::Choice(bt, vb, bf))
-                if va == vb =>
-            {
-                self.mk_choice(
-                    self.and(Rc::clone(at), Rc::clone(bt)),
-                    va.clone(),
-                    self.and(Rc::clone(af), Rc::clone(bf)),
-                )
-            }
+            (BDD::Choice(at, va, af), BDD::Choice(_, vb, _)) if va < vb => self.mk_choice(
+                self.and(Rc::clone(at), Rc::clone(&b)),
+                va.clone(),
+                self.and(Rc::clone(af), Rc::clone(&b)),
+            ),
+            (BDD::Choice(_, va, _), BDD::Choice(bt, vb, bf)) if vb < va => self.mk_choice(
+                self.and(Rc::clone(bt), Rc::clone(&a)),
+                vb.clone(),
+                self.and(Rc::clone(bf), Rc::clone(&a)),
+            ),
+            (BDD::Choice(at, va, af), BDD::Choice(bt, vb, bf)) if va == vb => self.mk_choice(
+                self.and(Rc::clone(at), Rc::clone(bt)),
+                va.clone(),
+                self.and(Rc::clone(af), Rc::clone(bf)),
+            ),
             _ => panic!("unsupported match: {:?} {:?}", a, b),
         }
     }
@@ -294,27 +287,21 @@ impl<S: BDDSymbol> BDDEnv<S> {
             (BDD::False, _) => Rc::clone(&b),
             (_, &BDD::False) => Rc::clone(&a),
             // todo:
-            (BDD::Choice(at, va, af), BDD::Choice(_, vb, _)) if va < vb => self
-                .mk_choice(
-                    self.or(Rc::clone(at), Rc::clone(&b)),
-                    va.clone(),
-                    self.or(Rc::clone(af), Rc::clone(&b)),
-                ),
-            (BDD::Choice(_, va, _), BDD::Choice(bt, vb, bf)) if vb < va => self
-                .mk_choice(
-                    self.or(Rc::clone(bt), Rc::clone(&a)),
-                    vb.clone(),
-                    self.or(Rc::clone(bf), Rc::clone(&a)),
-                ),
-            (BDD::Choice(at, va, af), BDD::Choice(bt, vb, bf))
-                if va == vb =>
-            {
-                self.mk_choice(
-                    self.or(Rc::clone(at), Rc::clone(bt)),
-                    va.clone(),
-                    self.or(Rc::clone(af), Rc::clone(bf)),
-                )
-            }
+            (BDD::Choice(at, va, af), BDD::Choice(_, vb, _)) if va < vb => self.mk_choice(
+                self.or(Rc::clone(at), Rc::clone(&b)),
+                va.clone(),
+                self.or(Rc::clone(af), Rc::clone(&b)),
+            ),
+            (BDD::Choice(_, va, _), BDD::Choice(bt, vb, bf)) if vb < va => self.mk_choice(
+                self.or(Rc::clone(bt), Rc::clone(&a)),
+                vb.clone(),
+                self.or(Rc::clone(bf), Rc::clone(&a)),
+            ),
+            (BDD::Choice(at, va, af), BDD::Choice(bt, vb, bf)) if va == vb => self.mk_choice(
+                self.or(Rc::clone(at), Rc::clone(bt)),
+                va.clone(),
+                self.or(Rc::clone(af), Rc::clone(bf)),
+            ),
             _ => panic!("unsupported match: {:?} {:?}", a, b),
         }
     }
