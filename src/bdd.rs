@@ -476,17 +476,17 @@ impl<S: BDDSymbol> BDDEnv<S> {
             let first = &s[0];
             let remainder = s[1..].to_vec();
 
-            self.exists_impl(first.clone(), self.exists(remainder, b))
+            self.exists_impl(first, self.exists(remainder, b))
         }
     }
 
     // existential quantification
-    pub fn exists_impl(&self, s: S, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
+    pub fn exists_impl(&self, s: &S, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match b.as_ref() {
             &BDD::False | &BDD::True => b,
-            &BDD::Choice(ref t, ref v, ref f) if *v == s => self.or(Rc::clone(t), Rc::clone(f)),
+            &BDD::Choice(ref t, ref v, ref f) if v == s => self.or(Rc::clone(t), Rc::clone(f)),
             &BDD::Choice(ref t, ref v, ref f) => self.mk_choice(
-                self.exists_impl(s.clone(), Rc::clone(t)),
+                self.exists_impl(s, Rc::clone(t)),
                 v.clone(),
                 self.exists_impl(s, Rc::clone(f)),
             ),
