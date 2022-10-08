@@ -74,7 +74,7 @@ forall state_is_off_1, state_is_on_1, state_is_emergency_1 #
         (state_is_emergency_1 eq true)
     ))
 ) => (
-    "If the machine is turned on and no danger exists, and no turn_off event is active"
+    "If the machine is turned on and no turn_off event is active"
     (-event_turn_off_0 & state_is_on_0) =>
 
     "The machine remains on"
