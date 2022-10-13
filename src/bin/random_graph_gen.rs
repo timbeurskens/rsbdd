@@ -1,71 +1,72 @@
-#[macro_use]
-extern crate clap;
-
+use clap::Parser;
 use rand::seq::SliceRandom;
 use rustc_hash::FxHashMap;
 use std::fs::File;
 use std::io;
 use std::io::Write;
 use std::io::*;
+use std::path::PathBuf;
+
+#[derive(Parser, Debug)]
+#[clap(author, version, about = "Generates a random edge list formatted graph", long_about = None)]
+struct Args {
+    #[clap(value_parser, value_name = "VERTICES")]
+    /// The number of vertices in the output graph
+    vertices: Option<usize>,
+
+    #[clap(value_parser, value_name = "EDGES")]
+    /// The number of edges in the output graph
+    edges: Option<usize>,
+
+    #[clap(value_parser, short, long)]
+    /// The output filename (or stdout if not provided)
+    output: Option<PathBuf>,
+
+    #[clap(short, long)]
+    /// Use undirected edges (test for both directions in the set-complement operation)
+    undirected: bool,
+
+    #[clap(short, long)]
+    /// Output in dot (GraphViz) format
+    dot: bool,
+
+    #[clap(long, value_parser)]
+    /// If this argument is provided, the provided edge-list will be used to generate a graph
+    convert: Option<PathBuf>,
+
+    #[clap(short, long, value_parser, value_name = "N")]
+    /// Generate a graph-coloring problem with N colors
+    colors: Option<usize>,
+}
 
 fn main() -> io::Result<()> {
-    let args = clap_app!(RandomGraphGenerator =>
-        (version: env!("CARGO_PKG_VERSION"))
-        (author: "Tim Beurskens")
-        (about: "Generates a random edge list formatted graph")
-        (@arg vertices: -v --vertices +takes_value "Number of vertices")
-        (@arg edges: -e --edges +takes_value "Number of edges")
-        (@arg output: -o --output +takes_value "The output file")
-        (@arg undirected: -u --undirected !takes_value "Use undirected edges (test for both directions in the set complement operation)")
-        (@arg dot: -d --dot !takes_value "Output in dot format")
-        (@arg convert: -i --input +takes_value "Do not generate a new graph, but convert an existing edge list")
-        (@arg colors: -c --colors +takes_value "Convert the graph to a graph-coloring specification")
-    )
-    .get_matches();
+    let args = Args::parse();
 
-    let undirected = args.is_present("undirected");
-
-    let mut selection = if args.is_present("convert") {
-        let file = File::open(args.value_of("convert").unwrap()).expect("Could not open file");
+    let mut selection = if let Some(file_to_convert) = args.convert {
+        let file = File::open(file_to_convert).expect("Could not open file");
         let mut bufreader = BufReader::new(file);
-        read_graph(&mut bufreader, undirected).expect("Could not parse edge list")
+        read_graph(&mut bufreader, args.undirected).expect("Could not parse edge list")
     } else {
-        let num_vertices = args
-            .value_of("vertices")
-            .expect("Specify the number of vertices")
-            .parse::<usize>()
-            .unwrap();
-        let num_edges = args
-            .value_of("edges")
-            .expect("Specify the number of edges")
-            .parse::<usize>()
-            .unwrap();
-
-        generate_graph(num_vertices, num_edges, undirected)
+        if args.vertices.is_none() || args.edges.is_none() {
+            panic!("Must provide vertices and edges if not converting a graph");
+        }
+        generate_graph(args.vertices.unwrap(), args.edges.unwrap(), args.undirected)
     };
 
     // convert to a graph-coloring problem
-    if args.is_present("colors") {
-        let num_colors = args
-            .value_of("colors")
-            .unwrap()
-            .parse::<usize>()
-            .expect("Colors is not a valid number");
-
+    if let Some(num_colors) = args.colors {
         selection = augment_colors(&selection, num_colors);
     }
 
-    let output = args.value_of("output");
-
-    let mut writer = if output.is_some() {
-        let file = File::create(output.unwrap())?;
+    let mut writer = if let Some(output_file) = args.output {
+        let file = File::create(output_file)?;
         Box::new(BufWriter::new(file)) as Box<dyn Write>
     } else {
         Box::new(BufWriter::new(io::stdout())) as Box<dyn Write>
     };
 
-    if args.is_present("dot") {
-        if undirected {
+    if args.dot {
+        if args.undirected {
             writeln!(writer, "graph G {{")?;
             for edge in selection {
                 writeln!(writer, "    {} -- {}", edge.0, edge.1)?;

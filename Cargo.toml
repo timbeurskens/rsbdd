@@ -1,6 +1,6 @@
 [package]
 name = "rsbdd"
-version = "0.10.1"
+version = "0.10.2"
 edition = "2021"
 authors = ["Tim Beurskens <timbeurskens.97@gmail.com>"]
 description = "A BDD-based SAT solver"
@@ -10,12 +10,12 @@ description = "A BDD-based SAT solver"
 [dependencies]
 dot = "0.1.4"
 itertools = "0.10.3"
-clap = { version = "3.2.17", features = ["derive"] }
 lazy_static = "1.4.0"
 regex = "1.6.0"
 csv = "1.1.6"
 rand = "0.8.5"
 rustc-hash = "1.1.0"
+clap = { version = "4.0.14", features = ["derive"] }
 
 [dev-dependencies]
 glob = "0.3.0"
