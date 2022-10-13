@@ -5,9 +5,11 @@ use rsbdd::parser::*;
 use rsbdd::parser_io::*;
 use rsbdd::plot::*;
 use std::cmp::max;
+use std::fmt::Display;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader};
+use std::ops::Index;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::rc::Rc;
@@ -161,17 +163,7 @@ fn main() {
     let widths: Vec<usize> = headers.iter().map(|v| max(5, v.len()) as usize).collect();
 
     if args.truthtable {
-        print!("|");
-        for free_var in &headers {
-            let len = 1 + max(5, free_var.len());
-            print!(" {:indent$}|", free_var, indent = len);
-        }
-        println!();
-        for width in &widths {
-            print!("|{:->width$}", "", width = *width + 2);
-        }
-        println!("|");
-        // println!("{:?}", input_parsed.free_vars.join("|"));
+        print_header(&headers, &widths);
         print_truth_table_recursive(
             &result,
             input_parsed
@@ -207,6 +199,46 @@ fn main() {
             .render_dot(&mut f)
             .expect("Could not write BDD to dot file");
     }
+}
+
+fn print_sized_line<B, C, D>(labels: &Vec<D>, widths: &B, result: &BDD<C>)
+where
+    B: Index<usize, Output = usize>,
+    C: BDDSymbol,
+    D: Display + Sized,
+{
+    print!("|");
+    let len = labels.len();
+    for (i, label) in labels.iter().enumerate() {
+        print!(" {:indent$} |", label, indent = widths[i]);
+    }
+    println!(
+        " {:indent$} |",
+        match result {
+            BDD::True => "True",
+            BDD::False => "False",
+            _ => unreachable!(),
+        },
+        indent = widths[len]
+    );
+}
+
+// print header
+fn print_header<'a, A, B>(labels: A, widths: B)
+where
+    A: IntoIterator<Item = &'a String>,
+    B: IntoIterator<Item = &'a usize>,
+{
+    print!("|");
+    for free_var in labels {
+        let len = 1 + max(5, free_var.len());
+        print!(" {:indent$}|", free_var, indent = len);
+    }
+    println!();
+    for width in widths {
+        print!("|{:->width$}", "", width = width + 2);
+    }
+    println!("|");
 }
 
 // compute run-time statistics: minimum, maximum, median, mean, standard-deviation
@@ -304,13 +336,15 @@ fn print_true_vars_recursive(
 }
 
 // recursively walk through the bdd and assign values to the variables until every permutation is assigned a true or false value
-fn print_truth_table_recursive(
+fn print_truth_table_recursive<A>(
     root: &Rc<BDD<NamedSymbol>>,
     vars: Vec<TruthTableEntry>,
     filter: TruthTableEntry,
     parsed: &ParsedFormula,
-    sizes: &[usize],
-) {
+    sizes: &A,
+) where
+    A: Index<usize, Output = usize>,
+{
     match root.as_ref() {
         BDD::Choice(ref l, s, ref r) => {
             // first visit the false subtree
@@ -327,19 +361,7 @@ fn print_truth_table_recursive(
             || (filter == TruthTableEntry::True && *c == BDD::True)
             || (filter == TruthTableEntry::False && *c == BDD::False) =>
         {
-            print!("|");
-            for (i, var) in vars.iter().enumerate() {
-                print!(" {:indent$} |", var, indent = sizes[i]);
-            }
-            println!(
-                " {:indent$} |",
-                match c {
-                    BDD::True => "True",
-                    BDD::False => "False",
-                    _ => unreachable!(),
-                },
-                indent = sizes[vars.len()]
-            );
+            print_sized_line(&vars, sizes, c);
         }
         _ => {}
     }

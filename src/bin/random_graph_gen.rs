@@ -2,7 +2,7 @@
 extern crate clap;
 
 use rand::seq::SliceRandom;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::fs::File;
 use std::io;
 use std::io::Write;
@@ -142,8 +142,8 @@ fn generate_graph(
 }
 
 fn augment_colors(edges: &Vec<(String, String)>, num_colors: usize) -> Vec<(String, String)> {
-    let mut vertex_map: HashMap<String, String> = HashMap::new();
-    let mut color_map: HashMap<String, usize> = HashMap::new();
+    let mut vertex_map: FxHashMap<String, String> = FxHashMap::default();
+    let mut color_map: FxHashMap<String, usize> = FxHashMap::default();
 
     for edge in edges {
         for color in 0..num_colors {

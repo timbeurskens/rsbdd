@@ -1,5 +1,4 @@
 use clap::Parser;
-use no_panic::no_panic;
 
 use std::fs::File;
 use std::io;

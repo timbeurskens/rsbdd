@@ -1,7 +1,6 @@
 use itertools::Itertools;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHasher};
 use std::cell::RefCell;
-use std::collections::hash_map::DefaultHasher;
 use std::error::Error;
 use std::fmt;
 use std::fmt::{Debug, Display};
@@ -57,11 +56,6 @@ impl From<NamedSymbol> for usize {
     }
 }
 
-// todo: place bdd items in a collection (hashmap?)
-// when constructing a new bdd, check if it already exists in the collection.
-// if it does, return a reference to the existing bdd.
-// otherwise, create a new bdd and return a reference to it.
-
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum BDD<Symbol: BDDSymbol> {
     False,
@@ -84,7 +78,7 @@ impl From<BDD<NamedSymbol>> for BDD<usize> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TruthTableEntry {
     True,
     False,
@@ -137,7 +131,7 @@ impl<S: BDDSymbol> Default for BDD<S> {
 
 impl<S: BDDSymbol> BDD<S> {
     pub fn get_hash(&self) -> u64 {
-        let mut s = DefaultHasher::new();
+        let mut s = FxHasher::default();
         self.hash(&mut s);
         s.finish()
     }
@@ -163,7 +157,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
     // this function currently has no effect, might be removed later
     pub fn clean(&self, root: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match root.as_ref() {
-            &BDD::Choice(ref l, ref s, ref r) => {
+            BDD::Choice(l, s, r) => {
                 let _l = self.find(l);
                 let _r = self.find(r);
 
@@ -195,7 +189,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
 
     pub fn node_list(&self, root: Rc<BDD<S>>) -> Vec<Rc<BDD<S>>> {
         match root.as_ref() {
-            &BDD::Choice(ref l, _, ref r) => {
+            BDD::Choice(l, _, r) => {
                 let l_nodes = self.node_list(Rc::clone(l));
                 let r_nodes = self.node_list(Rc::clone(r));
 
@@ -206,7 +200,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
                     .cloned()
                     .collect()
             }
-            &BDD::True | &BDD::False => vec![Rc::clone(&root)],
+            BDD::True | BDD::False => vec![Rc::clone(&root)],
         }
     }
 
@@ -262,30 +256,24 @@ impl<S: BDDSymbol> BDDEnv<S> {
     // conjunction
     pub fn and(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match (a.as_ref(), b.as_ref()) {
-            (&BDD::False, _) | (_, &BDD::False) => self.mk_const(false),
-            (&BDD::True, _) => Rc::clone(&b),
-            (_, &BDD::True) => Rc::clone(&a),
-            (&BDD::Choice(ref at, ref va, ref af), &BDD::Choice(_, ref vb, _)) if va < vb => self
-                .mk_choice(
-                    self.and(Rc::clone(at), Rc::clone(&b)),
-                    va.clone(),
-                    self.and(Rc::clone(af), Rc::clone(&b)),
-                ),
-            (&BDD::Choice(_, ref va, _), &BDD::Choice(ref bt, ref vb, ref bf)) if vb < va => self
-                .mk_choice(
-                    self.and(Rc::clone(bt), Rc::clone(&a)),
-                    vb.clone(),
-                    self.and(Rc::clone(bf), Rc::clone(&a)),
-                ),
-            (&BDD::Choice(ref at, ref va, ref af), &BDD::Choice(ref bt, ref vb, ref bf))
-                if va == vb =>
-            {
-                self.mk_choice(
-                    self.and(Rc::clone(at), Rc::clone(bt)),
-                    va.clone(),
-                    self.and(Rc::clone(af), Rc::clone(bf)),
-                )
-            }
+            (BDD::False, _) | (_, &BDD::False) => self.mk_const(false),
+            (BDD::True, _) => Rc::clone(&b),
+            (_, BDD::True) => Rc::clone(&a),
+            (BDD::Choice(at, va, af), BDD::Choice(_, vb, _)) if va < vb => self.mk_choice(
+                self.and(Rc::clone(at), Rc::clone(&b)),
+                va.clone(),
+                self.and(Rc::clone(af), Rc::clone(&b)),
+            ),
+            (BDD::Choice(_, va, _), BDD::Choice(bt, vb, bf)) if vb < va => self.mk_choice(
+                self.and(Rc::clone(bt), Rc::clone(&a)),
+                vb.clone(),
+                self.and(Rc::clone(bf), Rc::clone(&a)),
+            ),
+            (BDD::Choice(at, va, af), BDD::Choice(bt, vb, bf)) if va == vb => self.mk_choice(
+                self.and(Rc::clone(at), Rc::clone(bt)),
+                va.clone(),
+                self.and(Rc::clone(af), Rc::clone(bf)),
+            ),
             _ => panic!("unsupported match: {:?} {:?}", a, b),
         }
     }
@@ -295,40 +283,34 @@ impl<S: BDDSymbol> BDDEnv<S> {
         // self.not(self.nor(a, b))
 
         match (a.as_ref(), b.as_ref()) {
-            (&BDD::True, _) | (_, &BDD::True) => self.mk_const(true),
-            (&BDD::False, _) => Rc::clone(&b),
+            (BDD::True, _) | (_, BDD::True) => self.mk_const(true),
+            (BDD::False, _) => Rc::clone(&b),
             (_, &BDD::False) => Rc::clone(&a),
             // todo:
-            (&BDD::Choice(ref at, ref va, ref af), &BDD::Choice(_, ref vb, _)) if va < vb => self
-                .mk_choice(
-                    self.or(Rc::clone(at), Rc::clone(&b)),
-                    va.clone(),
-                    self.or(Rc::clone(af), Rc::clone(&b)),
-                ),
-            (&BDD::Choice(_, ref va, _), &BDD::Choice(ref bt, ref vb, ref bf)) if vb < va => self
-                .mk_choice(
-                    self.or(Rc::clone(bt), Rc::clone(&a)),
-                    vb.clone(),
-                    self.or(Rc::clone(bf), Rc::clone(&a)),
-                ),
-            (&BDD::Choice(ref at, ref va, ref af), &BDD::Choice(ref bt, ref vb, ref bf))
-                if va == vb =>
-            {
-                self.mk_choice(
-                    self.or(Rc::clone(at), Rc::clone(bt)),
-                    va.clone(),
-                    self.or(Rc::clone(af), Rc::clone(bf)),
-                )
-            }
+            (BDD::Choice(at, va, af), BDD::Choice(_, vb, _)) if va < vb => self.mk_choice(
+                self.or(Rc::clone(at), Rc::clone(&b)),
+                va.clone(),
+                self.or(Rc::clone(af), Rc::clone(&b)),
+            ),
+            (BDD::Choice(_, va, _), BDD::Choice(bt, vb, bf)) if vb < va => self.mk_choice(
+                self.or(Rc::clone(bt), Rc::clone(&a)),
+                vb.clone(),
+                self.or(Rc::clone(bf), Rc::clone(&a)),
+            ),
+            (BDD::Choice(at, va, af), BDD::Choice(bt, vb, bf)) if va == vb => self.mk_choice(
+                self.or(Rc::clone(at), Rc::clone(bt)),
+                va.clone(),
+                self.or(Rc::clone(af), Rc::clone(bf)),
+            ),
             _ => panic!("unsupported match: {:?} {:?}", a, b),
         }
     }
 
     pub fn not(&self, a: Rc<BDD<S>>) -> Rc<BDD<S>> {
-        match *a.as_ref() {
+        match a.as_ref() {
             BDD::False => self.mk_const(true),
             BDD::True => self.mk_const(false),
-            BDD::Choice(ref at, ref va, ref af) => {
+            BDD::Choice(at, va, af) => {
                 self.mk_choice(self.not(Rc::clone(at)), va.clone(), self.not(Rc::clone(af)))
             }
         }
@@ -476,17 +458,17 @@ impl<S: BDDSymbol> BDDEnv<S> {
             let first = &s[0];
             let remainder = s[1..].to_vec();
 
-            self.exists_impl(first.clone(), self.exists(remainder, b))
+            self.exists_impl(first, self.exists(remainder, b))
         }
     }
 
     // existential quantification
-    pub fn exists_impl(&self, s: S, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
+    pub fn exists_impl(&self, s: &S, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match b.as_ref() {
-            &BDD::False | &BDD::True => b,
-            &BDD::Choice(ref t, ref v, ref f) if *v == s => self.or(Rc::clone(t), Rc::clone(f)),
-            &BDD::Choice(ref t, ref v, ref f) => self.mk_choice(
-                self.exists_impl(s.clone(), Rc::clone(t)),
+            BDD::False | &BDD::True => b,
+            BDD::Choice(t, v, f) if v == s => self.or(Rc::clone(t), Rc::clone(f)),
+            BDD::Choice(t, v, f) => self.mk_choice(
+                self.exists_impl(s, Rc::clone(t)),
                 v.clone(),
                 self.exists_impl(s, Rc::clone(f)),
             ),
@@ -516,7 +498,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
 
     pub fn model(&self, a: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match a.as_ref() {
-            &BDD::Choice(ref t, ref v, ref f) => {
+            BDD::Choice(t, v, f) => {
                 let lhs = self.model(Rc::clone(t));
                 let rhs = self.model(Rc::clone(f));
                 if lhs != self.mk_const(false) {
@@ -527,7 +509,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
                     self.mk_const(false)
                 }
             }
-            &BDD::True | &BDD::False => a,
+            BDD::True | BDD::False => a,
         }
     }
 
@@ -546,7 +528,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
     // simplify removes a choice node if both subtrees are equivalent
     pub fn simplify(&self, a: &Rc<BDD<S>>) -> Rc<BDD<S>> {
         match a.as_ref() {
-            &BDD::Choice(ref t, _, ref f) if t.as_ref() == f.as_ref() => Rc::clone(t),
+            BDD::Choice(t, _, f) if t.as_ref() == f.as_ref() => Rc::clone(t),
             _ => Rc::clone(a),
         }
     }
