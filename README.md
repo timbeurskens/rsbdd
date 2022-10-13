@@ -234,116 +234,101 @@ rsbdd -i examples/4_queens.txt -t -ft
 ### rsbdd
 
 ```
-Solver 0.9.0
-Tim Beurskens
 A BDD-based SAT solver
 
-USAGE:
-    rsbdd [FLAGS] [OPTIONS]
+Usage: rsbdd [OPTIONS] [FILE]
 
-FLAGS:
-    -r, --ordering      Print the variable ordering to stdout
-    -h, --help          Prints help information
-    -m, --model         use a model of the bdd as output (instead of the satisfying assignment)
-    -g, --plot          show a distribution plot of the runtime
-    -t, --truthtable    print the truth-table to stdout
-    -v, --vars          print all true variables leading to a truth evaluation
-    -V, --version       Prints version information
+Arguments:
+  [FILE]  The input file containing a logic formula in rsbdd format
 
-OPTIONS:
-    -b, --benchmark <benchmark>         Repeat the solving process n times for more accurate performance reports
-    -e, --eval <evaluate>               Inline evaluate the given formula
-    -f, --filter <filter>               only show true or false entries in the truth-table
-    -i, --input <input>                 logic input file
-    -o, --order <ordering>              Provide a custom variable ordering
-    -d, --dot <show_dot>                write the bdd to a dot graphviz file
-    -p, --parsetree <show_parsetree>    write the parse tree in dot format to this file
+Options:
+  -p, --parsetree <PARSETREE>  Write the parse tree in dot format to the specified file
+  -t, --truthtable             Print the truth table to stdout
+  -d, --dot <DOT>              Write the bdd to a dot graphviz file
+  -m, --model                  Compute a single satisfying model as output
+  -v, --vars                   Print all satisfying variables leading to a truth value
+  -f, --filter <FILTER>        Only show true or false entries in the output [default: Any]
+  -b, --benchmark <N>          Repeat the solving process n times for more accurate performance reports
+  -g, --plot                   Use GNUPlot to plot the runtime distribution
+  -e, --evaluate <EVALUATE>    Parse the formula as string
+  -o, --ordering <ORDERING>    Read a custom variable ordering from file
+  -r, --export-ordering        Export the automatically derived ordering to stdout
+  -h, --help                   Print help information
+  -V, --version                Print version information
 
 ```
 
 ### max_clique_gen
 
 ```
-CliqueGenerator 0.6.2
-Tim Beurskens
 Converts a graph into a max-clique specification
 
-USAGE:
-    max_clique_gen [FLAGS] [OPTIONS]
+Usage: max_clique_gen [OPTIONS] [INPUT] [OUTPUT]
 
-FLAGS:
-    -a, --all           Construct a BDD satisfying all cliques, not just the maximum clique(s)
-    -h, --help          Prints help information
-    -u, --undirected    Use undirected edges (test for both directions in the set complement operation)
-    -V, --version       Prints version information
+Arguments:
+  [INPUT]   Input file graph in csv edge-list format
+  [OUTPUT]  The output rsbdd file
 
-OPTIONS:
-    -i, --input <input>      Input file (graph in csv edge-list format)
-    -o, --output <output>    The output file
+Options:
+  -u, --undirected  Use undirected edges (test for both directions in the set-complement operation)
+  -a, --all         Construct a satisfiable formula for all cliques
+  -h, --help        Print help information
+  -V, --version     Print version information
 
 ```
 
 ### random_graph_gen
 
 ```
-RandomGraphGenerator 0.6.2
-Tim Beurskens
 Generates a random edge list formatted graph
 
-USAGE:
-    random_graph_gen [FLAGS] [OPTIONS]
+Usage: random_graph_gen [OPTIONS] [VERTICES] [EDGES]
 
-FLAGS:
-    -d, --dot           Output in dot format
-    -h, --help          Prints help information
-    -u, --undirected    Use undirected edges (test for both directions in the set complement operation)
-    -V, --version       Prints version information
+Arguments:
+  [VERTICES]  The number of vertices in the output graph
+  [EDGES]     The number of edges in the output graph
 
-OPTIONS:
-    -c, --colors <colors>        Convert the graph to a graph-coloring specification
-    -i, --input <convert>        Do not generate a new graph, but convert an existing edge list
-    -e, --edges <edges>          Number of edges
-    -o, --output <output>        The output file
-    -v, --vertices <vertices>    Number of vertices
+Options:
+  -o, --output <OUTPUT>    The output filename (or stdout if not provided)
+  -u, --undirected         Use undirected edges (test for both directions in the set-complement operation)
+  -d, --dot                Output in dot (GraphViz) format
+      --convert <CONVERT>  If this argument is provided, the provided edge-list will be used to generate a graph
+  -c, --colors <N>         Generate a graph-coloring problem with N colors
+  -h, --help               Print help information
+  -V, --version            Print version information
 
 ```
 
 ### n_queens_gen
 
 ```
-QueenGenerator 0.9.0
-Tim Beurskens
 Generates n-queen formulae for the SAT solver
 
-USAGE:
-    n_queens_gen [OPTIONS]
+Usage: n_queens_gen [OPTIONS] [OUTPUT]
 
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
+Arguments:
+  [OUTPUT]  The output rsbdd file
 
-OPTIONS:
-    -o, --output <output>    The output file
-    -n, --queens <queens>    The number of queens
+Options:
+  -n, --queens <QUEENS>  The number of queens [default: 4]
+  -h, --help             Print help information
+  -V, --version          Print version information
 
 ```
 
 ### sudoku_gen
 
 ```
-SudokuGenerator 0.9.0
-Tim Beurskens
-Converts sudoku problems into RsBDD formulas
+Generates a random edge list formatted graph
 
-USAGE:
-    sudoku_gen [OPTIONS]
+Usage: sudoku_gen [INPUT] [OUTPUT]
 
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
+Arguments:
+  [INPUT]   The input sudoku file
+  [OUTPUT]  The output rsbdd file
 
-OPTIONS:
-    -i, --input <input>      The input sudoku file
-    -o, --output <output>    The output rsbdd file
+Options:
+  -h, --help     Print help information
+  -V, --version  Print version information
 
 ```
