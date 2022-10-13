@@ -1,25 +1,30 @@
-#[macro_use]
-extern crate clap;
-
 use std::fs::File;
 use std::io;
 use std::io::Read;
 use std::io::Write;
 use std::io::*;
+use std::path::PathBuf;
+
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[clap(author, version, about = "Generates a random edge list formatted graph", long_about = None)]
+struct Args {
+    #[clap(value_parser, value_name = "INPUT")]
+    /// The input sudoku file
+    input: Option<PathBuf>,
+
+    #[clap(value_parser, value_name = "OUTPUT")]
+    /// The output rsbdd file
+    output: Option<PathBuf>,
+}
 
 fn main() -> io::Result<()> {
     let version = env!("CARGO_PKG_VERSION");
 
-    let args = clap_app!(SudokuGenerator =>
-        (version: version)
-        (author: "Tim Beurskens")
-        (about: "Converts sudoku problems into RsBDD formulas")
-        (@arg input: -i --input +takes_value "The input sudoku file")
-        (@arg output: -o --output +takes_value "The output rsbdd file")
-    )
-    .get_matches();
+    let args = Args::parse();
 
-    let mut writer = if let Some(output) = args.value_of("output") {
+    let mut writer = if let Some(output) = args.output {
         let file = File::create(output)?;
         Box::new(BufWriter::new(file)) as Box<dyn Write>
     } else {
@@ -28,7 +33,7 @@ fn main() -> io::Result<()> {
 
     let mut puzzle_input = String::new();
 
-    if let Some(input) = args.value_of("input") {
+    if let Some(input) = args.input {
         let mut file = File::open(input)?;
         file.read_to_string(&mut puzzle_input)?;
     } else {

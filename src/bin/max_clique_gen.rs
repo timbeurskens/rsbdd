@@ -1,4 +1,3 @@
-use clap::Command;
 use clap::Parser;
 
 use std::fs::File;

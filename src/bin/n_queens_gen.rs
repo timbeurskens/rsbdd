@@ -29,7 +29,7 @@ fn main() -> io::Result<()> {
     let mut writer = if args.output.is_some() {
         let file = File::create(
             args.output
-                .ok_or(io::Error::new(ErrorKind::NotFound, "output is None"))?,
+                .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "output is None"))?,
         )?;
         Box::new(BufWriter::new(file)) as Box<dyn Write>
     } else {
