@@ -9,5 +9,8 @@ authors.workspace = true
 
 [dependencies]
 
-[lib]
-proc-macro = true
+[dev-dependencies]
+rsbdd = { path = "../" }
+
+# [lib]
+# proc-macro = true
