@@ -370,46 +370,40 @@ impl<S: BDDSymbol> BDDEnv<S> {
         self.mk_choice(self.mk_const(true), s, self.mk_const(false))
     }
 
+    #[inline]
+    fn cmp_count<CmpFn: Fn(i64) -> bool + Copy>(
+        &self,
+        branches: &[Rc<BDD<S>>],
+        n: i64,
+        cmp: CmpFn,
+    ) -> Rc<BDD<S>> {
+        if branches.is_empty() {
+            self.mk_const(cmp(n))
+        } else {
+            let first = &branches[0];
+            let remainder = branches[1..].to_vec();
+
+            self.ite(
+                Rc::clone(first),
+                self.cmp_count(&remainder, n - 1, cmp),
+                self.cmp_count(&remainder, n, cmp),
+            )
+        }
+    }
+
+    /// at least n: [i64] of the branches: [Rc<BDD<S>>] are true
     pub fn aln(&self, branches: &[Rc<BDD<S>>], n: i64) -> Rc<BDD<S>> {
-        if branches.is_empty() {
-            if n > 0 {
-                self.mk_const(false)
-            } else {
-                self.mk_const(true)
-            }
-        } else {
-            let first = &branches[0];
-            let remainder = branches[1..].to_vec();
-
-            self.ite(
-                Rc::clone(first),
-                self.aln(&remainder, n - 1),
-                self.aln(&remainder, n),
-            )
-        }
+        self.cmp_count(branches, n, |n| n <= 0)
     }
 
+    /// at most n: [i64] of the branches: [Rc<BDD<S>>] are true
     pub fn amn(&self, branches: &[Rc<BDD<S>>], n: i64) -> Rc<BDD<S>> {
-        if branches.is_empty() {
-            if n >= 0 {
-                self.mk_const(true)
-            } else {
-                self.mk_const(false)
-            }
-        } else {
-            let first = &branches[0];
-            let remainder = branches[1..].to_vec();
-
-            self.ite(
-                Rc::clone(first),
-                self.amn(&remainder, n - 1),
-                self.amn(&remainder, n),
-            )
-        }
+        self.cmp_count(branches, n, |n| n >= 0)
     }
 
+    /// exactly n: [i64] of the branches [Rc<BDD<S>>] are true
     pub fn exn(&self, branches: &[Rc<BDD<S>>], n: i64) -> Rc<BDD<S>> {
-        self.and(self.amn(branches, n), self.aln(branches, n))
+        self.cmp_count(branches, n, |n| n == 0)
     }
 
     pub fn count_leq(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>]) -> Rc<BDD<S>> {
