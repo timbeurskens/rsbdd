@@ -1,6 +1,7 @@
 [package]
 name = "n_queens_gen"
 version = "0.1.0"
+description = "Generates n-queen formulae for the SAT solver"
 edition.workspace = true
 authors.workspace = true
 

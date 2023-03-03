@@ -8,7 +8,7 @@ use std::io::*;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
-#[clap(author, version, about = "Converts a graph into a max-clique specification", long_about = None)]
+#[clap(author, version, long_about = None)]
 struct Args {
     #[clap(value_parser, value_name = "INPUT")]
     /// Input file graph in csv edge-list format

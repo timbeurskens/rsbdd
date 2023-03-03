@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use clap::Parser;
 
 #[derive(Parser, Debug)]
-#[clap(author, version, about = "Generates a random edge list formatted graph", long_about = None)]
+#[clap(author, version, long_about = None)]
 struct Args {
     #[clap(value_parser, value_name = "INPUT")]
     /// The input sudoku file
