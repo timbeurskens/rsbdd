@@ -1,5 +1,6 @@
 [workspace]
-members = ["n_queens_gen", "max_clique_gen", "random_graph_gen", "sudoku_gen"]
+members = [".", "n_queens_gen", "max_clique_gen", "random_graph_gen", "sudoku_gen"]
+default-members = ["."]
 
 [workspace.package]
 edition = "2021"
