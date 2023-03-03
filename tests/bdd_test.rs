@@ -6,7 +6,7 @@ use rsbdd::bdd_io::*;
 use std::env;
 use std::fs::File;
 
-use pretty_assertions::assert_eq;
+use pretty_assertions::{assert_eq, assert_ne};
 
 type BDD = bdd::BDD<usize>;
 
