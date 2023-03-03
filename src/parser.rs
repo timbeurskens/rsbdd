@@ -689,7 +689,7 @@ impl SymbolicBDD {
                     "nand" => result.push(SymbolicBDDToken::Nand),
                     "implies" | "in" => result.push(SymbolicBDDToken::Implies),
                     "iff" | "eq" => result.push(SymbolicBDDToken::Iff),
-                    "exists" => result.push(SymbolicBDDToken::Exists),
+                    "exists" | "any" => result.push(SymbolicBDDToken::Exists),
                     "forall" | "all" => result.push(SymbolicBDDToken::Forall),
                     "if" => result.push(SymbolicBDDToken::If),
                     "then" => result.push(SymbolicBDDToken::Then),
