@@ -221,10 +221,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f051f77a7c8e6957c0696eac88f26b0117e54f52d3fc682ab19397a8812846a4"
 
 [[package]]
+name = "max_clique_gen"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "csv",
+ "rustc-hash",
+]
+
+[[package]]
 name = "memchr"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
+
+[[package]]
+name = "n_queens_gen"
+version = "0.1.0"
+dependencies = [
+ "clap",
+]
 
 [[package]]
 name = "once_cell"
@@ -338,6 +354,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "random_graph_gen"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "csv",
+ "rand",
+ "rustc-hash",
+]
+
+[[package]]
 name = "regex"
 version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -407,6 +433,13 @@ name = "strsim"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
+
+[[package]]
+name = "sudoku_gen"
+version = "0.1.0"
+dependencies = [
+ "clap",
+]
 
 [[package]]
 name = "syn"

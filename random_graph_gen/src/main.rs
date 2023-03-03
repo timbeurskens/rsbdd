@@ -18,7 +18,7 @@ struct Args {
     /// The number of edges in the output graph
     edges: Option<usize>,
 
-    #[clap(value_parser, short, long)]
+    #[clap(value_parser, short, long, value_name = "FILE")]
     /// The output filename (or stdout if not provided)
     output: Option<PathBuf>,
 
@@ -30,7 +30,7 @@ struct Args {
     /// Output in dot (GraphViz) format
     dot: bool,
 
-    #[clap(long, value_parser)]
+    #[clap(long, value_parser, value_name = "FILE")]
     /// If this argument is provided, the provided edge-list will be used to generate a graph
     convert: Option<PathBuf>,
 
