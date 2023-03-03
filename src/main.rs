@@ -160,7 +160,7 @@ fn main() {
         .collect::<Vec<String>>();
     headers.push("*".to_string());
 
-    let widths: Vec<usize> = headers.iter().map(|v| max(5, v.len()) as usize).collect();
+    let widths: Vec<usize> = headers.iter().map(|v| max(5, v.len())).collect();
 
     if args.truthtable {
         print_header(&headers, &widths);

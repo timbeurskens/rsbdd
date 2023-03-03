@@ -47,7 +47,7 @@ impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<S>, GraphEdge<S>> for BDDGrap
         match n.as_ref() {
             BDD::True => dot::LabelText::label("true"),
             BDD::False => dot::LabelText::label("false"),
-            &BDD::Choice(_, ref v, _) => dot::LabelText::label(format!("{}", v)),
+            BDD::Choice(_, v, _) => dot::LabelText::label(format!("{}", v)),
         }
     }
 
@@ -81,7 +81,7 @@ impl<'a, S: BDDSymbol> dot::GraphWalk<'a, GraphNode<S>, GraphEdge<S>> for BDDGra
 impl<'a, S: BDDSymbol> BDDGraph<S> {
     fn nodes_recursive(&self, root: Rc<BDD<S>>) -> dot::Nodes<'a, GraphNode<S>> {
         match root.as_ref() {
-            &BDD::Choice(ref l, _, ref r) => {
+            BDD::Choice(l, _, r) => {
                 let l_nodes = self.nodes_recursive(l.clone());
                 let r_nodes = self.nodes_recursive(r.clone());
 
@@ -105,7 +105,7 @@ impl<'a, S: BDDSymbol> BDDGraph<S> {
 
     fn edges_recursive(&self, root: Rc<BDD<S>>) -> dot::Edges<'a, GraphEdge<S>> {
         match root.as_ref() {
-            &BDD::Choice(ref l, _, ref r) => {
+            BDD::Choice(l, _, r) => {
                 let l_edges = self.edges_recursive(l.clone());
                 let r_edges = self.edges_recursive(r.clone());
 
