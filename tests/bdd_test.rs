@@ -2,11 +2,13 @@ use rsbdd::bdd;
 use rsbdd::bdd::*;
 use std::rc::Rc;
 
-type BDD = bdd::BDD<usize>;
-
 use rsbdd::bdd_io::*;
 use std::env;
 use std::fs::File;
+
+use pretty_assertions::assert_eq;
+
+type BDD = bdd::BDD<usize>;
 
 #[test]
 fn test_equivalence() {

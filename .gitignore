@@ -1,3 +1,4 @@
 /target
 .vscode/
+.idea/
 n_queens_*.dot

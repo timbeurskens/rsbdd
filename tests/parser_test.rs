@@ -1,3 +1,4 @@
+use pretty_assertions::assert_eq;
 use rsbdd::bdd::*;
 use rsbdd::parser::*;
 use std::fs::File;

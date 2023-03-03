@@ -1,5 +1,6 @@
 // use rsbdd::bdd::*;
 use itertools::Itertools;
+use pretty_assertions::assert_eq;
 use rsbdd::bdd;
 use rsbdd::bdd::BDDEnv;
 use rustc_hash::FxHashMap;

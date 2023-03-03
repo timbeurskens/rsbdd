@@ -29,7 +29,7 @@ struct Args {
 
 use rustc_hash::FxHashSet;
 
-fn main() -> io::Result<()> {
+fn main() -> Result<()> {
     let version = env!("CARGO_PKG_VERSION");
     let args = Args::parse();
 
@@ -50,7 +50,7 @@ fn main() -> io::Result<()> {
     for edge_record in csv_reader.records() {
         let edge = edge_record?;
 
-        assert!(edge.len() == 2);
+        assert_eq!(edge.len(), 2);
 
         edges.push((edge[0].to_string(), edge[1].to_string()));
         vertices.insert(edge[0].to_string());
