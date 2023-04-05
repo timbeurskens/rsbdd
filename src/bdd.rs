@@ -333,9 +333,10 @@ impl<S: BDDSymbol> BDDEnv<S> {
 
     /// ite computes if a then b else c
     pub fn ite(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>, c: Rc<BDD<S>>) -> Rc<BDD<S>> {
+        let (left, right) = rayon::join(|| self.implies(Rc::clone(&a), Rc::clone(&b)), self.implies(self.not(Rc::clone(&a)), Rc::clone(&c)));
+
         self.and(
-            self.implies(Rc::clone(&a), Rc::clone(&b)),
-            self.implies(self.not(Rc::clone(&a)), Rc::clone(&c)),
+            left, right
         )
     }
 
