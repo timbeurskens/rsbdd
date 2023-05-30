@@ -68,7 +68,10 @@ struct Args {
 }
 
 fn main() {
-    let args = Args::parse();
+    let wild_args = wild::args_os();
+    let args_in =
+        argfile::expand_args_from(wild_args, argfile::parse_fromfile, argfile::PREFIX).unwrap();
+    let args = Args::parse_from(args_in);
 
     let repeat = args.benchmark.unwrap_or(1);
 
