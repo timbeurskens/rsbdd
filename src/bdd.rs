@@ -90,9 +90,23 @@ impl From<BDD<NamedSymbol>> for BDD<usize> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Single variable assignment in a truth table.
+///
+/// The variable assignments in a truth table can be one of True, False or Any.
+/// [`True`] is assigned when the variable can only be assigned a 'true' value;
+/// [`False`] is assigned when the variable can only be 'false'.
+/// When the variable can either be true or false, the truth table can either consist of
+/// both options (as separate models), or assign [`Any`].
+///
+/// [`Any`]: TruthTableEntry::Any
+/// [`True`]: TruthTableEntry::True
+/// [`False`]: TruthTableEntry::False
 pub enum TruthTableEntry {
+    /// Assigned when the variable can only be true
     True,
+    /// Assigned when the variable can only be false
     False,
+    /// Assigned when the variable can either be true or false
     Any,
 }
 
@@ -160,6 +174,7 @@ impl<S: BDDSymbol> Default for BDDEnv<S> {
 }
 
 impl<S: BDDSymbol> BDDEnv<S> {
+    /// Compute the size of the BDD (number of nodes)
     pub fn size(&self) -> usize {
         self.nodes.borrow().len()
     }
@@ -215,8 +230,10 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    // make a new choice based on the given symbol and the left and right subtree.
-    // the new choice is then simplified and a reference is added to the lookup table
+    /// Make a new choice based on the given symbol and the left and right subtree.
+    /// The new choice is then simplified and a reference is added to the lookup table.
+    ///
+    /// This function is probably the main bottleneck for bdd computations (in its current implementation).
     pub fn mk_choice(
         &self,
         true_subtree: Rc<BDD<S>>,
@@ -239,7 +256,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    // find the true or false node in the lookup table and return a reference to it
+    /// Find the true or false node in the lookup table and return a reference to it.
     pub fn mk_const(&self, v: bool) -> Rc<BDD<S>> {
         if v {
             Rc::clone(self.nodes.borrow().get(&BDD::True).unwrap())
@@ -248,11 +265,12 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    // find an equivalent subtree in the lookup table and return a reference to it
+    /// Find an equivalent subtree in the lookup table and return a reference to it
     pub fn find(&self, r: &Rc<BDD<S>>) -> Rc<BDD<S>> {
         Rc::clone(self.nodes.borrow().get(r.as_ref()).unwrap())
     }
 
+    /// Create a new BDD graph
     pub fn new() -> Self {
         let mut nodes = FxHashMap::default();
 
@@ -264,7 +282,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    // conjunction
+    /// Logic conjunction
     pub fn and(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match (a.as_ref(), b.as_ref()) {
             (BDD::False, _) | (_, &BDD::False) => self.mk_const(false),
@@ -289,7 +307,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    // disjunction
+    /// Disjunction
     pub fn or(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         // self.not(self.nor(a, b))
 
@@ -317,6 +335,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
+    /// Logic negation
     pub fn not(&self, a: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match a.as_ref() {
             BDD::False => self.mk_const(true),
@@ -327,6 +346,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
+    /// Implication
     pub fn implies(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         self.or(self.not(a), b)
     }
@@ -370,7 +390,6 @@ impl<S: BDDSymbol> BDDEnv<S> {
         self.mk_choice(self.mk_const(true), s, self.mk_const(false))
     }
 
-    #[inline]
     fn cmp_count<CmpFn: Fn(i64) -> bool + Copy>(
         &self,
         branches: &[Rc<BDD<S>>],
@@ -415,16 +434,31 @@ impl<S: BDDSymbol> BDDEnv<S> {
     }
 
     fn count_leq_recursive(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>], n: i64) -> Rc<BDD<S>> {
+        self.cmp_count_compare(a, b, n, Self::aln)
+    }
+
+    fn count_geq_recursive(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>], n: i64) -> Rc<BDD<S>> {
+        self.cmp_count_compare(a, b, n, Self::amn)
+    }
+
+    #[inline]
+    fn cmp_count_compare<CmpFn: Fn(&Self, &[Rc<BDD<S>>], i64) -> Rc<BDD<S>> + Copy>(
+        &self,
+        a: &[Rc<BDD<S>>],
+        b: &[Rc<BDD<S>>],
+        n: i64,
+        cmp: CmpFn,
+    ) -> Rc<BDD<S>> {
         if a.is_empty() {
-            self.aln(b, n)
+            cmp(self, b, n)
         } else {
             let first = &a[0];
             let remainder = a[1..].to_vec();
 
             self.ite(
                 Rc::clone(first),
-                self.count_leq_recursive(&remainder, b, n + 1),
-                self.count_leq_recursive(&remainder, b, n),
+                self.cmp_count_compare(&remainder, b, n + 1, cmp),
+                self.cmp_count_compare(&remainder, b, n, cmp),
             )
         }
     }
@@ -435,21 +469,6 @@ impl<S: BDDSymbol> BDDEnv<S> {
 
     pub fn count_geq(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>]) -> Rc<BDD<S>> {
         self.count_geq_recursive(a, b, 0)
-    }
-
-    fn count_geq_recursive(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>], n: i64) -> Rc<BDD<S>> {
-        if a.is_empty() {
-            self.amn(b, n)
-        } else {
-            let first = &a[0];
-            let remainder = a[1..].to_vec();
-
-            self.ite(
-                Rc::clone(first),
-                self.count_geq_recursive(&remainder, b, n + 1),
-                self.count_geq_recursive(&remainder, b, n),
-            )
-        }
     }
 
     pub fn count_eq(&self, a: &[Rc<BDD<S>>], b: &[Rc<BDD<S>>]) -> Rc<BDD<S>> {
