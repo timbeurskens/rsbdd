@@ -9,7 +9,7 @@ authors = ["Tim Beurskens <timbeurskens.97@gmail.com>"]
 [package]
 name = "rsbdd"
 description = "A BDD-based SAT solver"
-version = "0.10.5"
+version = "0.10.6"
 edition.workspace = true
 authors.workspace = true
 
