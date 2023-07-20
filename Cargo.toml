@@ -22,6 +22,7 @@ rustc-hash.workspace = true
 clap.workspace = true
 csv.workspace = true
 regex.workspace = true
+rayon.workspace = true
 argfile.workspace = true
 wild.workspace = true
 
@@ -40,5 +41,7 @@ csv = "1.2"
 regex = "1.7"
 glob = "0.3"
 pretty_assertions = "1.3"
+anyhow = "1.0"
+rayon = "1.7"
 argfile = "0.1"
 wild = "2.1"

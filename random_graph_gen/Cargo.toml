@@ -1,6 +1,6 @@
 [package]
 name = "random_graph_gen"
-version = "0.1.0"
+version = "0.2.0"
 description = "Generates a random edge list formatted graph"
 edition.workspace = true
 authors.workspace = true
@@ -10,3 +10,4 @@ clap.workspace = true
 rand.workspace = true
 rustc-hash.workspace = true
 csv.workspace = true
+anyhow.workspace = true

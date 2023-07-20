@@ -26,6 +26,10 @@ struct Args {
     /// Use undirected edges (test for both directions in the set-complement operation)
     undirected: bool,
 
+    #[clap(long)]
+    /// Construct a complete graph
+    complete: bool,
+
     #[clap(short, long)]
     /// Output in dot (GraphViz) format
     dot: bool,
@@ -39,23 +43,41 @@ struct Args {
     colors: Option<usize>,
 }
 
-fn main() -> io::Result<()> {
+fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     let mut selection = if let Some(file_to_convert) = args.convert {
-        let file = File::open(file_to_convert).expect("Could not open file");
+        let file = File::open(file_to_convert)?;
         let mut bufreader = BufReader::new(file);
-        read_graph(&mut bufreader, args.undirected).expect("Could not parse edge list")
+        read_graph(&mut bufreader, args.undirected)?
+    } else if args.complete {
+        if args.vertices.is_none() {
+            Err(anyhow::anyhow!(
+                "Must provide vertices for a complete graph"
+            ))?
+        }
+
+        let vertices = args.vertices.unwrap();
+
+        let edges = if args.undirected {
+            (vertices * (vertices - 1)) / 2
+        } else {
+            vertices * (vertices - 1)
+        };
+
+        generate_graph(vertices, edges, args.undirected)?
     } else {
         if args.vertices.is_none() || args.edges.is_none() {
-            panic!("Must provide vertices and edges if not converting a graph");
+            Err(anyhow::anyhow!(
+                "Must provide vertices and edges if not converting a graph"
+            ))?
         }
-        generate_graph(args.vertices.unwrap(), args.edges.unwrap(), args.undirected)
+        generate_graph(args.vertices.unwrap(), args.edges.unwrap(), args.undirected)?
     };
 
     // convert to a graph-coloring problem
     if let Some(num_colors) = args.colors {
-        selection = augment_colors(&selection, num_colors);
+        selection = augment_colors(&selection, num_colors)?;
     }
 
     let mut writer = if let Some(output_file) = args.output {
@@ -86,7 +108,7 @@ fn main() -> io::Result<()> {
     }
 
     // flush the writer before dropping it
-    writer.flush().expect("Could not flush write buffer");
+    writer.flush()?;
 
     Ok(())
 }
@@ -115,7 +137,7 @@ fn generate_graph(
     num_vertices: usize,
     num_edges: usize,
     undirected: bool,
-) -> Vec<(String, String)> {
+) -> anyhow::Result<Vec<(String, String)>> {
     let mut rng = rand::thread_rng();
 
     let vertices = (0..num_vertices)
@@ -125,8 +147,15 @@ fn generate_graph(
 
     for (i, v1) in vertices.iter().enumerate() {
         if undirected {
-            for v2 in vertices[(i + 1)..].iter() {
-                edges.push((v1.clone(), v2.clone()));
+            if let Some(vertices) = vertices.get((i + 1)..) {
+                for v2 in vertices.iter() {
+                    edges.push((v1.clone(), v2.clone()));
+                }
+            } else {
+                Err(anyhow::anyhow!(
+                    "Index out of bounds for vertex range {}..",
+                    i + 1
+                ))?
             }
         } else {
             for (j, v2) in vertices.iter().enumerate() {
@@ -139,10 +168,19 @@ fn generate_graph(
 
     edges.shuffle(&mut rng);
 
-    edges[0..num_edges].to_vec()
+    if let Some(edges) = edges.get(0..num_edges) {
+        Ok(edges.to_vec())
+    } else {
+        Err(anyhow::anyhow!(
+            "Cannot satisfy the desired amount of edges"
+        ))
+    }
 }
 
-fn augment_colors(edges: &Vec<(String, String)>, num_colors: usize) -> Vec<(String, String)> {
+fn augment_colors(
+    edges: &Vec<(String, String)>,
+    num_colors: usize,
+) -> anyhow::Result<Vec<(String, String)>> {
     let mut vertex_map: FxHashMap<String, String> = FxHashMap::default();
     let mut color_map: FxHashMap<String, usize> = FxHashMap::default();
 
@@ -164,23 +202,30 @@ fn augment_colors(edges: &Vec<(String, String)>, num_colors: usize) -> Vec<(Stri
     let vertices = vertex_map.keys().cloned().collect::<Vec<String>>();
 
     for (i, v1) in vertices.iter().enumerate() {
-        for v2 in vertices[(i + 1)..].iter() {
-            let c1 = color_map[v1];
-            let c2 = color_map[v2];
+        if let Some(vertices) = vertices.get((i + 1)..) {
+            for v2 in vertices.iter() {
+                let c1 = color_map[v1];
+                let c2 = color_map[v2];
 
-            let ov1 = &vertex_map[v1];
-            let ov2 = &vertex_map[v2];
+                let ov1 = &vertex_map[v1];
+                let ov2 = &vertex_map[v2];
 
-            // only add an edge to new_edges if the colors are different, or the vertices are not connected
-            if ov1 != ov2
-                && (c1 != c2
-                    || (!edges.contains(&(ov1.clone(), ov2.clone()))
-                        && !edges.contains(&(ov2.clone(), ov1.clone()))))
-            {
-                new_edges.push((v1.clone(), v2.clone()));
+                // only add an edge to new_edges if the colors are different, or the vertices are not connected
+                if ov1 != ov2
+                    && (c1 != c2
+                        || (!edges.contains(&(ov1.clone(), ov2.clone()))
+                            && !edges.contains(&(ov2.clone(), ov1.clone()))))
+                {
+                    new_edges.push((v1.clone(), v2.clone()));
+                }
             }
+        } else {
+            Err(anyhow::anyhow!(
+                "Index out of bounds for vertex range {}..",
+                i + 1
+            ))?
         }
     }
 
-    new_edges
+    Ok(new_edges)
 }
