@@ -8,7 +8,7 @@ use std::io::*;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
-#[clap(author, version, long_about = None)]
+#[clap(author, version, about, long_about = None)]
 struct Args {
     #[clap(value_parser, value_name = "OUTPUT")]
     /// The output rsbdd file

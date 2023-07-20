@@ -248,13 +248,14 @@ Options:
   -m, --model                  Compute a single satisfying model as output
   -v, --vars                   Print all satisfying variables leading to a truth value
   -f, --filter <FILTER>        Only show true or false entries in the output [default: Any]
-  -b, --benchmark <N>          Repeat the solving process n times for more accurate performance reports
+  -b, --benchmark <N>          Repeat the solving process n times for more accurate performance
+                               reports
   -g, --plot                   Use GNUPlot to plot the runtime distribution
   -e, --evaluate <EVALUATE>    Parse the formula as string
   -o, --ordering <ORDERING>    Read a custom variable ordering from file
   -r, --export-ordering        Export the automatically derived ordering to stdout
-  -h, --help                   Print help information
-  -V, --version                Print version information
+  -h, --help                   Print help
+  -V, --version                Print version
 
 ```
 
@@ -272,8 +273,8 @@ Arguments:
 Options:
   -u, --undirected  Use undirected edges (test for both directions in the set-complement operation)
   -a, --all         Construct a satisfiable formula for all cliques
-  -h, --help        Print help information
-  -V, --version     Print version information
+  -h, --help        Print help
+  -V, --version     Print version
 
 ```
 
@@ -289,13 +290,15 @@ Arguments:
   [EDGES]     The number of edges in the output graph
 
 Options:
-  -o, --output <OUTPUT>    The output filename (or stdout if not provided)
-  -u, --undirected         Use undirected edges (test for both directions in the set-complement operation)
-  -d, --dot                Output in dot (GraphViz) format
-      --convert <CONVERT>  If this argument is provided, the provided edge-list will be used to generate a graph
-  -c, --colors <N>         Generate a graph-coloring problem with N colors
-  -h, --help               Print help information
-  -V, --version            Print version information
+  -o, --output <FILE>   The output filename (or stdout if not provided)
+  -u, --undirected      Use undirected edges (test for both directions in the set-complement
+                        operation)
+  -d, --dot             Output in dot (GraphViz) format
+      --convert <FILE>  If this argument is provided, the provided edge-list will be used to
+                        generate a graph
+  -c, --colors <N>      Generate a graph-coloring problem with N colors
+  -h, --help            Print help
+  -V, --version         Print version
 
 ```
 
@@ -311,8 +314,8 @@ Arguments:
 
 Options:
   -n, --queens <QUEENS>  The number of queens [default: 4]
-  -h, --help             Print help information
-  -V, --version          Print version information
+  -h, --help             Print help
+  -V, --version          Print version
 
 ```
 
@@ -321,14 +324,16 @@ Options:
 ```
 Generates a random edge list formatted graph
 
-Usage: sudoku_gen [INPUT] [OUTPUT]
+Usage: sudoku_gen [OPTIONS] [INPUT] [OUTPUT]
 
 Arguments:
   [INPUT]   The input sudoku file
   [OUTPUT]  The output rsbdd file
 
 Options:
-  -h, --help     Print help information
-  -V, --version  Print version information
+  -r, --root <N>  The root value of the puzzle. Typically the square root of the largest possible
+                  number [default: 3]
+  -h, --help      Print help
+  -V, --version   Print version
 
 ```
