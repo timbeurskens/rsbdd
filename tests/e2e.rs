@@ -1,6 +1,7 @@
 use pretty_assertions::assert_eq;
 use rsbdd::bdd::*;
 use rsbdd::parser::*;
+use rsbdd::NamedSymbol;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
