@@ -43,7 +43,7 @@ impl SymbolicParseTree {
                 let mut new_nodes: Vec<SymbolicBDD> = this_node;
 
                 for subtree in f {
-                    new_nodes.extend(SymbolicParseTree::nodes_recursive(subtree).into_iter());
+                    new_nodes.extend(SymbolicParseTree::nodes_recursive(subtree));
                 }
 
                 new_nodes
@@ -52,11 +52,11 @@ impl SymbolicParseTree {
                 let mut new_nodes: Vec<SymbolicBDD> = this_node;
 
                 for subtree in a {
-                    new_nodes.extend(SymbolicParseTree::nodes_recursive(subtree).into_iter());
+                    new_nodes.extend(SymbolicParseTree::nodes_recursive(subtree));
                 }
 
                 for subtree in b {
-                    new_nodes.extend(SymbolicParseTree::nodes_recursive(subtree).into_iter());
+                    new_nodes.extend(SymbolicParseTree::nodes_recursive(subtree));
                 }
 
                 new_nodes
@@ -64,9 +64,9 @@ impl SymbolicParseTree {
             SymbolicBDD::Ite(c, t, e) => {
                 let mut new_nodes: Vec<SymbolicBDD> = this_node;
 
-                new_nodes.extend(SymbolicParseTree::nodes_recursive(c).into_iter());
-                new_nodes.extend(SymbolicParseTree::nodes_recursive(t).into_iter());
-                new_nodes.extend(SymbolicParseTree::nodes_recursive(e).into_iter());
+                new_nodes.extend(SymbolicParseTree::nodes_recursive(c));
+                new_nodes.extend(SymbolicParseTree::nodes_recursive(t));
+                new_nodes.extend(SymbolicParseTree::nodes_recursive(e));
 
                 new_nodes
             }

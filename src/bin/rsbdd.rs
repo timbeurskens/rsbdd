@@ -34,36 +34,40 @@ struct Args {
     /// Write the bdd to a dot graphviz file.
     dot: Option<PathBuf>,
 
-    /// Compute a single satisfying model as output.
     #[clap(short, long)]
+    /// Compute a single satisfying model as output.
     model: bool,
 
-    /// Print all satisfying variables leading to a truth value.
     #[clap(short, long)]
+    /// Print all satisfying variables leading to a truth value.
     vars: bool,
 
-    /// Only show true or false entries in the output.
     #[clap(short, long, value_parser, default_value_t = TruthTableEntry::Any)]
+    /// Only show true or false entries in the output.
     filter: TruthTableEntry,
 
-    /// Repeat the solving process n times for more accurate performance reports.
+    #[clap(short = 'c', long, value_parser, default_value_t = TruthTableEntry::Any)]
+    /// Only retain choice variables when filtering.
+    retain_choices: TruthTableEntry,
+
     #[clap(short, long, value_parser, value_name = "N")]
+    /// Repeat the solving process n times for more accurate performance reports.
     benchmark: Option<usize>,
 
-    /// Use GNUPlot to plot the runtime distribution.
     #[clap(short = 'g', long)]
+    /// Use GNUPlot to plot the runtime distribution.
     plot: bool,
 
-    /// Parse the formula as string.
     #[clap(short, long, value_parser)]
+    /// Parse the formula as string.
     evaluate: Option<String>,
 
-    /// Read a custom variable ordering from file.
     #[clap(short, long, value_parser)]
+    /// Read a custom variable ordering from file.
     ordering: Option<PathBuf>,
 
-    /// Export the automatically derived ordering to stdout.
     #[clap(short = 'r', long)]
+    /// Export the automatically derived ordering to stdout.
     export_ordering: bool,
 }
 
@@ -121,6 +125,14 @@ fn main() {
         exec_times.push(tick.elapsed());
 
         eprintln!("finished {}/{} runs", i + 1, repeat);
+    }
+
+    // Simplify the output when retain_choices is on
+    if !args.retain_choices.is_any() {
+        result = input_parsed
+            .env
+            .borrow()
+            .retain_choice_bottom_up(result, args.retain_choices);
     }
 
     // only print performance results when the benchmark flag is available, and more than 1 run has completed
