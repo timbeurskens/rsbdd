@@ -1,5 +1,5 @@
-use rsbdd::bdd;
 use rsbdd::bdd::*;
+use rsbdd::{bdd, TruthTableEntry};
 use std::rc::Rc;
 
 use rsbdd::bdd_io::*;
