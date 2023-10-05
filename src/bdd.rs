@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
-use crate::{BDDSymbol, NamedSymbol};
+use crate::{BDDSymbol, NamedSymbol, TruthTableEntry};
 
 #[macro_export]
 macro_rules! bdd {
@@ -19,13 +19,51 @@ macro_rules! bdd {
     }};
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash)]
 pub enum BDD<Symbol: BDDSymbol> {
     #[default]
     False,
     True,
     // Choice (true-subtree, symbol, false-subtree)
     Choice(Rc<BDD<Symbol>>, Symbol, Rc<BDD<Symbol>>),
+}
+
+impl<Symbol> BDD<Symbol>
+where
+    Symbol: BDDSymbol,
+{
+    pub fn is_choice(&self) -> bool {
+        matches!(self, BDD::Choice(_, _, _))
+    }
+
+    pub fn is_const(&self) -> bool {
+        !self.is_choice()
+    }
+
+    pub fn is_true(&self) -> bool {
+        self == &BDD::True
+    }
+
+    pub fn is_false(&self) -> bool {
+        self == &BDD::False
+    }
+
+    pub fn node_list(self: &Rc<Self>) -> Vec<Rc<Self>> {
+        match self.as_ref() {
+            BDD::Choice(l, _, r) => {
+                let l_nodes = l.node_list();
+                let r_nodes = r.node_list();
+
+                l_nodes
+                    .iter()
+                    .chain(&vec![Rc::clone(self)])
+                    .chain(r_nodes.iter())
+                    .cloned()
+                    .collect()
+            }
+            BDD::True | BDD::False => vec![Rc::clone(self)],
+        }
+    }
 }
 
 impl From<BDD<NamedSymbol>> for BDD<usize> {
@@ -82,7 +120,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
     }
 
     pub fn duplicates(&self, root: Rc<BDD<S>>) -> usize {
-        let all_nodes: Vec<Rc<BDD<S>>> = Self::node_list(root);
+        let all_nodes: Vec<Rc<BDD<S>>> = root.node_list();
 
         // todo: conclusion: hashes are stricter than pointers
         // try to rephrase the equivalence check, such hash a == hash b <=> a == b
@@ -99,23 +137,6 @@ impl<S: BDDSymbol> BDDEnv<S> {
             .count();
 
         unique_pointers - unique_hashes
-    }
-
-    pub fn node_list(root: Rc<BDD<S>>) -> Vec<Rc<BDD<S>>> {
-        match root.as_ref() {
-            BDD::Choice(l, _, r) => {
-                let l_nodes = Self::node_list(Rc::clone(l));
-                let r_nodes = Self::node_list(Rc::clone(r));
-
-                l_nodes
-                    .iter()
-                    .chain(&vec![Rc::clone(&root)])
-                    .chain(r_nodes.iter())
-                    .cloned()
-                    .collect()
-            }
-            BDD::True | BDD::False => vec![Rc::clone(&root)],
-        }
     }
 
     /// Make a new choice based on the given symbol and the left and right subtree.
@@ -442,6 +463,45 @@ impl<S: BDDSymbol> BDDEnv<S> {
         match a.as_ref() {
             BDD::Choice(t, _, f) if t.as_ref() == f.as_ref() => Rc::clone(t),
             _ => Rc::clone(a),
+        }
+    }
+
+    pub fn retain_choice_bottom_up(&self, src: Rc<BDD<S>>, filter: TruthTableEntry) -> Rc<BDD<S>> {
+        match filter {
+            // if we don't filter, we can just return the source
+            TruthTableEntry::Any => src,
+            // otherwise, remove nodes depending on truth value of the filter
+            _ => {
+                match src.as_ref() {
+                    BDD::Choice(left, symbol, right) => {
+                        // recursively run the retain function
+                        let left = self.retain_choice_bottom_up(Rc::clone(left), filter);
+                        let right = self.retain_choice_bottom_up(Rc::clone(right), filter);
+
+                        if left.is_const() && right.is_choice() {
+                            if left.is_true() != filter.is_true() {
+                                // omit choice
+                                eprintln!("omitted choice {symbol}");
+                                right
+                            } else {
+                                self.mk_choice(left, symbol.clone(), right)
+                            }
+                        } else if right.is_const() && left.is_choice() {
+                            if right.is_true() != filter.is_true() {
+                                // omit choice
+                                eprintln!("omitted choice {symbol}");
+                                left
+                            } else {
+                                self.mk_choice(left, symbol.clone(), right)
+                            }
+                        } else {
+                            self.mk_choice(left, symbol.clone(), right)
+                        }
+                    }
+                    // if the node is a constant, we can just return it
+                    _ => src,
+                }
+            }
         }
     }
 }

@@ -99,7 +99,7 @@ fn test_duplicates() {
 
     let mut max_size: usize = 0;
 
-    for ref node in BDDEnv::node_list(Rc::clone(&expr_comb_clean)) {
+    for ref node in expr_comb_clean.node_list() {
         let h = node.get_hash();
 
         if let Some(l) = hm.get_mut(&h) {

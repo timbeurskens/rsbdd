@@ -36,6 +36,18 @@ impl TruthTableEntry {
             TruthTableEntry::Any => matches!(s, "any" | "Any" | "a" | "A" | "*"),
         }
     }
+
+    pub fn is_true(self) -> bool {
+        self == TruthTableEntry::True
+    }
+
+    pub fn is_false(self) -> bool {
+        self == TruthTableEntry::False
+    }
+
+    pub fn is_any(self) -> bool {
+        self == TruthTableEntry::Any
+    }
 }
 
 impl Display for TruthTableEntry {
