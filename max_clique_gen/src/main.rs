@@ -156,7 +156,7 @@ fn main() -> Result<()> {
     }
 
     // flush the writer before dropping it
-    writer.flush().expect("Could not flush write buffer");
+    writer.flush()?;
 
     Ok(())
 }

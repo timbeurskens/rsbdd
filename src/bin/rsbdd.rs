@@ -74,7 +74,7 @@ struct Args {
     export_ordering: bool,
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let wild_args = wild::args_os();
     let args_in =
         argfile::expand_args_from(wild_args, argfile::parse_fromfile, argfile::PREFIX).unwrap();
@@ -88,34 +88,30 @@ fn main() {
     let mut reader = if let Some(inline_str) = &inline_eval {
         Box::new(BufReader::new(inline_str.as_bytes())) as Box<dyn BufRead>
     } else if let Some(some_input_filename) = input_filename {
-        let file = File::open(some_input_filename).expect("Could not open input file");
+        let file = File::open(some_input_filename)?;
         Box::new(BufReader::new(file)) as Box<dyn BufRead>
     } else {
         Box::new(BufReader::new(io::stdin())) as Box<dyn BufRead>
     };
 
     let pre_variable_ordering = if let Some(ord_filename) = args.ordering {
-        let file = File::open(ord_filename).expect("Could not open variable ordering file");
+        let file = File::open(ord_filename)?;
         let mut contents = Box::new(BufReader::new(file)) as Box<dyn BufRead>;
-        let tokens = SymbolicBDD::tokenize(&mut contents, None)
-            .expect("Could not extract tokens from variable ordering");
+        let tokens = SymbolicBDD::tokenize(&mut contents, None)?;
         let vars = ParsedFormula::extract_vars(&tokens);
         Some(vars)
     } else {
         None
     };
 
-    let input_parsed =
-        ParsedFormula::new(&mut reader, pre_variable_ordering).expect("Could not parse input file");
+    let input_parsed = ParsedFormula::new(&mut reader, pre_variable_ordering)?;
 
     if let Some(parsetree_filename) = args.parsetree {
-        let mut f = File::create(parsetree_filename).expect("Could not create parsetree dot file");
+        let mut f = File::create(parsetree_filename)?;
 
         let graph = SymbolicParseTree::new(&input_parsed.bdd);
 
-        graph
-            .render_dot(&mut f)
-            .expect("Could not write parsetree to dot file");
+        graph.render_dot(&mut f)?;
     }
 
     let mut result: Rc<BDD<NamedSymbol>> = Rc::default();
@@ -143,7 +139,7 @@ fn main() {
         print_performance_results(&exec_times);
 
         if args.plot {
-            plot_performance_results(&exec_times);
+            plot_performance_results(&exec_times)?;
         }
     }
 
@@ -209,14 +205,14 @@ fn main() {
     }
 
     if let Some(dot_filename) = args.dot {
-        let mut f = File::create(dot_filename).expect("Could not create dot file");
+        let mut f = File::create(dot_filename)?;
 
         let graph = BDDGraph::new(&result, args.filter);
 
-        graph
-            .render_dot(&mut f)
-            .expect("Could not write BDD to dot file");
+        graph.render_dot(&mut f)?
     }
+
+    Ok(())
 }
 
 fn print_sized_line<B, C, D>(labels: &Vec<D>, widths: &B, result: &BDD<C>)
@@ -294,15 +290,14 @@ fn print_performance_results(results: &[Duration]) {
 }
 
 // invoke gnuplot to show the run-time distribution plot
-fn plot_performance_results(results: &[Duration]) {
+fn plot_performance_results(results: &[Duration]) -> anyhow::Result<()> {
     let (_, _, _, mean, stddev) = stats(results);
 
     let mut gnuplot_cmd = Command::new("gnuplot")
         .arg("-p") // persistent mode
         .arg("-") // piped mode
         .stdin(Stdio::piped())
-        .spawn()
-        .expect("Could not spawn gnuplot");
+        .spawn()?;
 
     let stdin = gnuplot_cmd.stdin.as_mut().unwrap();
     write_gnuplot_normal_distribution(
@@ -311,12 +306,11 @@ fn plot_performance_results(results: &[Duration]) {
         mean + (stddev * 2.0),
         mean,
         stddev,
-    )
-    .expect("Could not write to gnuplot command");
+    )?;
 
-    gnuplot_cmd
-        .wait()
-        .expect("Could not wait for gnuplot to finish");
+    gnuplot_cmd.wait()?;
+
+    Ok(())
 }
 
 // print all variables which can take a 'true' value in the bdd

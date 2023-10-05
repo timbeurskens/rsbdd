@@ -133,7 +133,7 @@ fn main() -> io::Result<()> {
 
     writeln!(writer, "true")?;
 
-    writer.flush().expect("Could not flush write buffer");
+    writer.flush()?;
 
     Ok(())
 }

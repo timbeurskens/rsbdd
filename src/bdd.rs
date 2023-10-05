@@ -10,13 +10,15 @@ use crate::{BDDSymbol, NamedSymbol, TruthTableEntry};
 
 #[macro_export]
 macro_rules! bdd {
-    ($($expr:tt)+) => {{
-        let input = stringify!($($expr)+);
-        let mut input_reader = std::io::BufReader::new(input.as_bytes());
-        let parsed_formula = rsbdd::parser::ParsedFormula::new(&mut input_reader, None).expect("could not parse expression");
+    ($($expr:tt)+) => {
+        (|| -> anyhow::Result<_> {
+            let input = stringify!($($expr)+);
+            let mut input_reader = std::io::BufReader::new(input.as_bytes());
+            let parsed_formula = rsbdd::parser::ParsedFormula::new(&mut input_reader, None)?;
 
-        parsed_formula.eval()
-    }};
+            Ok(parsed_formula.eval())
+        })()
+    };
 }
 
 #[derive(Debug, Clone, Default, Eq, PartialEq, Hash)]

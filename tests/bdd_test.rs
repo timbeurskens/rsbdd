@@ -640,9 +640,9 @@ fn test_queens() {
 
 #[test]
 fn test_basic_syntax_1() {
-    let e1 = bdd!(a | -a);
-    let e2 = bdd!(a | b | c);
-    let e3 = bdd!(false);
+    let e1 = bdd!(a | -a).unwrap();
+    let e2 = bdd!(a | b | c).unwrap();
+    let e3 = bdd!(false).unwrap();
 
     println!("{:#?}\n{:#?}\n{:#?}", e1, e2, e3);
 }
