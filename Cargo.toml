@@ -25,6 +25,7 @@ regex.workspace = true
 rayon.workspace = true
 argfile.workspace = true
 wild.workspace = true
+anyhow.workspace = true
 
 [dev-dependencies]
 glob.workspace = true

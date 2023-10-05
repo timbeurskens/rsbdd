@@ -1,6 +1,6 @@
 extern crate dot;
 
-use crate::bdd::*;
+use crate::{bdd::*, BDDSymbol, TruthTableEntry};
 use itertools::Itertools;
 use std::borrow::Cow;
 use std::io;

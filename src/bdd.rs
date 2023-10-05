@@ -1,12 +1,12 @@
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHasher};
 use std::cell::RefCell;
-use std::error::Error;
-use std::fmt;
-use std::fmt::{Debug, Display};
+
+use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
-use std::str::FromStr;
+
+use crate::{BDDSymbol, NamedSymbol, TruthTableEntry};
 
 #[macro_export]
 macro_rules! bdd {
@@ -17,54 +17,6 @@ macro_rules! bdd {
 
         parsed_formula.eval()
     }};
-}
-
-pub trait BDDSymbol: Ord + Display + Debug + Clone + Hash {}
-
-impl<T> BDDSymbol for T where T: Ord + Display + Debug + Clone + Hash {}
-
-#[derive(Debug, Clone)]
-pub struct NamedSymbol {
-    pub name: Rc<String>,
-    pub id: usize,
-}
-
-impl fmt::Display for NamedSymbol {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self.name, f)
-    }
-}
-
-impl Hash for NamedSymbol {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-    }
-}
-
-impl PartialEq for NamedSymbol {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
-impl Eq for NamedSymbol {}
-
-impl Ord for NamedSymbol {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.id.cmp(&other.id)
-    }
-}
-
-impl PartialOrd for NamedSymbol {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl From<NamedSymbol> for usize {
-    fn from(ns: NamedSymbol) -> Self {
-        ns.id
-    }
 }
 
 #[derive(Debug, Clone, Default, Eq, PartialEq, Hash)]
@@ -125,79 +77,6 @@ impl From<BDD<NamedSymbol>> for BDD<usize> {
                 Rc::new(BDD::from(false_subtree.as_ref().clone())),
             ),
         }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-/// Single variable assignment in a truth table.
-///
-/// The variable assignments in a truth table can be one of True, False or Any.
-/// [`True`] is assigned when the variable can only be assigned a 'true' value;
-/// [`False`] is assigned when the variable can only be 'false'.
-/// When the variable can either be true or false, the truth table can either consist of
-/// both options (as separate models), or assign [`Any`].
-///
-/// [`Any`]: TruthTableEntry::Any
-/// [`True`]: TruthTableEntry::True
-/// [`False`]: TruthTableEntry::False
-pub enum TruthTableEntry {
-    /// Assigned when the variable can only be true
-    True,
-    /// Assigned when the variable can only be false
-    False,
-    /// Assigned when the variable can either be true or false
-    Any,
-}
-
-impl TruthTableEntry {
-    pub fn is_true(self) -> bool {
-        self == TruthTableEntry::True
-    }
-
-    pub fn is_false(self) -> bool {
-        self == TruthTableEntry::False
-    }
-
-    pub fn is_any(self) -> bool {
-        self == TruthTableEntry::Any
-    }
-}
-
-#[derive(Debug)]
-pub struct TruthTableEntryParseError {
-    pub input: String,
-}
-
-impl Error for TruthTableEntryParseError {}
-
-impl Display for TruthTableEntryParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Could not parse truth table entry: {}", self.input)
-    }
-}
-
-impl FromStr for TruthTableEntry {
-    type Err = TruthTableEntryParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "true" | "True" | "t" | "T" | "1" => Ok(TruthTableEntry::True),
-            "false" | "False" | "f" | "F" | "0" => Ok(TruthTableEntry::False),
-            "any" | "Any" | "a" | "A" => Ok(TruthTableEntry::Any),
-            _ => Err(TruthTableEntryParseError {
-                input: s.to_string(),
-            }),
-        }
-    }
-}
-
-impl Display for TruthTableEntry {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.pad(match self {
-            TruthTableEntry::True => "True",
-            TruthTableEntry::False => "False",
-            TruthTableEntry::Any => "Any",
-        })
     }
 }
 
