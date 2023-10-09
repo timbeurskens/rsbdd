@@ -111,19 +111,27 @@ pub struct ParsedFormula {
     // the environment
     pub env: RefCell<BDDEnv<NamedSymbol>>,
 
-    pub definitions: RefCell<FxHashMap<String, SymbolicBDD>>,
+    pub definitions: RefCell<FxHashMap<String, ReferenceContents>>,
+}
+
+#[derive(Debug, Clone)]
+pub enum ReferenceContents {
+    Syntax(SymbolicBDD),
+    BDD(Rc<BDD<NamedSymbol>>),
 }
 
 type TokenReader<'a> = Peekable<Iter<'a, SymbolicBDDToken>>;
 
 impl ParsedFormula {
     /// Define a new BDD by name
-    pub fn define(&self, name: &str, bdd: SymbolicBDD) {
-        self.definitions.borrow_mut().insert(name.to_string(), bdd);
+    pub fn define(&self, name: &str, contents: ReferenceContents) {
+        self.definitions
+            .borrow_mut()
+            .insert(name.to_string(), contents);
     }
 
     /// Get a reference to a previously defined BDD by name
-    pub fn get_definition(&self, name: &str) -> Option<SymbolicBDD> {
+    pub fn get_definition(&self, name: &str) -> Option<ReferenceContents> {
         self.definitions.borrow().get(name).cloned()
     }
 
@@ -187,17 +195,24 @@ impl ParsedFormula {
                     .map(|v| self.replace_var(v, var, replacement))
                     .collect(),
             ),
-            SymbolicBDD::True
-            | SymbolicBDD::False
-            | SymbolicBDD::Subtree(_)
-            | SymbolicBDD::Var(_) => formula.clone(),
             SymbolicBDD::Reference(name) => {
                 if let Some(t) = self.get_definition(name) {
-                    self.replace_var(&t, var, replacement)
+                    match t {
+                        ReferenceContents::Syntax(syntax) => {
+                            self.replace_var(&syntax, var, replacement)
+                        }
+                        ReferenceContents::BDD(_) => unimplemented!(
+                            "variable replacement in referenced BDDs is not supported (yet)"
+                        ),
+                    }
                 } else {
                     formula.clone()
                 }
             }
+            SymbolicBDD::True
+            | SymbolicBDD::False
+            | SymbolicBDD::Subtree(_)
+            | SymbolicBDD::Var(_) => formula.clone(),
         }
     }
 
@@ -283,7 +298,11 @@ impl ParsedFormula {
             SymbolicBDD::True | SymbolicBDD::False => false,
             SymbolicBDD::Reference(name) => {
                 if let Some(f) = self.get_definition(name) {
-                    self.var_is_free(&f, var)
+                    match f {
+                        ReferenceContents::Syntax(syntax) => self.var_is_free(&syntax, var),
+                        // a bdd is quantifier free by definition
+                        ReferenceContents::BDD(_) => true,
+                    }
                 } else {
                     true
                 }
@@ -373,7 +392,10 @@ impl ParsedFormula {
             SymbolicBDD::Subtree(t) => Rc::clone(t),
             SymbolicBDD::Reference(name) => {
                 if let Some(t) = self.get_definition(name) {
-                    self.eval_recursive(&t)
+                    match t {
+                        ReferenceContents::Syntax(syntax) => self.eval_recursive(&syntax),
+                        ReferenceContents::BDD(bdd) => bdd,
+                    }
                 } else {
                     self.env.borrow().mk_const(false)
                 }
