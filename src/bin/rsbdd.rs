@@ -130,7 +130,6 @@ fn main() -> anyhow::Result<()> {
     if !args.retain_choices.is_any() {
         result = input_parsed
             .env
-            .borrow()
             .retain_choice_bottom_up(result, args.retain_choices);
     }
 
@@ -145,7 +144,7 @@ fn main() -> anyhow::Result<()> {
 
     // reduce the bdd to a single path from root to a single 'true' node
     if args.model {
-        result = input_parsed.env.borrow().model(result);
+        result = input_parsed.env.model(result);
     }
 
     // show ordered variable list

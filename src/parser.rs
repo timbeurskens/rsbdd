@@ -109,7 +109,7 @@ pub struct ParsedFormula {
     // the parse tree
     pub bdd: SymbolicBDD,
     // the environment
-    pub env: RefCell<BDDEnv<NamedSymbol>>,
+    pub env: Rc<BDDEnv<NamedSymbol>>,
 
     pub definitions: RefCell<FxHashMap<String, ReferenceContents>>,
 }
@@ -235,6 +235,14 @@ impl ParsedFormula {
         contents: &mut dyn BufRead,
         variable_ordering: Option<Vec<NamedSymbol>>,
     ) -> io::Result<Self> {
+        Self::new_with_env(Rc::new(BDDEnv::new()), contents, variable_ordering)
+    }
+
+    pub fn new_with_env(
+        env: Rc<BDDEnv<NamedSymbol>>,
+        contents: &mut dyn BufRead,
+        variable_ordering: Option<Vec<NamedSymbol>>,
+    ) -> io::Result<Self> {
         let tokens = SymbolicBDD::tokenize(contents, variable_ordering)?;
 
         let mut vars: Vec<NamedSymbol> = Self::extract_vars(&tokens);
@@ -248,7 +256,7 @@ impl ParsedFormula {
             free_vars: Vec::new(),
             raw2free: Vec::with_capacity(n),
             bdd: formula,
-            env: RefCell::new(BDDEnv::new()),
+            env,
             definitions: Default::default(),
         };
 
@@ -312,26 +320,26 @@ impl ParsedFormula {
 
     fn eval_recursive(&self, root: &SymbolicBDD) -> Rc<BDD<NamedSymbol>> {
         match root {
-            SymbolicBDD::False => self.env.borrow().mk_const(false),
-            SymbolicBDD::True => self.env.borrow().mk_const(true),
-            SymbolicBDD::Var(v) => self.env.borrow().var(v.clone()),
-            SymbolicBDD::Not(b) => self.env.borrow().not(self.eval_recursive(b)),
+            SymbolicBDD::False => self.env.mk_const(false),
+            SymbolicBDD::True => self.env.mk_const(true),
+            SymbolicBDD::Var(v) => self.env.var(v.clone()),
+            SymbolicBDD::Not(b) => self.env.not(self.eval_recursive(b)),
             SymbolicBDD::Quantifier(QuantifierType::Exists, v, b) => {
-                self.env.borrow().exists(v.clone(), self.eval_recursive(b))
+                self.env.exists(v.clone(), self.eval_recursive(b))
             }
             SymbolicBDD::Quantifier(QuantifierType::Forall, v, b) => {
-                self.env.borrow().all(v.clone(), self.eval_recursive(b))
+                self.env.all(v.clone(), self.eval_recursive(b))
             }
             SymbolicBDD::CountableConst(op, bs, n) => {
                 let branches: Vec<Rc<BDD<NamedSymbol>>> =
                     bs.iter().map(|b| self.eval_recursive(b)).collect();
 
                 match op {
-                    CountableOperator::AtMost => self.env.borrow().amn(&branches, *n as i64),
-                    CountableOperator::AtLeast => self.env.borrow().aln(&branches, *n as i64),
-                    CountableOperator::Exactly => self.env.borrow().exn(&branches, *n as i64),
-                    CountableOperator::LessThan => self.env.borrow().amn(&branches, *n as i64 - 1),
-                    CountableOperator::MoreThan => self.env.borrow().aln(&branches, *n as i64 + 1),
+                    CountableOperator::AtMost => self.env.amn(&branches, *n as i64),
+                    CountableOperator::AtLeast => self.env.aln(&branches, *n as i64),
+                    CountableOperator::Exactly => self.env.exn(&branches, *n as i64),
+                    CountableOperator::LessThan => self.env.amn(&branches, *n as i64 - 1),
+                    CountableOperator::MoreThan => self.env.aln(&branches, *n as i64 + 1),
                 }
             }
             SymbolicBDD::CountableVariable(op, l, r) => {
@@ -341,24 +349,14 @@ impl ParsedFormula {
                     r.iter().map(|b| self.eval_recursive(b)).collect();
 
                 match op {
-                    CountableOperator::AtMost => {
-                        self.env.borrow().count_leq(&l_branches, &r_branches)
-                    }
-                    CountableOperator::AtLeast => {
-                        self.env.borrow().count_geq(&l_branches, &r_branches)
-                    }
-                    CountableOperator::Exactly => {
-                        self.env.borrow().count_eq(&l_branches, &r_branches)
-                    }
-                    CountableOperator::LessThan => {
-                        self.env.borrow().count_lt(&l_branches, &r_branches)
-                    }
-                    CountableOperator::MoreThan => {
-                        self.env.borrow().count_gt(&l_branches, &r_branches)
-                    }
+                    CountableOperator::AtMost => self.env.count_leq(&l_branches, &r_branches),
+                    CountableOperator::AtLeast => self.env.count_geq(&l_branches, &r_branches),
+                    CountableOperator::Exactly => self.env.count_eq(&l_branches, &r_branches),
+                    CountableOperator::LessThan => self.env.count_lt(&l_branches, &r_branches),
+                    CountableOperator::MoreThan => self.env.count_gt(&l_branches, &r_branches),
                 }
             }
-            SymbolicBDD::Ite(c, t, e) => self.env.borrow().ite(
+            SymbolicBDD::Ite(c, t, e) => self.env.ite(
                 self.eval_recursive(c),
                 self.eval_recursive(t),
                 self.eval_recursive(e),
@@ -368,22 +366,22 @@ impl ParsedFormula {
                 let r = self.eval_recursive(r);
 
                 match op {
-                    BinaryOperator::And => self.env.borrow().and(l, r),
-                    BinaryOperator::Or => self.env.borrow().or(l, r),
-                    BinaryOperator::Xor => self.env.borrow().xor(l, r),
-                    BinaryOperator::Nor => self.env.borrow().nor(l, r),
-                    BinaryOperator::Nand => self.env.borrow().nand(l, r),
-                    BinaryOperator::Implies => self.env.borrow().implies(l, r),
-                    BinaryOperator::ImpliesInv => self.env.borrow().implies(r, l),
-                    BinaryOperator::Iff => self.env.borrow().eq(l, r),
+                    BinaryOperator::And => self.env.and(l, r),
+                    BinaryOperator::Or => self.env.or(l, r),
+                    BinaryOperator::Xor => self.env.xor(l, r),
+                    BinaryOperator::Nor => self.env.nor(l, r),
+                    BinaryOperator::Nand => self.env.nand(l, r),
+                    BinaryOperator::Implies => self.env.implies(l, r),
+                    BinaryOperator::ImpliesInv => self.env.implies(r, l),
+                    BinaryOperator::Iff => self.env.as_ref().eq(l, r),
                 }
             }
             SymbolicBDD::FixedPoint(var, initial, transformer) => {
-                let env = self.env.borrow();
+                let env = &self.env;
 
                 env.fp(env.mk_const(*initial), |x| {
                     self.eval_recursive(&self.replace_var(
-                        &transformer,
+                        transformer,
                         var,
                         &SymbolicBDD::Subtree(x),
                     ))
@@ -397,7 +395,7 @@ impl ParsedFormula {
                         ReferenceContents::BDD(bdd) => bdd,
                     }
                 } else {
-                    self.env.borrow().mk_const(false)
+                    self.env.mk_const(false)
                 }
             }
         }
