@@ -112,14 +112,13 @@ fn test_4_queens_file() -> io::Result<()> {
 
     let input_evaluated = input_parsed.eval();
 
-    let model = input_parsed.env.borrow().model(input_evaluated);
+    let model = input_parsed.env.model(input_evaluated);
 
     // only retain the queens
     let queens = (0..(n * n))
         .filter(|&i| {
             input_parsed
                 .env
-                .borrow()
                 .infer(model.clone(), input_parsed.vars[i].clone())
                 .1
         })
@@ -139,17 +138,12 @@ fn test_cliques_file() -> io::Result<()> {
 
     let input_evaluated = input_parsed.eval();
 
-    let model = input_parsed.env.borrow().model(input_evaluated);
+    let model = input_parsed.env.model(input_evaluated);
 
     let var_map: Vec<(NamedSymbol, (bool, bool))> = input_parsed
         .free_vars
         .iter()
-        .map(|v| {
-            (
-                v.clone(),
-                input_parsed.env.borrow().infer(model.clone(), v.clone()),
-            )
-        })
+        .map(|v| (v.clone(), input_parsed.env.infer(model.clone(), v.clone())))
         .collect();
 
     dbg!(&var_map);
