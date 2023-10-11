@@ -31,6 +31,15 @@ only the complement of E is denoted below.
 The cliques problem shows an interesting similarity to the graph-coloring problem:
 graph coloring can be encoded as a clique in a graph of vertices VxC where V is the set of vertices in the graph to be colored, and C is the set of colors.
 a vertex pair in the clique graph is connected by an edge if the original vertices are adjacent, and they do not share the same color.
+
+more intuitive explanation:
+
+- The encoding chosen here is: 'a variable is true if it is in the clique, false if it is not in the clique'.
+- Every node is a variable.
+- A node can be in the clique if all its edges are in the clique as well.
+- Unconnected nodes can not be in the clique simultaneously.
+- Every unconnected edge (edge in the residual graph) is a new -(x & y) constraint.
+
 "
 
 -(a & f) &
