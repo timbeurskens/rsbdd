@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io;
 use std::io::BufReader;
 use std::rc::Rc;
+use std::sync::Arc;
 
 #[test]
 fn test_basic_tokens() -> io::Result<()> {
@@ -68,9 +69,9 @@ fn test_parser() -> io::Result<()> {
     Ok(())
 }
 
-fn parse_and_evaluate(test_str: &str) -> io::Result<Rc<BDD<usize>>> {
+fn parse_and_evaluate(test_str: &str) -> io::Result<BDDContainer<usize>> {
     let result = ParsedFormula::new(&mut BufReader::new(test_str.as_bytes()), None)?;
-    Ok(Rc::new(BDD::<usize>::from(result.eval().as_ref().clone())))
+    Ok(Arc::new(BDD::<usize>::from(result.eval().as_ref().clone())))
 }
 
 fn env() -> BDDEnv<usize> {

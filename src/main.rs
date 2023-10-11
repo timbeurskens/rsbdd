@@ -12,7 +12,6 @@ use std::io::{BufRead, BufReader};
 use std::ops::Index;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 #[derive(Parser, Debug)]
@@ -108,7 +107,7 @@ fn main() {
             .expect("Could not write parsetree to dot file");
     }
 
-    let mut result: Rc<BDD<NamedSymbol>> = Rc::default();
+    let mut result: BDDContainer<NamedSymbol> = Default::default();
     let mut exec_times = Vec::new();
 
     // Benchmark: repeat n times and log runtime per iteration
@@ -303,7 +302,7 @@ fn plot_performance_results(results: &[Duration]) {
 
 // print all variables which can take a 'true' value in the bdd
 fn print_true_vars_recursive(
-    root: &Rc<BDD<NamedSymbol>>,
+    root: &BDDContainer<NamedSymbol>,
     values: Vec<TruthTableEntry>,
     vars: &[String],
     parsed: &ParsedFormula,
@@ -337,7 +336,7 @@ fn print_true_vars_recursive(
 
 // recursively walk through the bdd and assign values to the variables until every permutation is assigned a true or false value
 fn print_truth_table_recursive<A>(
-    root: &Rc<BDD<NamedSymbol>>,
+    root: &BDDContainer<NamedSymbol>,
     vars: Vec<TruthTableEntry>,
     filter: TruthTableEntry,
     parsed: &ParsedFormula,

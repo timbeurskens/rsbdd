@@ -1,14 +1,11 @@
 use rsbdd::bdd;
 use rsbdd::bdd::*;
-use std::rc::Rc;
 
 use rsbdd::bdd_io::*;
 use std::env;
 use std::fs::File;
 
 use pretty_assertions::{assert_eq, assert_ne};
-
-type BDD = bdd::BDD<usize>;
 
 #[test]
 fn test_equivalence() {
@@ -72,7 +69,7 @@ fn test_simple_duplicates() {
                 &vec![1, 2]
                     .iter()
                     .map(|&i| e.var(i))
-                    .collect::<Vec<Rc<BDD>>>(),
+                    .collect::<Vec<BDDContainer<usize>>>(),
                 1
             )
         ),
@@ -157,7 +154,8 @@ fn test_fixedpoint() {
     let e = BDDEnv::new();
 
     assert_eq!(
-        e.fp(e.mk_const(false), |x: Rc<BDD>| e.or(x, e.mk_const(true))),
+        e.fp(e.mk_const(false), |x: BDDContainer<usize>| e
+            .or(x, e.mk_const(true))),
         e.mk_const(true)
     );
 }
@@ -205,7 +203,10 @@ fn test_exn() {
     assert_eq!(e.exn(&[], 1), e.mk_const(false));
     assert_eq!(
         e.exn(
-            &vec![0].iter().map(|&i| e.var(i)).collect::<Vec<Rc<BDD>>>(),
+            &vec![0]
+                .iter()
+                .map(|&i| e.var(i))
+                .collect::<Vec<BDDContainer<usize>>>(),
             1
         ),
         e.var(0)
@@ -215,7 +216,7 @@ fn test_exn() {
             &vec![0, 1]
                 .iter()
                 .map(|&i| e.var(i))
-                .collect::<Vec<Rc<BDD>>>(),
+                .collect::<Vec<BDDContainer<usize>>>(),
             1
         ),
         e.or(
@@ -232,14 +233,20 @@ fn test_aln() {
     assert_eq!(e.aln(&[], 0), e.mk_const(true));
     assert_eq!(
         e.aln(
-            &vec![0].iter().map(|&i| e.var(i)).collect::<Vec<Rc<BDD>>>(),
+            &vec![0]
+                .iter()
+                .map(|&i| e.var(i))
+                .collect::<Vec<BDDContainer<usize>>>(),
             0
         ),
         e.mk_const(true)
     );
     assert_eq!(
         e.aln(
-            &vec![0].iter().map(|&i| e.var(i)).collect::<Vec<Rc<BDD>>>(),
+            &vec![0]
+                .iter()
+                .map(|&i| e.var(i))
+                .collect::<Vec<BDDContainer<usize>>>(),
             1
         ),
         e.var(0)
@@ -249,7 +256,7 @@ fn test_aln() {
             &vec![0, 1]
                 .iter()
                 .map(|&i| e.var(i))
-                .collect::<Vec<Rc<BDD>>>(),
+                .collect::<Vec<BDDContainer<usize>>>(),
             1
         ),
         e.or(e.var(0), e.var(1))
@@ -259,7 +266,7 @@ fn test_aln() {
             &vec![0, 1, 2]
                 .iter()
                 .map(|&i| e.var(i))
-                .collect::<Vec<Rc<BDD>>>(),
+                .collect::<Vec<BDDContainer<usize>>>(),
             1
         ),
         e.or(e.or(e.var(0), e.var(1)), e.var(2))
@@ -274,14 +281,20 @@ fn test_amn() {
     assert_eq!(e.amn(&[], 0), e.mk_const(true));
     assert_eq!(
         e.amn(
-            &vec![0].iter().map(|&i| e.var(i)).collect::<Vec<Rc<BDD>>>(),
+            &vec![0]
+                .iter()
+                .map(|&i| e.var(i))
+                .collect::<Vec<BDDContainer<usize>>>(),
             0
         ),
         e.not(e.var(0))
     );
     assert_eq!(
         e.amn(
-            &vec![0].iter().map(|&i| e.var(i)).collect::<Vec<Rc<BDD>>>(),
+            &vec![0]
+                .iter()
+                .map(|&i| e.var(i))
+                .collect::<Vec<BDDContainer<usize>>>(),
             1
         ),
         e.mk_const(true)
@@ -291,7 +304,7 @@ fn test_amn() {
             &vec![0, 1]
                 .iter()
                 .map(|&i| e.var(i))
-                .collect::<Vec<Rc<BDD>>>(),
+                .collect::<Vec<BDDContainer<usize>>>(),
             1
         ),
         e.or(
@@ -307,7 +320,7 @@ fn test_amn() {
             &vec![0, 1, 2]
                 .iter()
                 .map(|&i| e.var(i))
-                .collect::<Vec<Rc<BDD>>>(),
+                .collect::<Vec<BDDContainer<usize>>>(),
             1
         ),
         e.mk_const(false)
@@ -331,14 +344,14 @@ fn test_amn_quantifiers() {
             &vec![0, 1, 2]
                 .iter()
                 .map(|&i| e.var(i))
-                .collect::<Vec<Rc<BDD>>>(),
+                .collect::<Vec<BDDContainer<usize>>>(),
             2
         ),
         e.amn(
             &vec![3, 4, 5]
                 .iter()
                 .map(|&i| e.var(i))
-                .collect::<Vec<Rc<BDD>>>(),
+                .collect::<Vec<BDDContainer<usize>>>(),
             2
         )
     );
@@ -349,7 +362,7 @@ fn test_amn_quantifiers() {
             &vec![0, 1, 2]
                 .iter()
                 .map(|&i| e.var(i))
-                .collect::<Vec<Rc<BDD>>>(),
+                .collect::<Vec<BDDContainer<usize>>>(),
             2
         ),
         e.exists(
@@ -368,7 +381,7 @@ fn test_amn_quantifiers() {
                                     &vec![3, 4, 5]
                                         .iter()
                                         .map(|&i| e.var(i))
-                                        .collect::<Vec<Rc<BDD>>>(),
+                                        .collect::<Vec<BDDContainer<usize>>>(),
                                     2
                                 )
                             )
@@ -401,7 +414,7 @@ fn test_exn_model() {
     // semi-exhaustive test for exactly n
     for n in 0..15 {
         for c in 0..=n {
-            let vars: Vec<Rc<BDD>> = (0..n).map(|i| e.var(i)).collect();
+            let vars: Vec<BDDContainer<usize>> = (0..n).map(|i| e.var(i)).collect();
             let expr = e.exn(&vars, c.try_into().unwrap());
             let model = e.model(expr);
 
@@ -427,8 +440,9 @@ fn test_exn_interference_model() {
             for c in 0..=n {
                 println!("n: {}, o: {}, c: {}", n, o, c);
 
-                let vars: Vec<Rc<BDD>> = (0..n).map(|i| e.var(i)).collect();
-                let vars_interference: Vec<Rc<BDD>> = (n - o..(2 * n)).map(|i| e.var(i)).collect();
+                let vars: Vec<BDDContainer<usize>> = (0..n).map(|i| e.var(i)).collect();
+                let vars_interference: Vec<BDDContainer<usize>> =
+                    (n - o..(2 * n)).map(|i| e.var(i)).collect();
 
                 let expr = e.exn(&vars, c.try_into().unwrap());
                 let expr_interference = e.exn(&vars_interference, c.try_into().unwrap());
@@ -466,7 +480,7 @@ fn test_amn_model() {
     // non-exhaustive test for at most n
     for n in 0..15 {
         for c in 0..=n {
-            let vars: Vec<Rc<BDD>> = (0..n).map(|i| e.var(i)).collect();
+            let vars: Vec<BDDContainer<usize>> = (0..n).map(|i| e.var(i)).collect();
             let expr = e.amn(&vars, c.try_into().unwrap());
             let model = e.model(expr);
 
@@ -488,7 +502,7 @@ fn test_aln_model() {
     // non-exhaustive test for at least n
     for n in 0..15 {
         for c in 0..=n {
-            let vars: Vec<Rc<BDD>> = (0..n).map(|i| e.var(i)).collect();
+            let vars: Vec<BDDContainer<usize>> = (0..n).map(|i| e.var(i)).collect();
             let expr = e.aln(&vars, c as i64);
             let model = e.model(expr);
 
@@ -545,7 +559,7 @@ fn test_queens() {
         .map(|i| (0..n).map(|j| e.var(j + i * n)).collect::<Vec<_>>())
         .map(|ref c| e.exn(c, 1))
         .fold(e.mk_const(true), |ref acc, ref k| {
-            e.and(Rc::clone(acc), Rc::clone(k))
+            e.and(acc.clone(), k.clone())
         });
 
     // every column must contain exactly one queen
@@ -553,7 +567,7 @@ fn test_queens() {
         .map(|i| (0..n).map(|j| e.var(j * n + i)).collect::<Vec<_>>())
         .map(|ref c| e.exn(c, 1))
         .fold(e.mk_const(true), |ref acc, ref k| {
-            e.and(Rc::clone(acc), Rc::clone(k))
+            e.and(acc.clone(), k.clone())
         });
 
     let diag_expr_hl = (0..n)
@@ -564,7 +578,7 @@ fn test_queens() {
         })
         .map(|ref c| e.amn(c, 1))
         .fold(e.mk_const(true), |ref acc, ref k| {
-            e.and(Rc::clone(acc), Rc::clone(k))
+            e.and(acc.clone(), k.clone())
         });
 
     // skip the first, as this is already covered by the previous expression
@@ -576,7 +590,7 @@ fn test_queens() {
         })
         .map(|ref c| e.amn(c, 1))
         .fold(e.mk_const(true), |ref acc, ref k| {
-            e.and(Rc::clone(acc), Rc::clone(k))
+            e.and(acc.clone(), k.clone())
         });
 
     let diag_expr_hr = (0..n)
@@ -587,7 +601,7 @@ fn test_queens() {
         })
         .map(|ref c| e.amn(c, 1))
         .fold(e.mk_const(true), |ref acc, ref k| {
-            e.and(Rc::clone(acc), Rc::clone(k))
+            e.and(acc.clone(), k.clone())
         });
 
     // skip the first, as this is already covered by the previous expression
@@ -599,10 +613,10 @@ fn test_queens() {
         })
         .map(|ref c| e.amn(c, 1))
         .fold(e.mk_const(true), |ref acc, ref k| {
-            e.and(Rc::clone(acc), Rc::clone(k))
+            e.and(acc.clone(), k.clone())
         });
 
-    let expr_list: Vec<Rc<BDD>> = vec![
+    let expr_list: Vec<BDDContainer<usize>> = vec![
         row_expr,
         col_expr,
         diag_expr_hl,
@@ -611,9 +625,9 @@ fn test_queens() {
         diag_expr_vr,
     ];
 
-    let expr_comb = expr_list.iter().fold(e.mk_const(true), |ref acc, k| {
-        e.and(Rc::clone(acc), Rc::clone(k))
-    });
+    let expr_comb = expr_list
+        .iter()
+        .fold(e.mk_const(true), |ref acc, k| e.and(acc.clone(), k.clone()));
 
     // duplicates tested in hash.rs
     assert_eq!(e.duplicates(expr_comb.clone()), 0);

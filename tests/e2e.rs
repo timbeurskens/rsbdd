@@ -4,14 +4,14 @@ use rsbdd::parser::*;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::Arc;
 
 fn file_assert_eq<P: AsRef<Path>>(file1: P, file2: P, ordering: &[&str]) {
     let ord: Vec<NamedSymbol> = ordering
         .iter()
         .enumerate()
         .map(|(i, s)| NamedSymbol {
-            name: Rc::new(s.to_string()),
+            name: Arc::new(s.to_string()),
             id: i,
         })
         .collect();

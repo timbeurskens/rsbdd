@@ -2,12 +2,20 @@ use crate::bdd::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct BDDSet {
     env: Rc<BDDEnv<usize>>,
-    pub bdd: RefCell<Rc<BDD<usize>>>,
+    pub bdd: RefCell<BDDContainer<usize>>,
     bits: usize,
 }
+
+impl PartialEq for BDDSet {
+    fn eq(&self, other: &Self) -> bool {
+        self.bdd == other.bdd && self.bits == other.bits
+    }
+}
+
+impl Eq for BDDSet {}
 
 pub trait BDDCategorizable {
     fn categorize(&self, c: usize) -> bool;
@@ -33,7 +41,7 @@ impl BDDSet {
         }
     }
 
-    pub fn from_bdd(bdd: &Rc<BDD<usize>>, bits: usize, env: &Rc<BDDEnv<usize>>) -> BDDSet {
+    pub fn from_bdd(bdd: &BDDContainer<usize>, bits: usize, env: &Rc<BDDEnv<usize>>) -> BDDSet {
         BDDSet {
             env: env.clone(),
             bdd: RefCell::new(bdd.clone()),
@@ -91,7 +99,7 @@ impl BDDSet {
     }
 
     pub fn complement(&self, other: &BDDSet) -> &Self {
-        let new: Rc<BDD<usize>> = self.bdd.borrow().clone();
+        let new = self.bdd.borrow().clone();
 
         self.bdd
             .replace(self.env.and(new, other.bdd.borrow().clone()));

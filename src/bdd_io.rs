@@ -5,13 +5,13 @@ use itertools::Itertools;
 use std::borrow::Cow;
 use std::io;
 use std::io::Write;
-use std::rc::Rc;
+use std::sync::Arc;
 
-type GraphEdge<S> = (Rc<BDD<S>>, bool, Rc<BDD<S>>);
-type GraphNode<S> = Rc<BDD<S>>;
+type GraphEdge<S> = (BDDContainer<S>, bool, BDDContainer<S>);
+type GraphNode<S> = BDDContainer<S>;
 
 pub struct BDDGraph<S: BDDSymbol> {
-    root: Rc<BDD<S>>,
+    root: BDDContainer<S>,
     filter: TruthTableEntry,
 }
 
@@ -20,7 +20,7 @@ impl<S: BDDSymbol> BDDGraph<S> {
         dot::render(self, writer)
     }
 
-    pub fn new(root: &Rc<BDD<S>>, filter: TruthTableEntry) -> Self {
+    pub fn new(root: &BDDContainer<S>, filter: TruthTableEntry) -> Self {
         BDDGraph {
             root: root.clone(),
             filter,
@@ -38,7 +38,7 @@ impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<S>, GraphEdge<S>> for BDDGrap
             // use grep -v n_true or grep -v n_false to filter nodes adjacent to true or false
             BDD::True => dot::Id::new("n_true".to_string()).unwrap(),
             BDD::False => dot::Id::new("n_false".to_string()).unwrap(),
-            _ => dot::Id::new(format!("n_{:p}", Rc::into_raw(n.clone()))).unwrap(),
+            _ => dot::Id::new(format!("n_{:p}", Arc::into_raw(n.clone()))).unwrap(),
             // _ => dot::Id::new(format!("n_{}", n.get_hash())).unwrap(), // use the hash for optimal sharing, use (above) pointers to test issue with duplicates
         }
     }
@@ -79,7 +79,7 @@ impl<'a, S: BDDSymbol> dot::GraphWalk<'a, GraphNode<S>, GraphEdge<S>> for BDDGra
 }
 
 impl<'a, S: BDDSymbol> BDDGraph<S> {
-    fn nodes_recursive(&self, root: Rc<BDD<S>>) -> dot::Nodes<'a, GraphNode<S>> {
+    fn nodes_recursive(&self, root: BDDContainer<S>) -> dot::Nodes<'a, GraphNode<S>> {
         match root.as_ref() {
             BDD::Choice(l, _, r) => {
                 let l_nodes = self.nodes_recursive(l.clone());
@@ -103,7 +103,7 @@ impl<'a, S: BDDSymbol> BDDGraph<S> {
         }
     }
 
-    fn edges_recursive(&self, root: Rc<BDD<S>>) -> dot::Edges<'a, GraphEdge<S>> {
+    fn edges_recursive(&self, root: BDDContainer<S>) -> dot::Edges<'a, GraphEdge<S>> {
         match root.as_ref() {
             BDD::Choice(l, _, r) => {
                 let l_edges = self.edges_recursive(l.clone());

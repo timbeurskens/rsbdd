@@ -1,4 +1,4 @@
-use crate::bdd::{BDDEnv, NamedSymbol, BDD};
+use crate::bdd::{BDDContainer, BDDEnv, NamedSymbol};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -6,9 +6,9 @@ use std::cell::RefCell;
 use std::io;
 use std::io::BufRead;
 use std::iter::Peekable;
-use std::rc::Rc;
 use std::slice::Iter;
 use std::string::String;
+use std::sync::Arc;
 use std::vec::Vec;
 
 use rustc_hash::FxHashMap;
@@ -92,7 +92,7 @@ pub enum SymbolicBDD {
     FixedPoint(NamedSymbol, bool, Box<SymbolicBDD>),
     Ite(Box<SymbolicBDD>, Box<SymbolicBDD>, Box<SymbolicBDD>),
     BinaryOp(BinaryOperator, Box<SymbolicBDD>, Box<SymbolicBDD>),
-    Subtree(Rc<BDD<NamedSymbol>>),
+    Subtree(BDDContainer<NamedSymbol>),
 }
 
 #[derive(Debug, Clone)]
@@ -164,11 +164,11 @@ impl ParsedFormula {
         })
     }
 
-    pub fn eval(&self) -> Rc<BDD<NamedSymbol>> {
+    pub fn eval(&self) -> BDDContainer<NamedSymbol> {
         self.eval_recursive(&self.bdd)
     }
 
-    fn eval_recursive(&self, root: &SymbolicBDD) -> Rc<BDD<NamedSymbol>> {
+    fn eval_recursive(&self, root: &SymbolicBDD) -> BDDContainer<NamedSymbol> {
         match root {
             SymbolicBDD::False => self.env.borrow().mk_const(false),
             SymbolicBDD::True => self.env.borrow().mk_const(true),
@@ -181,7 +181,7 @@ impl ParsedFormula {
                 self.env.borrow().all(v.clone(), self.eval_recursive(b))
             }
             SymbolicBDD::CountableConst(op, bs, n) => {
-                let branches: Vec<Rc<BDD<NamedSymbol>>> =
+                let branches: Vec<BDDContainer<NamedSymbol>> =
                     bs.iter().map(|b| self.eval_recursive(b)).collect();
 
                 match op {
@@ -193,9 +193,9 @@ impl ParsedFormula {
                 }
             }
             SymbolicBDD::CountableVariable(op, l, r) => {
-                let l_branches: Vec<Rc<BDD<NamedSymbol>>> =
+                let l_branches: Vec<BDDContainer<NamedSymbol>> =
                     l.iter().map(|b| self.eval_recursive(b)).collect();
-                let r_branches: Vec<Rc<BDD<NamedSymbol>>> =
+                let r_branches: Vec<BDDContainer<NamedSymbol>> =
                     r.iter().map(|b| self.eval_recursive(b)).collect();
 
                 match op {
@@ -243,7 +243,7 @@ impl ParsedFormula {
                     self.eval_recursive(&transformer.replace_var(var, &SymbolicBDD::Subtree(x)))
                 })
             }
-            SymbolicBDD::Subtree(t) => Rc::clone(t),
+            SymbolicBDD::Subtree(t) => t.clone(),
         }
     }
 
@@ -710,7 +710,7 @@ impl SymbolicBDD {
                         }
 
                         result.push(SymbolicBDDToken::Var(NamedSymbol {
-                            name: Rc::new(var_str),
+                            name: Arc::new(var_str),
                             id: var_id,
                         }))
                     }
