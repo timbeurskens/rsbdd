@@ -276,49 +276,65 @@ impl<S: BDDSymbol> BDDEnv<S> {
             (BDD::False, _) | (_, &BDD::False) => self.mk_const(false),
             (BDD::True, _) => b.clone(),
             (_, BDD::True) => a.clone(),
-            (BDD::Choice(at, va, af), BDD::Choice(_, vb, _)) if va < vb => self.mk_choice(
-                self.and(at.clone(), b.clone()),
-                va.clone(),
-                self.and(af.clone(), b.clone()),
-            ),
-            (BDD::Choice(_, va, _), BDD::Choice(bt, vb, bf)) if vb < va => self.mk_choice(
-                self.and(bt.clone(), a.clone()),
-                vb.clone(),
-                self.and(bf.clone(), a.clone()),
-            ),
-            (BDD::Choice(at, va, af), BDD::Choice(bt, vb, bf)) if va == vb => self.mk_choice(
-                self.and(at.clone(), bt.clone()),
-                va.clone(),
-                self.and(af.clone(), bf.clone()),
-            ),
+            (BDD::Choice(at, va, af), BDD::Choice(_, vb, _)) if va < vb => {
+                let (left, right) = rayon::join(
+                    || self.and(at.clone(), b.clone()),
+                    || self.and(af.clone(), b.clone()),
+                );
+
+                self.mk_choice(left, va.clone(), right)
+            }
+            (BDD::Choice(_, va, _), BDD::Choice(bt, vb, bf)) if vb < va => {
+                let (left, right) = rayon::join(
+                    || self.and(bt.clone(), a.clone()),
+                    || self.and(bf.clone(), a.clone()),
+                );
+
+                self.mk_choice(left, vb.clone(), right)
+            }
+            (BDD::Choice(at, va, af), BDD::Choice(bt, vb, bf)) if va == vb => {
+                let (left, right) = rayon::join(
+                    || self.and(at.clone(), bt.clone()),
+                    || self.and(af.clone(), bf.clone()),
+                );
+
+                self.mk_choice(left, va.clone(), right)
+            }
             _ => panic!("unsupported match: {:?} {:?}", a, b),
         }
     }
 
     // disjunction
     pub fn or(&self, a: BDDContainer<S>, b: BDDContainer<S>) -> BDDContainer<S> {
-        // self.not(self.nor(a, b))
-
         match (a.as_ref(), b.as_ref()) {
             (BDD::True, _) | (_, BDD::True) => self.mk_const(true),
             (BDD::False, _) => b.clone(),
             (_, &BDD::False) => a.clone(),
             // todo:
-            (BDD::Choice(at, va, af), BDD::Choice(_, vb, _)) if va < vb => self.mk_choice(
-                self.or(at.clone(), b.clone()),
-                va.clone(),
-                self.or(af.clone(), b.clone()),
-            ),
-            (BDD::Choice(_, va, _), BDD::Choice(bt, vb, bf)) if vb < va => self.mk_choice(
-                self.or(bt.clone(), a.clone()),
-                vb.clone(),
-                self.or(bf.clone(), a.clone()),
-            ),
-            (BDD::Choice(at, va, af), BDD::Choice(bt, vb, bf)) if va == vb => self.mk_choice(
-                self.or(at.clone(), bt.clone()),
-                va.clone(),
-                self.or(af.clone(), bf.clone()),
-            ),
+            (BDD::Choice(at, va, af), BDD::Choice(_, vb, _)) if va < vb => {
+                let (left, right) = rayon::join(
+                    || self.or(at.clone(), b.clone()),
+                    || self.or(af.clone(), b.clone()),
+                );
+
+                self.mk_choice(left, va.clone(), right)
+            }
+            (BDD::Choice(_, va, _), BDD::Choice(bt, vb, bf)) if vb < va => {
+                let (left, right) = rayon::join(
+                    || self.or(bt.clone(), a.clone()),
+                    || self.or(bf.clone(), a.clone()),
+                );
+
+                self.mk_choice(left, vb.clone(), right)
+            }
+            (BDD::Choice(at, va, af), BDD::Choice(bt, vb, bf)) if va == vb => {
+                let (left, right) = rayon::join(
+                    || self.or(at.clone(), bt.clone()),
+                    || self.or(af.clone(), bf.clone()),
+                );
+
+                self.mk_choice(left, va.clone(), right)
+            }
             _ => panic!("unsupported match: {:?} {:?}", a, b),
         }
     }
@@ -328,7 +344,9 @@ impl<S: BDDSymbol> BDDEnv<S> {
             BDD::False => self.mk_const(true),
             BDD::True => self.mk_const(false),
             BDD::Choice(at, va, af) => {
-                self.mk_choice(self.not(at.clone()), va.clone(), self.not(af.clone()))
+                let (left, right) = rayon::join(|| self.not(at.clone()), || self.not(af.clone()));
+
+                self.mk_choice(left, va.clone(), right)
             }
         }
     }
