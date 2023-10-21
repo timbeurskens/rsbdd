@@ -48,6 +48,7 @@ A variable is a single word starting with a non-digit character. Examples of goo
 
 ```
 a
+a'
 alpha
 _x
 a1
@@ -138,6 +139,30 @@ A counting comparison can either be made by comparing a set of expressions to a 
 
 "there are strictly less true expressions in a, b, c than d, e, f"
 [a, b, c] < [d, e, f]
+```
+
+Counting comparison also allows us to specify optimization problems.
+Example: the max-clique problem can be described as a clique problem, such that
+for all satisfiable cliques, the reported result is the largest.
+
+```
+-(a & f) &
+-(a & g) &
+
+-(b & d) &
+-(b & e) &
+
+-(c & e) &
+-(c & g) &
+
+forall _a,_b,_c,_d,_e,_f,_g # (
+    -(_a & _f) &
+    -(_a & _g) &
+    -(_b & _d) &
+    -(_b & _e) &
+    -(_c & _e) &
+    -(_c & _g)
+) => [a,b,c,d,e,f,g] >= [_a,_b,_c,_d,_e,_f,_g]
 ```
 
 ### Fixed points
@@ -242,20 +267,20 @@ Arguments:
   [FILE]  The input file containing a logic formula in rsbdd format
 
 Options:
-  -p, --parsetree <PARSETREE>  Write the parse tree in dot format to the specified file
-  -t, --truthtable             Print the truth table to stdout
-  -d, --dot <DOT>              Write the bdd to a dot graphviz file
-  -m, --model                  Compute a single satisfying model as output
-  -v, --vars                   Print all satisfying variables leading to a truth value
-  -f, --filter <FILTER>        Only show true or false entries in the output [default: Any]
-  -b, --benchmark <N>          Repeat the solving process n times for more accurate performance
-                               reports
-  -g, --plot                   Use GNUPlot to plot the runtime distribution
-  -e, --evaluate <EVALUATE>    Parse the formula as string
-  -o, --ordering <ORDERING>    Read a custom variable ordering from file
-  -r, --export-ordering        Export the automatically derived ordering to stdout
-  -h, --help                   Print help
-  -V, --version                Print version
+  -p, --parsetree <PARSETREE>            Write the parse tree in dot format to the specified file
+  -t, --truthtable                       Print the truth table to stdout
+  -d, --dot <DOT>                        Write the bdd to a dot graphviz file
+  -m, --model                            Compute a single satisfying model as output
+  -v, --vars                             Print all satisfying variables leading to a truth value
+  -f, --filter <FILTER>                  Only show true or false entries in the output [default: Any]
+  -c, --retain-choices <RETAIN_CHOICES>  Only retain choice variables when filtering [default: Any]
+  -b, --benchmark <N>                    Repeat the solving process n times for more accurate performance reports
+  -g, --plot                             Use GNUPlot to plot the runtime distribution
+  -e, --evaluate <EVALUATE>              Parse the formula as string
+  -o, --ordering <ORDERING>              Read a custom variable ordering from file
+  -r, --export-ordering                  Export the automatically derived ordering to stdout
+  -h, --help                             Print help
+  -V, --version                          Print version
 
 ```
 
@@ -291,11 +316,10 @@ Arguments:
 
 Options:
   -o, --output <FILE>   The output filename (or stdout if not provided)
-  -u, --undirected      Use undirected edges (test for both directions in the set-complement
-                        operation)
+  -u, --undirected      Use undirected edges (test for both directions in the set-complement operation)
+      --complete        Construct a complete graph
   -d, --dot             Output in dot (GraphViz) format
-      --convert <FILE>  If this argument is provided, the provided edge-list will be used to
-                        generate a graph
+      --convert <FILE>  If this argument is provided, the provided edge-list will be used to generate a graph
   -c, --colors <N>      Generate a graph-coloring problem with N colors
   -h, --help            Print help
   -V, --version         Print version
@@ -331,8 +355,7 @@ Arguments:
   [OUTPUT]  The output rsbdd file
 
 Options:
-  -r, --root <N>  The root value of the puzzle. Typically the square root of the largest possible
-                  number [default: 3]
+  -r, --root <N>  The root value of the puzzle. Typically the square root of the largest possible number [default: 3]
   -h, --help      Print help
   -V, --version   Print version
 
