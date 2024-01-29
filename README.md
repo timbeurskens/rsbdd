@@ -1,6 +1,6 @@
 # RsBDD
 
-[![Rust](https://github.com/timbeurskens/rsbdd/actions/workflows/rust.yml/badge.svg)](https://github.com/timbeurskens/rsbdd/actions/workflows/rust.yml) 
+[![Rust](https://github.com/timbeurskens/rsbdd/actions/workflows/rust.yml/badge.svg)](https://github.com/timbeurskens/rsbdd/actions/workflows/rust.yml)
 
 _Solving satisfiability problems in Rust_
 
@@ -9,11 +9,13 @@ _Solving satisfiability problems in Rust_
 1) Make sure to install the [Rust toolchain](https://www.rust-lang.org/tools/install).
 
 2) Clone the latest version of this repository:
+
 ```
 $ git clone git@github.com:timbeurskens/rsbdd.git
 ```
 
 3) Build and install the RsBDD tools:
+
 ```
 $ cd rsbdd
 $ cargo install --bins --path .
@@ -31,11 +33,13 @@ The following tools will be available after installing the RsBDD package:
 
 ### Comments
 
-Characters contained within "..." (excluding the " char itself) are regarded as comments and can be placed at any point in the formula.
+Characters contained within "..." (excluding the " char itself) are regarded as comments and can be placed at any point
+in the formula.
 
 ### Constants
 
-The most basic building blocks of the syntax are 'variables' and 'constants'. A constant can be either 'true' or 'false'. A variable can accept either a 'true' or 'false' value after evaluation depending on its environment.
+The most basic building blocks of the syntax are 'variables' and 'constants'. A constant can be either 'true' or '
+false'. A variable can accept either a 'true' or 'false' value after evaluation depending on its environment.
 
 ```
 true
@@ -57,7 +61,8 @@ hello_world
 
 ### Negation
 
-A variable, constant, or sub-formula can be negated using the negation operator. This operator can be expressed by either `!`, `-`, or `not`.
+A variable, constant, or sub-formula can be negated using the negation operator. This operator can be expressed by
+either `!`, `-`, or `not`.
 
 ```
 not true
@@ -67,7 +72,8 @@ not true
 
 ### Binary operators
 
-RsBDD supports the most common, and some uncommon binary operators, such as conjunction, disjunction, implication and bi-implication.
+RsBDD supports the most common, and some uncommon binary operators, such as conjunction, disjunction, implication and
+bi-implication.
 
 Most operators have a symbolic and textual representation, e.g. `and` or `&`.
 
@@ -106,7 +112,8 @@ a | (a & b)
 
 ### If-then-else
 
-A simplification of a common expression `(a => b) & ((!a) => c)` can be made using the ternary if-then-else (ite) operator.
+A simplification of a common expression `(a => b) & ((!a) => c)` can be made using the ternary if-then-else (ite)
+operator.
 
 ```
 if a then b else c
@@ -115,7 +122,8 @@ if exists a # a <=> b then b <=> c else false | c
 
 ### Quantifiers
 
-The RsBDD supports universal and existential quantification using the `exists` and `forall`/`all` keywords: `{forall|exists} var_1, var_2, .., var_n # {subformula}`
+The RsBDD supports universal and existential quantification using the `exists` and `forall`/`all`
+keywords: `{forall|exists} var_1, var_2, .., var_n # {subformula}`
 
 ```
 forall a # true
@@ -125,13 +133,17 @@ forall a, b # exists c # (c | a) & (c | b)
 
 ### Counting
 
-For some problems it can be beneficial to express properties relating to the number of true or false variables, e.g. "at least 2 of the 4 properties must hold".
+For some problems it can be beneficial to express properties relating to the number of true or false variables, e.g. "at
+least 2 of the 4 properties must hold".
 
-The counting operator (`[]`) in combination with five new equality and inequality operators (`=`, `<=`, `>=`, `<`, `>`) can be used to concisely express these properties.
+The counting operator (`[]`) in combination with five new equality and inequality operators (`=`, `<=`, `>=`, `<`, `>`)
+can be used to concisely express these properties.
 
-_Note:_ like most operators, the counting operator can be expressed using logic primitives, but this operator simplifies the expression significantly.
+_Note:_ like most operators, the counting operator can be expressed using logic primitives, but this operator simplifies
+the expression significantly.
 
-A counting comparison can either be made by comparing a set of expressions to a given constant, or an other set of expressions.
+A counting comparison can either be made by comparing a set of expressions to a given constant, or an other set of
+expressions.
 
 ```
 "exactly one of a, b, and c holds"
@@ -167,9 +179,12 @@ forall _a,_b,_c,_d,_e,_f,_g # (
 
 ### Fixed points
 
-The rsbdd language supports least-fixpoint (`lfp` / `mu`) and greatest-fixpoint (`gfp` / `nu`) operations to find a respectively minimal or maximal solution by repeatedly applying a given transformer function until the solution is stable.
+The rsbdd language supports least-fixpoint (`lfp` / `mu`) and greatest-fixpoint (`gfp` / `nu`) operations to find a
+respectively minimal or maximal solution by repeatedly applying a given transformer function until the solution is
+stable.
 
-Only monotonic transformer functions are guaranteed to terminate. Termination of fixed point operations are not checked and will run indefinatedly if not handled correctly.
+Only monotonic transformer functions are guaranteed to terminate. Termination of fixed point operations are not checked
+and will run indefinatedly if not handled correctly.
 
 Its basic properties are defined as follows.
 
@@ -187,13 +202,17 @@ gfp/lfp X # false   <=> false
 
 ### Parse-tree display
 
-Adding the `-p {path}` argument to `rsbdd` constructs a graphviz graph of the parse-tree. This can be used to for introspection of the intended formula, or for reporting purposes. An example of the parse-tree output for `exists b,c # a | (b ^ c)` is displayed below.
+Adding the `-p {path}` argument to `rsbdd` constructs a graphviz graph of the parse-tree. This can be used to for
+introspection of the intended formula, or for reporting purposes. An example of the parse-tree output
+for `exists b,c # a | (b ^ c)` is displayed below.
 
 ![parse tree](docs/images/parsetree.svg)
 
 ### Experimental and/or upcoming features
 
-Currently the RsBDD language relies heavily on logical primitives. Integer arithmetic could be expressed by manually introducing the primitive 'bits' of a number. Rewrite rules could significantly simplify this process by introducting domains other than boolean variables. Embedding rewrite rules in the BDD could prove to be a challenge.
+Currently the RsBDD language relies heavily on logical primitives. Integer arithmetic could be expressed by manually
+introducing the primitive 'bits' of a number. Rewrite rules could significantly simplify this process by introducting
+domains other than boolean variables. Embedding rewrite rules in the BDD could prove to be a challenge.
 
 ## Examples
 
@@ -206,9 +225,12 @@ Currently the RsBDD language relies heavily on logical primitives. Integer arith
 ### Example 2: the 4 queens problem
 
 The famous n-queens problem can be expressed efficiently in the RsBDD language.
-The example below shows a 4-queens variant, which can be solved in roughly 15 milliseconds. The library contains a generator for arbitrary n-queens problems.
-At this point, the largest verified problem size is n=8, which reports all solutions in less than 20 minutes on modern hardware.
-The explosive nature of the problem makes n=9 an infeasable problem. Further optimizations (such as multi-processor parallellism, or vertex ordering) could decrease the run-time in the future.
+The example below shows a 4-queens variant, which can be solved in roughly 15 milliseconds. The library contains a
+generator for arbitrary n-queens problems.
+At this point, the largest verified problem size is n=8, which reports all solutions in less than 20 minutes on modern
+hardware.
+The explosive nature of the problem makes n=9 an infeasable problem. Further optimizations (such as multi-processor
+parallellism, or vertex ordering) could decrease the run-time in the future.
 
 ```
 "every row must contain exactly one queen"
@@ -242,17 +264,17 @@ The explosive nature of the problem makes n=9 an infeasable problem. Further opt
 [_3x0] <= 1
 ```
 
-Running this example with the following arguments yields a truth-table showing the queen configuration(s) on a 4x4 chess board.
+Running this example with the following arguments yields a truth-table showing the queen configuration(s) on a 4x4 chess
+board.
 
 ```bash
 rsbdd -i examples/4_queens.txt -t -ft
 ```
 
-| _0x0  | _0x1  | _0x2  | _0x3  | _1x0  | _1x1  | _1x2  | _1x3  | _2x0  | _2x1  | _2x2  | _2x3  | _3x0  | _3x1  | _3x2  | _3x3  | *     |
-|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
-| False | False | True  | False | True  | False | False | False | False | False | False | True  | False | True  | False | False | True  |
-| False | True  | False | False | False | False | False | True  | True  | False | False | False | False | False | True  | False | True  |
-
+| _0x0  | _0x1  | _0x2  | _0x3  | _1x0  | _1x1  | _1x2  | _1x3  | _2x0  | _2x1  | _2x2  | _2x3  | _3x0  | _3x1  | _3x2  | _3x3  | *    |
+|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|------|
+| False | False | True  | False | True  | False | False | False | False | False | False | True  | False | True  | False | False | True |
+| False | True  | False | False | False | False | False | True  | True  | False | False | False | False | False | True  | False | True |
 
 ## CLI Usage
 

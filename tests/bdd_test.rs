@@ -1,12 +1,12 @@
-use rsbdd::bdd::*;
-use rsbdd::{bdd, TruthTableEntry};
-use std::rc::Rc;
-
-use rsbdd::bdd_io::*;
 use std::env;
 use std::fs::File;
+use std::rc::Rc;
 
 use pretty_assertions::{assert_eq, assert_ne};
+
+use rsbdd::bdd::*;
+use rsbdd::bdd_io::*;
+use rsbdd::{bdd, TruthTableEntry};
 
 type BDD = bdd::BDD<usize>;
 
@@ -73,7 +73,7 @@ fn test_simple_duplicates() {
                     .iter()
                     .map(|&i| e.var(i))
                     .collect::<Vec<Rc<BDD>>>(),
-                1
+                1,
             )
         ),
         0
@@ -104,7 +104,7 @@ fn test_combined() {
     assert_eq!(
         e.and(
             e.or(e.var(0), e.not(e.var(0))),
-            e.or(e.var(1), e.not(e.var(1)))
+            e.or(e.var(1), e.not(e.var(1))),
         ),
         e.mk_const(true)
     );
@@ -180,7 +180,7 @@ fn test_implication_biimplication() {
         e.eq(e.var(0), e.var(1)),
         e.and(
             e.or(e.not(e.var(0)), e.var(1)),
-            e.or(e.not(e.var(1)), e.var(0))
+            e.or(e.not(e.var(1)), e.var(0)),
         )
     );
 }
@@ -206,7 +206,7 @@ fn test_exn() {
     assert_eq!(
         e.exn(
             &vec![0].iter().map(|&i| e.var(i)).collect::<Vec<Rc<BDD>>>(),
-            1
+            1,
         ),
         e.var(0)
     );
@@ -216,11 +216,11 @@ fn test_exn() {
                 .iter()
                 .map(|&i| e.var(i))
                 .collect::<Vec<Rc<BDD>>>(),
-            1
+            1,
         ),
         e.or(
             e.and(e.not(e.var(0)), e.var(1)),
-            e.and(e.not(e.var(1)), e.var(0))
+            e.and(e.not(e.var(1)), e.var(0)),
         )
     );
 }
@@ -233,14 +233,14 @@ fn test_aln() {
     assert_eq!(
         e.aln(
             &vec![0].iter().map(|&i| e.var(i)).collect::<Vec<Rc<BDD>>>(),
-            0
+            0,
         ),
         e.mk_const(true)
     );
     assert_eq!(
         e.aln(
             &vec![0].iter().map(|&i| e.var(i)).collect::<Vec<Rc<BDD>>>(),
-            1
+            1,
         ),
         e.var(0)
     );
@@ -250,7 +250,7 @@ fn test_aln() {
                 .iter()
                 .map(|&i| e.var(i))
                 .collect::<Vec<Rc<BDD>>>(),
-            1
+            1,
         ),
         e.or(e.var(0), e.var(1))
     );
@@ -260,7 +260,7 @@ fn test_aln() {
                 .iter()
                 .map(|&i| e.var(i))
                 .collect::<Vec<Rc<BDD>>>(),
-            1
+            1,
         ),
         e.or(e.or(e.var(0), e.var(1)), e.var(2))
     );
@@ -275,14 +275,14 @@ fn test_amn() {
     assert_eq!(
         e.amn(
             &vec![0].iter().map(|&i| e.var(i)).collect::<Vec<Rc<BDD>>>(),
-            0
+            0,
         ),
         e.not(e.var(0))
     );
     assert_eq!(
         e.amn(
             &vec![0].iter().map(|&i| e.var(i)).collect::<Vec<Rc<BDD>>>(),
-            1
+            1,
         ),
         e.mk_const(true)
     );
@@ -292,14 +292,14 @@ fn test_amn() {
                 .iter()
                 .map(|&i| e.var(i))
                 .collect::<Vec<Rc<BDD>>>(),
-            1
+            1,
         ),
         e.or(
             e.and(e.not(e.var(0)), e.not(e.var(1))),
             e.or(
                 e.and(e.var(0), e.not(e.var(1))),
-                e.and(e.not(e.var(0)), e.var(1))
-            )
+                e.and(e.not(e.var(0)), e.var(1)),
+            ),
         )
     );
     assert_ne!(
@@ -308,7 +308,7 @@ fn test_amn() {
                 .iter()
                 .map(|&i| e.var(i))
                 .collect::<Vec<Rc<BDD>>>(),
-            1
+            1,
         ),
         e.mk_const(false)
     );
@@ -332,14 +332,14 @@ fn test_amn_quantifiers() {
                 .iter()
                 .map(|&i| e.var(i))
                 .collect::<Vec<Rc<BDD>>>(),
-            2
+            2,
         ),
         e.amn(
             &vec![3, 4, 5]
                 .iter()
                 .map(|&i| e.var(i))
                 .collect::<Vec<Rc<BDD>>>(),
-            2
+            2,
         )
     );
 
@@ -350,7 +350,7 @@ fn test_amn_quantifiers() {
                 .iter()
                 .map(|&i| e.var(i))
                 .collect::<Vec<Rc<BDD>>>(),
-            2
+            2,
         ),
         e.exists(
             vec![3],
@@ -369,13 +369,13 @@ fn test_amn_quantifiers() {
                                         .iter()
                                         .map(|&i| e.var(i))
                                         .collect::<Vec<Rc<BDD>>>(),
-                                    2
-                                )
-                            )
-                        )
-                    )
-                )
-            )
+                                    2,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
         )
     );
 }

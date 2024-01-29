@@ -25,37 +25,37 @@ pub enum TruthTableEntry {
 }
 
 impl TruthTableEntry {
-    fn variants<'a>() -> &'a [Self] {
+    const fn variants<'a>() -> &'a [Self] {
         &[Self::True, Self::False, Self::Any]
     }
 
     fn matches(&self, s: &str) -> bool {
         match self {
-            TruthTableEntry::True => matches!(s, "true" | "True" | "t" | "T" | "1"),
-            TruthTableEntry::False => matches!(s, "false" | "False" | "f" | "F" | "0"),
-            TruthTableEntry::Any => matches!(s, "any" | "Any" | "a" | "A" | "*"),
+            Self::True => matches!(s, "true" | "True" | "t" | "T" | "1"),
+            Self::False => matches!(s, "false" | "False" | "f" | "F" | "0"),
+            Self::Any => matches!(s, "any" | "Any" | "a" | "A" | "*"),
         }
     }
 
     pub fn is_true(self) -> bool {
-        self == TruthTableEntry::True
+        self == Self::True
     }
 
     pub fn is_false(self) -> bool {
-        self == TruthTableEntry::False
+        self == Self::False
     }
 
     pub fn is_any(self) -> bool {
-        self == TruthTableEntry::Any
+        self == Self::Any
     }
 }
 
 impl Display for TruthTableEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.pad(match self {
-            TruthTableEntry::True => "True",
-            TruthTableEntry::False => "False",
-            TruthTableEntry::Any => "Any",
+            Self::True => "True",
+            Self::False => "False",
+            Self::Any => "Any",
         })
     }
 }
@@ -67,7 +67,7 @@ impl FromStr for TruthTableEntry {
         Self::variants()
             .iter()
             .find(|variant| variant.matches(s))
-            .ok_or(anyhow::anyhow!("cannot parse {s} as truth-table entry"))
+            .ok_or_else(|| anyhow::anyhow!("cannot parse {s} as truth-table entry"))
             .copied()
     }
 }

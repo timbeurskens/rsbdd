@@ -1,11 +1,10 @@
-use clap::Parser;
-
 use std::fs::File;
 use std::io;
 use std::io::Write;
 use std::io::*;
-
 use std::path::PathBuf;
+
+use clap::Parser;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]

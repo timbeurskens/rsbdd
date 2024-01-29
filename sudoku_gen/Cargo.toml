@@ -5,5 +5,8 @@ description = "Generates a random edge list formatted graph"
 edition.workspace = true
 authors.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 clap.workspace = true

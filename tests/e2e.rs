@@ -1,11 +1,13 @@
-use pretty_assertions::assert_eq;
-use rsbdd::bdd::*;
-use rsbdd::parser::*;
-use rsbdd::NamedSymbol;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use std::rc::Rc;
+
+use pretty_assertions::assert_eq;
+
+use rsbdd::bdd::*;
+use rsbdd::parser::*;
+use rsbdd::NamedSymbol;
 
 fn file_assert_eq<P: AsRef<Path>>(file1: P, file2: P, ordering: &[&str]) {
     let ord: Vec<NamedSymbol> = ordering

@@ -1,8 +1,3 @@
-use crate::bdd::{BDDEnv, BDD};
-use crate::NamedSymbol;
-use itertools::Itertools;
-use lazy_static::lazy_static;
-use regex::Regex;
 use std::cell::RefCell;
 use std::io;
 use std::io::BufRead;
@@ -12,10 +7,16 @@ use std::slice::Iter;
 use std::string::String;
 use std::vec::Vec;
 
+use itertools::Itertools;
+use lazy_static::lazy_static;
+use regex::Regex;
 use rustc_hash::FxHashMap;
 
+use crate::bdd::{BDDEnv, BDD};
+use crate::NamedSymbol;
+
 lazy_static! {
-    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+|>=|=|>|<|\[|\]|,|\(|\))|(?P<countable>\d+)|\{(?P<reference>[\w']+)\}|(?P<identifier>[\w']+)|(?P<eof>$)|(?P<comment>"[^"]*")"#).unwrap();
+    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+|>=|=|>|<|\[|\]|,|\(|\))|(?P<countable>\d+)|\{(?P<reference>[\w']+)\}|(?P<identifier>[\w']+)|(?P<eof>$)|(?P<comment>"[^"]*")"#).expect("Error setting-up tokenizer regex");
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -195,20 +196,17 @@ impl ParsedFormula {
                     .map(|v| self.replace_var(v, var, replacement))
                     .collect(),
             ),
-            SymbolicBDD::Reference(name) => {
-                if let Some(t) = self.get_definition(name) {
-                    match t {
-                        ReferenceContents::Syntax(syntax) => {
-                            self.replace_var(&syntax, var, replacement)
-                        }
-                        ReferenceContents::BDD(_) => unimplemented!(
-                            "variable replacement in referenced BDDs is not supported (yet)"
-                        ),
+            SymbolicBDD::Reference(name) => self.get_definition(name).map_or_else(
+                || formula.clone(),
+                |t| match t {
+                    ReferenceContents::Syntax(syntax) => {
+                        self.replace_var(&syntax, var, replacement)
                     }
-                } else {
-                    formula.clone()
-                }
-            }
+                    ReferenceContents::BDD(_) => unimplemented!(
+                        "variable replacement in referenced BDDs is not supported (yet)"
+                    ),
+                },
+            ),
             SymbolicBDD::True
             | SymbolicBDD::False
             | SymbolicBDD::Subtree(_)
@@ -246,12 +244,12 @@ impl ParsedFormula {
         let tokens = SymbolicBDD::tokenize(contents, variable_ordering)?;
 
         let mut vars: Vec<NamedSymbol> = Self::extract_vars(&tokens);
-        vars.sort_by(|a, b| a.id.partial_cmp(&b.id).unwrap());
+        vars.sort_by(|a, b| a.id.cmp(&b.id));
 
         let formula = SymbolicBDD::parse_formula(&mut tokens.iter().peekable())?;
 
         let n = vars.len();
-        let mut result = ParsedFormula {
+        let mut result = Self {
             vars,
             free_vars: Vec::new(),
             raw2free: Vec::with_capacity(n),
@@ -305,15 +303,14 @@ impl ParsedFormula {
             SymbolicBDD::Subtree(_t) => unimplemented!(),
             SymbolicBDD::True | SymbolicBDD::False => false,
             SymbolicBDD::Reference(name) => {
-                if let Some(f) = self.get_definition(name) {
-                    match f {
+                self.get_definition(name).map_or_else(
+                    || true,
+                    |f| match f {
                         ReferenceContents::Syntax(syntax) => self.var_is_free(&syntax, var),
                         // a bdd is quantifier free by definition
                         ReferenceContents::BDD(_) => true,
-                    }
-                } else {
-                    true
-                }
+                    },
+                )
             }
         }
     }
@@ -388,16 +385,13 @@ impl ParsedFormula {
                 })
             }
             SymbolicBDD::Subtree(t) => Rc::clone(t),
-            SymbolicBDD::Reference(name) => {
-                if let Some(t) = self.get_definition(name) {
-                    match t {
-                        ReferenceContents::Syntax(syntax) => self.eval_recursive(&syntax),
-                        ReferenceContents::BDD(bdd) => bdd,
-                    }
-                } else {
-                    self.env.mk_const(false)
-                }
-            }
+            SymbolicBDD::Reference(name) => self.get_definition(name).map_or_else(
+                || self.env.mk_const(false),
+                |t| match t {
+                    ReferenceContents::Syntax(syntax) => self.eval_recursive(&syntax),
+                    ReferenceContents::BDD(bdd) => bdd,
+                },
+            ),
         }
     }
 
@@ -416,38 +410,36 @@ impl ParsedFormula {
 }
 
 impl SymbolicBDD {
-    fn parse_formula(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
-        let result = SymbolicBDD::parse_sub_formula(tokens)?;
+    fn parse_formula(tokens: &mut TokenReader) -> io::Result<Self> {
+        let result = Self::parse_sub_formula(tokens)?;
 
         expect(SymbolicBDDToken::Eof, tokens)?;
 
         Ok(result)
     }
 
-    fn parse_simple_sub_formula(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
+    fn parse_simple_sub_formula(tokens: &mut TokenReader) -> io::Result<Self> {
         match tokens.peek() {
-            Some(SymbolicBDDToken::OpenParen) => SymbolicBDD::parse_parentized_formula(tokens),
-            Some(SymbolicBDDToken::OpenSquare) => SymbolicBDD::parse_countable_formula(tokens),
+            Some(SymbolicBDDToken::OpenParen) => Self::parse_parentized_formula(tokens),
+            Some(SymbolicBDDToken::OpenSquare) => Self::parse_countable_formula(tokens),
             Some(SymbolicBDDToken::False) => {
                 expect(SymbolicBDDToken::False, tokens)?;
-                Ok(SymbolicBDD::False)
+                Ok(Self::False)
             }
             Some(SymbolicBDDToken::True) => {
                 expect(SymbolicBDDToken::True, tokens)?;
-                Ok(SymbolicBDD::True)
+                Ok(Self::True)
             }
-            Some(SymbolicBDDToken::Reference(_)) => Ok(SymbolicBDD::Reference(
-                SymbolicBDD::parse_reference_name(tokens)?,
-            )),
-            Some(SymbolicBDDToken::Var(_)) => {
-                Ok(SymbolicBDD::Var(SymbolicBDD::parse_variable_name(tokens)?))
+            Some(SymbolicBDDToken::Reference(_)) => {
+                Ok(Self::Reference(Self::parse_reference_name(tokens)?))
             }
-            Some(SymbolicBDDToken::Not) => SymbolicBDD::parse_negation(tokens),
-            Some(SymbolicBDDToken::Exists) => SymbolicBDD::parse_existence_quantifier(tokens),
-            Some(SymbolicBDDToken::Forall) => SymbolicBDD::parse_universal_quantifier(tokens),
-            Some(SymbolicBDDToken::GFP) => SymbolicBDD::parse_fixed_point(tokens, true),
-            Some(SymbolicBDDToken::LFP) => SymbolicBDD::parse_fixed_point(tokens, false),
-            Some(SymbolicBDDToken::If) => SymbolicBDD::parse_ite(tokens),
+            Some(SymbolicBDDToken::Var(_)) => Ok(Self::Var(Self::parse_variable_name(tokens)?)),
+            Some(SymbolicBDDToken::Not) => Self::parse_negation(tokens),
+            Some(SymbolicBDDToken::Exists) => Self::parse_existence_quantifier(tokens),
+            Some(SymbolicBDDToken::Forall) => Self::parse_universal_quantifier(tokens),
+            Some(SymbolicBDDToken::GFP) => Self::parse_fixed_point(tokens, true),
+            Some(SymbolicBDDToken::LFP) => Self::parse_fixed_point(tokens, false),
+            Some(SymbolicBDDToken::If) => Self::parse_ite(tokens),
             None | Some(SymbolicBDDToken::Eof) => {
                 Err(io::Error::new(io::ErrorKind::InvalidData, "Unexpected EOF"))
             }
@@ -458,8 +450,8 @@ impl SymbolicBDD {
         }
     }
 
-    fn parse_sub_formula(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
-        let left = SymbolicBDD::parse_simple_sub_formula(tokens)?;
+    fn parse_sub_formula(tokens: &mut TokenReader) -> io::Result<Self> {
+        let left = Self::parse_simple_sub_formula(tokens)?;
 
         // either a binary operator or end of sub-formula
         match tokens.peek() {
@@ -471,36 +463,32 @@ impl SymbolicBDD {
             | Some(SymbolicBDDToken::Implies)
             | Some(SymbolicBDDToken::ImpliesInv)
             | Some(SymbolicBDDToken::Iff) => {
-                let op = SymbolicBDD::parse_binary_operator(tokens)?;
-                let right = SymbolicBDD::parse_sub_formula(tokens)?;
-                Ok(SymbolicBDD::BinaryOp(op, Box::new(left), Box::new(right)))
+                let op = Self::parse_binary_operator(tokens)?;
+                let right = Self::parse_sub_formula(tokens)?;
+                Ok(Self::BinaryOp(op, Box::new(left), Box::new(right)))
             }
             _ => Ok(left),
         }
     }
 
-    fn parse_ite(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
+    fn parse_ite(tokens: &mut TokenReader) -> io::Result<Self> {
         expect(SymbolicBDDToken::If, tokens)?;
-        let cond = SymbolicBDD::parse_sub_formula(tokens)?;
+        let cond = Self::parse_sub_formula(tokens)?;
         expect(SymbolicBDDToken::Then, tokens)?;
-        let then = SymbolicBDD::parse_sub_formula(tokens)?;
+        let then = Self::parse_sub_formula(tokens)?;
         expect(SymbolicBDDToken::Else, tokens)?;
-        let else_ = SymbolicBDD::parse_sub_formula(tokens)?;
+        let else_ = Self::parse_sub_formula(tokens)?;
 
-        Ok(SymbolicBDD::Ite(
-            Box::new(cond),
-            Box::new(then),
-            Box::new(else_),
-        ))
+        Ok(Self::Ite(Box::new(cond), Box::new(then), Box::new(else_)))
     }
 
-    fn parse_formula_list(tokens: &mut TokenReader) -> io::Result<Vec<SymbolicBDD>> {
+    fn parse_formula_list(tokens: &mut TokenReader) -> io::Result<Vec<Self>> {
         expect(SymbolicBDDToken::OpenSquare, tokens)?;
         let mut subforms = Vec::new();
 
         loop {
             if check(SymbolicBDDToken::CloseSquare, tokens).is_err() {
-                subforms.push(SymbolicBDD::parse_sub_formula(tokens)?);
+                subforms.push(Self::parse_sub_formula(tokens)?);
 
                 // if no comma is found after the sub-formula, the formula should end with a closing square bracket
                 if check(SymbolicBDDToken::Comma, tokens).is_err() {
@@ -529,8 +517,8 @@ impl SymbolicBDD {
         }
     }
 
-    fn parse_countable_formula(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
-        let leftlist = SymbolicBDD::parse_formula_list(tokens)?;
+    fn parse_countable_formula(tokens: &mut TokenReader) -> io::Result<Self> {
+        let leftlist = Self::parse_formula_list(tokens)?;
 
         let operator = match tokens.next() {
             Some(SymbolicBDDToken::Eq) => CountableOperator::Exactly,
@@ -542,20 +530,18 @@ impl SymbolicBDD {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     format!("Expected countable operator, got {:?}", other),
-                ))
+                ));
             }
         };
 
         if check(SymbolicBDDToken::OpenSquare, tokens).is_ok() {
-            let rightlist = SymbolicBDD::parse_formula_list(tokens)?;
+            let rightlist = Self::parse_formula_list(tokens)?;
 
-            Ok(SymbolicBDD::CountableVariable(
-                operator, leftlist, rightlist,
-            ))
+            Ok(Self::CountableVariable(operator, leftlist, rightlist))
         } else {
-            let count = SymbolicBDD::parse_countable(tokens)?;
+            let count = Self::parse_countable(tokens)?;
 
-            Ok(SymbolicBDD::CountableConst(operator, leftlist, count))
+            Ok(Self::CountableConst(operator, leftlist, count))
         }
     }
 
@@ -584,7 +570,7 @@ impl SymbolicBDD {
 
         loop {
             if check(SymbolicBDDToken::Hash, tokens).is_err() {
-                vars.push(SymbolicBDD::parse_variable_name(tokens)?);
+                vars.push(Self::parse_variable_name(tokens)?);
 
                 // if no comma is found after the variable, the list should end with a closing hash
                 if check(SymbolicBDDToken::Comma, tokens).is_err() {
@@ -601,7 +587,7 @@ impl SymbolicBDD {
         Ok(vars)
     }
 
-    fn parse_fixed_point(tokens: &mut TokenReader, initial: bool) -> io::Result<SymbolicBDD> {
+    fn parse_fixed_point(tokens: &mut TokenReader, initial: bool) -> io::Result<Self> {
         expect(
             if initial {
                 SymbolicBDDToken::GFP
@@ -611,41 +597,41 @@ impl SymbolicBDD {
             tokens,
         )?;
 
-        let transformer_var = SymbolicBDD::parse_variable_name(tokens)?;
+        let transformer_var = Self::parse_variable_name(tokens)?;
 
         expect(SymbolicBDDToken::Hash, tokens)?;
 
-        let formula = SymbolicBDD::parse_sub_formula(tokens)?;
+        let formula = Self::parse_sub_formula(tokens)?;
 
-        Ok(SymbolicBDD::FixedPoint(
+        Ok(Self::FixedPoint(
             transformer_var,
             initial,
             Box::new(formula),
         ))
     }
 
-    fn parse_existence_quantifier(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
+    fn parse_existence_quantifier(tokens: &mut TokenReader) -> io::Result<Self> {
         expect(SymbolicBDDToken::Exists, tokens)?;
-        let vars = SymbolicBDD::parse_variable_list(tokens)?;
+        let vars = Self::parse_variable_list(tokens)?;
 
         expect(SymbolicBDDToken::Hash, tokens)?;
-        let formula = SymbolicBDD::parse_sub_formula(tokens)?;
+        let formula = Self::parse_sub_formula(tokens)?;
 
-        Ok(SymbolicBDD::Quantifier(
+        Ok(Self::Quantifier(
             QuantifierType::Exists,
             vars,
             Box::new(formula),
         ))
     }
 
-    fn parse_universal_quantifier(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
+    fn parse_universal_quantifier(tokens: &mut TokenReader) -> io::Result<Self> {
         expect(SymbolicBDDToken::Forall, tokens)?;
-        let vars = SymbolicBDD::parse_variable_list(tokens)?;
+        let vars = Self::parse_variable_list(tokens)?;
 
         expect(SymbolicBDDToken::Hash, tokens)?;
-        let formula = SymbolicBDD::parse_sub_formula(tokens)?;
+        let formula = Self::parse_sub_formula(tokens)?;
 
-        Ok(SymbolicBDD::Quantifier(
+        Ok(Self::Quantifier(
             QuantifierType::Forall,
             vars,
             Box::new(formula),
@@ -693,24 +679,22 @@ impl SymbolicBDD {
         }
     }
 
-    fn parse_negation(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
+    fn parse_negation(tokens: &mut TokenReader) -> io::Result<Self> {
         expect(SymbolicBDDToken::Not, tokens)?;
 
-        let sf = SymbolicBDD::parse_simple_sub_formula(tokens);
+        let sf = Self::parse_simple_sub_formula(tokens);
 
         if let Ok(sf_ok) = sf {
-            Ok(SymbolicBDD::Not(Box::new(sf_ok)))
+            Ok(Self::Not(Box::new(sf_ok)))
         } else {
             // failover if the next part is not a simple formula
-            Ok(SymbolicBDD::Not(Box::new(SymbolicBDD::parse_sub_formula(
-                tokens,
-            )?)))
+            Ok(Self::Not(Box::new(Self::parse_sub_formula(tokens)?)))
         }
     }
 
-    fn parse_parentized_formula(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
+    fn parse_parentized_formula(tokens: &mut TokenReader) -> io::Result<Self> {
         expect(SymbolicBDDToken::OpenParen, tokens)?;
-        let subform = SymbolicBDD::parse_sub_formula(tokens)?;
+        let subform = Self::parse_sub_formula(tokens)?;
         expect(SymbolicBDDToken::CloseParen, tokens)?;
 
         Ok(subform)
@@ -761,7 +745,7 @@ impl SymbolicBDD {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidData,
                             format!("Unknown symbol: {}", symbol.as_str()),
-                        ))
+                        ));
                     }
                 }
             } else if let Some(reference) = c.name("reference") {

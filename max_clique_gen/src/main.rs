@@ -1,11 +1,12 @@
-use clap::Parser;
-
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::io::Write;
 use std::io::*;
 use std::path::PathBuf;
+
+use clap::Parser;
+use rustc_hash::FxHashSet;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -26,8 +27,6 @@ struct Args {
     /// Construct a satisfiable formula for all cliques
     all: bool,
 }
-
-use rustc_hash::FxHashSet;
 
 fn main() -> Result<()> {
     let version = env!("CARGO_PKG_VERSION");

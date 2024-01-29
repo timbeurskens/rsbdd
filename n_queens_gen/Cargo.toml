@@ -5,5 +5,8 @@ description = "Generates n-queen formulae for the SAT solver"
 edition.workspace = true
 authors.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 clap.workspace = true

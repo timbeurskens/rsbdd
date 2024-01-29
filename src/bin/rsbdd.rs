@@ -1,12 +1,3 @@
-use clap::Parser;
-use rsbdd::bdd::*;
-use rsbdd::bdd_io::*;
-use rsbdd::parser::*;
-use rsbdd::parser_io::*;
-use rsbdd::plot::*;
-use rsbdd::BDDSymbol;
-use rsbdd::NamedSymbol;
-use rsbdd::TruthTableEntry;
 use std::cmp::max;
 use std::fmt::Display;
 use std::fs::File;
@@ -17,6 +8,17 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
+
+use clap::Parser;
+
+use rsbdd::bdd::*;
+use rsbdd::bdd_io::*;
+use rsbdd::parser::*;
+use rsbdd::parser_io::*;
+use rsbdd::plot::*;
+use rsbdd::BDDSymbol;
+use rsbdd::NamedSymbol;
+use rsbdd::TruthTableEntry;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -76,8 +78,7 @@ struct Args {
 
 fn main() -> anyhow::Result<()> {
     let wild_args = wild::args_os();
-    let args_in =
-        argfile::expand_args_from(wild_args, argfile::parse_fromfile, argfile::PREFIX).unwrap();
+    let args_in = argfile::expand_args_from(wild_args, argfile::parse_fromfile, argfile::PREFIX)?;
     let args = Args::parse_from(args_in);
 
     let repeat = args.benchmark.unwrap_or(1);
@@ -151,7 +152,7 @@ fn main() -> anyhow::Result<()> {
 
     if args.export_ordering {
         let mut ordered_variables = input_parsed.vars.clone();
-        ordered_variables.sort_by(|a, b| a.id.partial_cmp(&b.id).unwrap());
+        ordered_variables.sort_by(|a, b| a.id.cmp(&b.id));
         let ordered_variable_names = ordered_variables
             .iter()
             .map(|v| v.name.as_ref())
@@ -270,8 +271,16 @@ fn stats(results: &[Duration]) -> (f64, f64, f64, f64, f64) {
     let variance = sum_variance / (sresults.len() as f64);
     let stddev = variance.sqrt();
 
-    let min = sresults.iter().min().unwrap().as_secs_f64();
-    let max = sresults.iter().max().unwrap().as_secs_f64();
+    let min = sresults
+        .iter()
+        .min()
+        .expect("sresults.min() is None")
+        .as_secs_f64();
+    let max = sresults
+        .iter()
+        .max()
+        .expect("sresults.min() is None")
+        .as_secs_f64();
 
     (min, max, median, mean, stddev)
 }
@@ -298,11 +307,11 @@ fn plot_performance_results(results: &[Duration]) -> anyhow::Result<()> {
         .stdin(Stdio::piped())
         .spawn()?;
 
-    let stdin = gnuplot_cmd.stdin.as_mut().unwrap();
+    let stdin = gnuplot_cmd.stdin.as_mut().expect("cannot take stdin");
     write_gnuplot_normal_distribution(
         stdin,
-        mean - (stddev * 2.0),
-        mean + (stddev * 2.0),
+        stddev.mul_add(-2.0, mean),
+        stddev.mul_add(2.0, mean),
         mean,
         stddev,
     )?;

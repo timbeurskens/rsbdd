@@ -1,11 +1,13 @@
 extern crate dot;
 
-use crate::{bdd::*, BDDSymbol, TruthTableEntry};
-use itertools::Itertools;
 use std::borrow::Cow;
 use std::io;
 use std::io::Write;
 use std::rc::Rc;
+
+use itertools::Itertools;
+
+use crate::{bdd::*, BDDSymbol, TruthTableEntry};
 
 type GraphEdge<S> = (Rc<BDD<S>>, bool, Rc<BDD<S>>);
 type GraphNode<S> = Rc<BDD<S>>;
@@ -21,7 +23,7 @@ impl<S: BDDSymbol> BDDGraph<S> {
     }
 
     pub fn new(root: &Rc<BDD<S>>, filter: TruthTableEntry) -> Self {
-        BDDGraph {
+        Self {
             root: root.clone(),
             filter,
         }
@@ -30,15 +32,20 @@ impl<S: BDDSymbol> BDDGraph<S> {
 
 impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<S>, GraphEdge<S>> for BDDGraph<S> {
     fn graph_id(&self) -> dot::Id<'a> {
-        dot::Id::new("bdd_graph").unwrap()
+        dot::Id::new("bdd_graph").expect("cannot create Id named 'bdd_graph'")
     }
 
     fn node_id(&self, n: &GraphNode<S>) -> dot::Id<'a> {
         match n.as_ref() {
             // use grep -v n_true or grep -v n_false to filter nodes adjacent to true or false
-            BDD::True => dot::Id::new("n_true".to_string()).unwrap(),
-            BDD::False => dot::Id::new("n_false".to_string()).unwrap(),
-            _ => dot::Id::new(format!("n_{:p}", Rc::into_raw(n.clone()))).unwrap(),
+            BDD::True => {
+                dot::Id::new("n_true".to_string()).expect("cannot create Id named 'n_true'")
+            }
+            BDD::False => {
+                dot::Id::new("n_false".to_string()).expect("cannot create Id named 'n_false'")
+            }
+            _ => dot::Id::new(format!("n_{:p}", Rc::into_raw(n.clone())))
+                .unwrap_or_else(|_| panic!("cannot create Id named 'n_{n:p}'")),
             // _ => dot::Id::new(format!("n_{}", n.get_hash())).unwrap(), // use the hash for optimal sharing, use (above) pointers to test issue with duplicates
         }
     }

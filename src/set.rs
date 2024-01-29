@@ -1,6 +1,7 @@
-use crate::bdd::*;
 use std::cell::RefCell;
 use std::rc::Rc;
+
+use crate::bdd::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BDDSet {
@@ -20,21 +21,21 @@ impl BDDCategorizable for usize {
 }
 
 impl BDDSet {
-    pub fn new(bits: usize) -> BDDSet {
+    pub fn new(bits: usize) -> Self {
         let env = BDDEnv::new();
         Self::with_env(bits, &Rc::new(env))
     }
 
-    pub fn with_env(bits: usize, env: &Rc<BDDEnv<usize>>) -> BDDSet {
-        BDDSet {
+    pub fn with_env(bits: usize, env: &Rc<BDDEnv<usize>>) -> Self {
+        Self {
             env: env.clone(),
             bdd: RefCell::new(env.mk_const(false)),
             bits,
         }
     }
 
-    pub fn from_bdd(bdd: &Rc<BDD<usize>>, bits: usize, env: &Rc<BDDEnv<usize>>) -> BDDSet {
-        BDDSet {
+    pub fn from_bdd(bdd: &Rc<BDD<usize>>, bits: usize, env: &Rc<BDDEnv<usize>>) -> Self {
+        Self {
             env: env.clone(),
             bdd: RefCell::new(bdd.clone()),
             bits,
@@ -75,14 +76,14 @@ impl BDDSet {
         self
     }
 
-    pub fn union(&self, other: &BDDSet) -> &Self {
+    pub fn union(&self, other: &Self) -> &Self {
         let _self = self.bdd.borrow().clone();
         self.bdd
             .replace(self.env.or(_self, other.bdd.borrow().clone()));
         self
     }
 
-    pub fn intersect(&self, other: &BDDSet) -> &Self {
+    pub fn intersect(&self, other: &Self) -> &Self {
         let _self = self.bdd.borrow().clone();
 
         self.bdd
@@ -90,7 +91,7 @@ impl BDDSet {
         self
     }
 
-    pub fn complement(&self, other: &BDDSet) -> &Self {
+    pub fn complement(&self, other: &Self) -> &Self {
         let new: Rc<BDD<usize>> = self.bdd.borrow().clone();
 
         self.bdd
@@ -100,7 +101,7 @@ impl BDDSet {
     }
 
     pub fn contains<T: BDDCategorizable>(&self, e: T) -> bool {
-        let singleton = BDDSet::from_element(e, self.bits, &self.env);
+        let singleton = Self::from_element(e, self.bits, &self.env);
         self.intersect(&singleton) == &singleton
     }
 }

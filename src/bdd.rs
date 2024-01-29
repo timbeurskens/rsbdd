@@ -1,10 +1,10 @@
-use itertools::Itertools;
-use rustc_hash::{FxHashMap, FxHasher};
 use std::cell::RefCell;
-
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
+
+use itertools::Itertools;
+use rustc_hash::{FxHashMap, FxHasher};
 
 use crate::{BDDSymbol, NamedSymbol, TruthTableEntry};
 
@@ -34,25 +34,25 @@ impl<Symbol> BDD<Symbol>
 where
     Symbol: BDDSymbol,
 {
-    pub fn is_choice(&self) -> bool {
-        matches!(self, BDD::Choice(_, _, _))
+    pub const fn is_choice(&self) -> bool {
+        matches!(self, Self::Choice(_, _, _))
     }
 
-    pub fn is_const(&self) -> bool {
+    pub const fn is_const(&self) -> bool {
         !self.is_choice()
     }
 
     pub fn is_true(&self) -> bool {
-        self == &BDD::True
+        self == &Self::True
     }
 
     pub fn is_false(&self) -> bool {
-        self == &BDD::False
+        self == &Self::False
     }
 
     pub fn node_list(self: &Rc<Self>) -> Vec<Rc<Self>> {
         match self.as_ref() {
-            BDD::Choice(l, _, r) => {
+            Self::Choice(l, _, r) => {
                 let l_nodes = l.node_list();
                 let r_nodes = r.node_list();
 
@@ -63,20 +63,20 @@ where
                     .cloned()
                     .collect()
             }
-            BDD::True | BDD::False => vec![Rc::clone(self)],
+            Self::True | Self::False => vec![Rc::clone(self)],
         }
     }
 }
 
 impl From<BDD<NamedSymbol>> for BDD<usize> {
-    fn from(bdd: BDD<NamedSymbol>) -> BDD<usize> {
+    fn from(bdd: BDD<NamedSymbol>) -> Self {
         match bdd {
-            BDD::False => BDD::False,
-            BDD::True => BDD::True,
-            BDD::Choice(true_subtree, symbol, false_subtree) => BDD::Choice(
-                Rc::new(BDD::from(true_subtree.as_ref().clone())),
+            BDD::False => Self::False,
+            BDD::True => Self::True,
+            BDD::Choice(true_subtree, symbol, false_subtree) => Self::Choice(
+                Rc::new(Self::from(true_subtree.as_ref().clone())),
                 symbol.into(),
-                Rc::new(BDD::from(false_subtree.as_ref().clone())),
+                Rc::new(Self::from(false_subtree.as_ref().clone())),
             ),
         }
     }
@@ -157,6 +157,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         // pre-borrow the nodes as mutable
         let mut nodes_borrow = self.nodes.borrow_mut();
 
+        #[allow(clippy::option_if_let_else)]
         // if the node already exists, return a reference to it
         if let Some(subtree) = nodes_borrow.get(&ins) {
             Rc::clone(subtree)
@@ -170,15 +171,17 @@ impl<S: BDDSymbol> BDDEnv<S> {
     /// Find the true or false node in the lookup table and return a reference to it.
     pub fn mk_const(&self, v: bool) -> Rc<BDD<S>> {
         if v {
-            Rc::clone(self.nodes.borrow().get(&BDD::True).unwrap())
+            Rc::clone(self.nodes.borrow().get(&BDD::True).expect("'True' is not a const in this BDD, make sure to initialize the data structure correctly"))
         } else {
-            Rc::clone(self.nodes.borrow().get(&BDD::False).unwrap())
+            Rc::clone(self.nodes.borrow().get(&BDD::False).expect("'False' is not a const in this BDD, make sure to initialize the data structure correctly"))
         }
     }
 
     /// Find an equivalent subtree in the lookup table and return a reference to it
     pub fn find(&self, r: &Rc<BDD<S>>) -> Rc<BDD<S>> {
-        Rc::clone(self.nodes.borrow().get(r.as_ref()).unwrap())
+        Rc::clone(self.nodes.borrow().get(r.as_ref()).expect(
+            "Subtree not found in this BDD, make sure to initialize the data structure correctly",
+        ))
     }
 
     /// Create a new BDD graph
@@ -188,7 +191,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         nodes.insert(BDD::True, Rc::new(BDD::True));
         nodes.insert(BDD::False, Rc::new(BDD::False));
 
-        BDDEnv {
+        Self {
             nodes: RefCell::new(nodes),
         }
     }

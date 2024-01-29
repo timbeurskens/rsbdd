@@ -1,11 +1,13 @@
+use std::rc::Rc;
+use std::vec::Vec;
+
 // use rsbdd::bdd::*;
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
+use rustc_hash::FxHashMap;
+
 use rsbdd::bdd;
 use rsbdd::bdd::BDDEnv;
-use rustc_hash::FxHashMap;
-use std::rc::Rc;
-use std::vec::Vec;
 
 type BDD = bdd::BDD<usize>;
 

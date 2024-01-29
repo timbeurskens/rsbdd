@@ -1,7 +1,9 @@
+use std::rc::Rc;
+
 use pretty_assertions::assert_eq;
+
 use rsbdd::bdd::BDDEnv;
 use rsbdd::set::BDDSet;
-use std::rc::Rc;
 
 #[ignore]
 #[test]

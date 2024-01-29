@@ -1,11 +1,13 @@
-use pretty_assertions::assert_eq;
-use rsbdd::bdd::*;
-use rsbdd::parser::*;
-use rsbdd::NamedSymbol;
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
 use std::rc::Rc;
+
+use pretty_assertions::assert_eq;
+
+use rsbdd::bdd::*;
+use rsbdd::parser::*;
+use rsbdd::NamedSymbol;
 
 #[test]
 fn test_basic_tokens() -> io::Result<()> {
@@ -32,7 +34,7 @@ fn test_basic_tokens() -> io::Result<()> {
         dbg!(test_str);
         dbg!(SymbolicBDD::tokenize(
             &mut BufReader::new(test_str.as_bytes()),
-            None
+            None,
         )?);
     }
 

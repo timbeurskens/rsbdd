@@ -1,9 +1,11 @@
 extern crate dot;
 
-use crate::parser::*;
-use itertools::Itertools;
 use std::io;
 use std::io::Write;
+
+use itertools::Itertools;
+
+use crate::parser::*;
 
 pub struct SymbolicParseTree {
     pub internal_tree: SymbolicBDD,
@@ -23,8 +25,8 @@ impl SymbolicParseTree {
 
         match root {
             SymbolicBDD::BinaryOp(_, l, r) => {
-                let left_nodes = SymbolicParseTree::nodes_recursive(l);
-                let right_nodes = SymbolicParseTree::nodes_recursive(r);
+                let left_nodes = Self::nodes_recursive(l);
+                let right_nodes = Self::nodes_recursive(r);
 
                 left_nodes
                     .into_iter()
@@ -35,7 +37,7 @@ impl SymbolicParseTree {
             SymbolicBDD::Quantifier(_, _, f)
             | SymbolicBDD::Not(f)
             | SymbolicBDD::FixedPoint(_, _, f) => {
-                let new_nodes = SymbolicParseTree::nodes_recursive(f);
+                let new_nodes = Self::nodes_recursive(f);
 
                 new_nodes.into_iter().chain(this_node).collect()
             }
@@ -43,7 +45,7 @@ impl SymbolicParseTree {
                 let mut new_nodes: Vec<SymbolicBDD> = this_node;
 
                 for subtree in f {
-                    new_nodes.extend(SymbolicParseTree::nodes_recursive(subtree));
+                    new_nodes.extend(Self::nodes_recursive(subtree));
                 }
 
                 new_nodes
@@ -52,11 +54,11 @@ impl SymbolicParseTree {
                 let mut new_nodes: Vec<SymbolicBDD> = this_node;
 
                 for subtree in a {
-                    new_nodes.extend(SymbolicParseTree::nodes_recursive(subtree));
+                    new_nodes.extend(Self::nodes_recursive(subtree));
                 }
 
                 for subtree in b {
-                    new_nodes.extend(SymbolicParseTree::nodes_recursive(subtree));
+                    new_nodes.extend(Self::nodes_recursive(subtree));
                 }
 
                 new_nodes
@@ -64,9 +66,9 @@ impl SymbolicParseTree {
             SymbolicBDD::Ite(c, t, e) => {
                 let mut new_nodes: Vec<SymbolicBDD> = this_node;
 
-                new_nodes.extend(SymbolicParseTree::nodes_recursive(c));
-                new_nodes.extend(SymbolicParseTree::nodes_recursive(t));
-                new_nodes.extend(SymbolicParseTree::nodes_recursive(e));
+                new_nodes.extend(Self::nodes_recursive(c));
+                new_nodes.extend(Self::nodes_recursive(t));
+                new_nodes.extend(Self::nodes_recursive(e));
 
                 new_nodes
             }
@@ -79,23 +81,21 @@ impl SymbolicParseTree {
     }
 
     pub fn new(src: &SymbolicBDD) -> Self {
-        SymbolicParseTree {
+        Self {
             internal_tree: src.clone(),
-            nodes: SymbolicParseTree::nodes_recursive(src)
-                .into_iter()
-                .unique()
-                .collect(),
+            nodes: Self::nodes_recursive(src).into_iter().unique().collect(),
         }
     }
 }
 
 impl<'a> dot::Labeller<'a, GraphNode, GraphEdge> for SymbolicParseTree {
     fn graph_id(&self) -> dot::Id<'a> {
-        dot::Id::new("parse_tree").unwrap()
+        dot::Id::new("parse_tree").expect("cannot create Id named 'parse_tree'")
     }
 
     fn node_id(&self, n: &GraphNode) -> dot::Id<'a> {
-        dot::Id::new(format!("n_{}", n)).unwrap()
+        dot::Id::new(format!("n_{}", n))
+            .unwrap_or_else(|_| panic!("cannot create Id named 'n_{n}'"))
     }
 
     fn node_label(&self, n: &GraphNode) -> dot::LabelText<'a> {
@@ -148,12 +148,18 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                     edges.push((
                         i,
                         "L".to_string(),
-                        self.nodes.iter().position(|n| n == l.as_ref()).unwrap(),
+                        self.nodes
+                            .iter()
+                            .position(|n| n == l.as_ref())
+                            .expect("cannot find position"),
                     ));
                     edges.push((
                         i,
                         "R".to_string(),
-                        self.nodes.iter().position(|n| n == r.as_ref()).unwrap(),
+                        self.nodes
+                            .iter()
+                            .position(|n| n == r.as_ref())
+                            .expect("cannot find position"),
                     ));
                 }
                 SymbolicBDD::Quantifier(_, _, f)
@@ -162,7 +168,10 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                     edges.push((
                         i,
                         "".to_string(),
-                        self.nodes.iter().position(|n| n == f.as_ref()).unwrap(),
+                        self.nodes
+                            .iter()
+                            .position(|n| n == f.as_ref())
+                            .expect("cannot find position"),
                     ));
                 }
                 SymbolicBDD::CountableConst(_, f, _) => {
@@ -170,7 +179,10 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                         edges.push((
                             i,
                             format!("{{{}}}", j),
-                            self.nodes.iter().position(|n| n == subtree).unwrap(),
+                            self.nodes
+                                .iter()
+                                .position(|n| n == subtree)
+                                .expect("cannot find position"),
                         ));
                     }
                 }
@@ -179,14 +191,20 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                         edges.push((
                             i,
                             format!("L{{{}}}", j),
-                            self.nodes.iter().position(|n| n == subtree).unwrap(),
+                            self.nodes
+                                .iter()
+                                .position(|n| n == subtree)
+                                .expect("cannot find position"),
                         ));
                     }
                     for (j, subtree) in b.iter().enumerate() {
                         edges.push((
                             i,
                             format!("R{{{}}}", j),
-                            self.nodes.iter().position(|n| n == subtree).unwrap(),
+                            self.nodes
+                                .iter()
+                                .position(|n| n == subtree)
+                                .expect("cannot find position"),
                         ));
                     }
                 }
@@ -194,17 +212,26 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                     edges.push((
                         i,
                         "If".to_string(),
-                        self.nodes.iter().position(|n| n == c.as_ref()).unwrap(),
+                        self.nodes
+                            .iter()
+                            .position(|n| n == c.as_ref())
+                            .expect("cannot find position"),
                     ));
                     edges.push((
                         i,
                         "Then".to_string(),
-                        self.nodes.iter().position(|n| n == t.as_ref()).unwrap(),
+                        self.nodes
+                            .iter()
+                            .position(|n| n == t.as_ref())
+                            .expect("cannot find position"),
                     ));
                     edges.push((
                         i,
                         "Else".to_string(),
-                        self.nodes.iter().position(|n| n == e.as_ref()).unwrap(),
+                        self.nodes
+                            .iter()
+                            .position(|n| n == e.as_ref())
+                            .expect("cannot find position"),
                     ));
                 }
                 SymbolicBDD::False

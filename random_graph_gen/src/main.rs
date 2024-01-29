@@ -1,11 +1,12 @@
-use clap::Parser;
-use rand::seq::SliceRandom;
-use rustc_hash::FxHashMap;
 use std::fs::File;
 use std::io;
 use std::io::Write;
 use std::io::*;
 use std::path::PathBuf;
+
+use clap::Parser;
+use rand::seq::SliceRandom;
+use rustc_hash::FxHashMap;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
