@@ -9,7 +9,7 @@ authors = ["Tim Beurskens <timbeurskens.97@gmail.com>"]
 [package]
 name = "rsbdd"
 description = "A BDD-based SAT solver"
-version = "0.14.3"
+version = "0.14.5"
 edition.workspace = true
 authors.workspace = true
 
@@ -47,7 +47,7 @@ glob = "0.3"
 pretty_assertions = "1.4"
 anyhow = "1.0"
 rayon = "1.8"
-argfile = "0.1"
+argfile = "0.2"
 wild = "2.2"
 
 [workspace.lints.rust]
