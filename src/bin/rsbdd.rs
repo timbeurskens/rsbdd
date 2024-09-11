@@ -215,7 +215,7 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn print_sized_line<B, C, D>(labels: &Vec<D>, widths: &B, result: &BDD<C>)
+fn print_sized_line<B, C, D>(labels: &[D], widths: &B, result: &BDD<C>)
 where
     B: Index<usize, Output = usize>,
     C: BDDSymbol,

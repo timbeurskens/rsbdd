@@ -56,6 +56,6 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 enum_glob_use = "deny"
 #pedantic = "deny"
-nursery = "deny"
+nursery = { level = "deny", priority = -1 }
 unwrap_used = "deny"
 future_not_send = "allow"

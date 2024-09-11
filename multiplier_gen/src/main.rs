@@ -9,9 +9,15 @@ struct Args {
     /// the width of of the multiplier
     bits: NonZeroUsize,
 
-    value_a: Option<usize>,
-    value_b: Option<usize>,
-    value_out: Option<usize>,
+    #[clap(long)]
+    a: Option<usize>,
+    #[clap(long)]
+    b: Option<usize>,
+    #[clap(long)]
+    out: Option<usize>,
+
+    #[clap(long)]
+    hide_known: bool,
 }
 
 fn to_bits(value: usize, bits: usize) -> Vec<bool> {
@@ -80,24 +86,34 @@ fn produce_adder_array(
 fn main() {
     let args = Args::parse();
 
-    let output_width = args.bits.get() * 2 - 1;
+    // increase the bit-width of the adders by one, to accomodate for carry-out in the next addition.
+
+    let output_width = args.bits.get() * 2;
     let input_width = args.bits.get();
 
-    let mut outputs:  Vec<AdderOutput> = Vec::new();
+    let mut outputs: Vec<AdderOutput> = Vec::new();
     let mut last_adder: Vec<AdderOutput> = Vec::new();
 
     for (i, j) in (0..input_width).tuple_windows() {
         let port_a: Vec<String> = if i == 0 {
-            (0..input_width).map(|bit| format!("(port_a_{bit} & port_b_{i})")).collect()
+            (0..input_width)
+                .map(|bit| format!("(port_a_{bit} & port_b_{i})"))
+                .chain(["false".to_string()])
+                .collect()
         } else {
             let carry_out = last_adder.last().unwrap().carry_out.clone();
-            last_adder.into_iter().skip(1).map(|adder| {
-                adder.sum
-            }).chain([carry_out]).collect()
+            last_adder
+                .into_iter()
+                .skip(1)
+                .map(|adder| adder.sum)
+                .chain([carry_out])
+                .collect()
         };
-        
-        let port_b = (0..input_width).map(|bit| format!("(port_a_{bit} & port_b_{j})"));
-        
+
+        let port_b = ["false".to_string()]
+            .into_iter()
+            .chain((0..input_width).map(|bit| format!("(port_a_{bit} & port_b_{j})")));
+
         let adder = produce_adder_array(port_a, port_b);
         last_adder = adder.clone();
 
@@ -106,20 +122,40 @@ fn main() {
 
     outputs.extend(last_adder.into_iter().skip(1));
 
+    let mut known_ports = Vec::new();
+
+    if args.a.is_some() {
+        known_ports.extend((0..input_width).map(|bit| format!("port_a_{bit}")));
+    }
+
+    if args.b.is_some() {
+        known_ports.extend((0..input_width).map(|bit| format!("port_b_{bit}")));
+    }
+
+    if args.out.is_some() {
+        known_ports.extend((0..output_width).map(|bit| format!("port_out_{bit}")));
+    }
+
+    println!("any {} #", known_ports.join(","));
+
     for (i, adder) in outputs.iter().enumerate() {
         println!("(port_out_{i} <=> {}) &", adder.sum);
     }
 
     if let Some(last_output) = outputs.last() {
-        println!("(port_out_{} <=> {}) &", outputs.len(), last_output.carry_out);
+        println!(
+            "(port_out_{} <=> {}) &",
+            outputs.len(),
+            last_output.carry_out
+        );
     }
 
     // assign output values
-    args.value_a
+    args.a
         .inspect(|value| produce_port_value("port_a_", to_bits(*value, input_width)));
-    args.value_b
+    args.b
         .inspect(|value| produce_port_value("port_b_", to_bits(*value, input_width)));
-    args.value_out
+    args.out
         .inspect(|value| produce_port_value("port_out_", to_bits(*value, output_width)));
 
     println!("true");
