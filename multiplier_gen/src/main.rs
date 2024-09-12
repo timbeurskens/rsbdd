@@ -20,6 +20,19 @@ struct Args {
     hide_known: bool,
 }
 
+fn check_bits(value: usize, bits: usize) -> bool {
+    let bits_required = f64::log2(value as f64).floor() as usize + 1;
+
+    if bits_required > bits {
+        eprintln!(
+            "{bits} bits is not enough to represent {value}, needs at least {bits_required} bits"
+        );
+        false
+    } else {
+        true
+    }
+}
+
 fn to_bits(value: usize, bits: usize) -> Vec<bool> {
     (0..bits).map(|bit| (value & (1 << bit)) != 0).collect()
 }
@@ -124,15 +137,24 @@ fn main() {
 
     let mut known_ports = Vec::new();
 
-    if args.a.is_some() {
+    if let Some(a) = args.a {
+        if !check_bits(a, input_width) {
+            return;
+        }
         known_ports.extend((0..input_width).map(|bit| format!("port_a_{bit}")));
     }
 
-    if args.b.is_some() {
+    if let Some(b) = args.b {
+        if !check_bits(b, input_width) {
+            return;
+        }
         known_ports.extend((0..input_width).map(|bit| format!("port_b_{bit}")));
     }
 
-    if args.out.is_some() {
+    if let Some(out) = args.out {
+        if !check_bits(out, output_width) {
+            return;
+        }
         known_ports.extend((0..output_width).map(|bit| format!("port_out_{bit}")));
     }
 
