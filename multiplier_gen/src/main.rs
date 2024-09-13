@@ -106,6 +106,7 @@ fn main() {
 
     let mut outputs: Vec<AdderOutput> = Vec::new();
     let mut last_adder: Vec<AdderOutput> = Vec::new();
+    let mut assignments: Vec<String> = Vec::new();
 
     for (i, j) in (0..input_width).tuple_windows() {
         let port_a: Vec<String> = if i == 0 {
@@ -115,11 +116,18 @@ fn main() {
                 .collect()
         } else {
             let carry_out = last_adder.last().unwrap().carry_out.clone();
-            last_adder
-                .into_iter()
-                .skip(1)
-                .map(|adder| adder.sum)
-                .chain([carry_out])
+            assignments.extend(
+                last_adder
+                    .into_iter()
+                    .skip(1)
+                    .map(|adder| adder.sum)
+                    .chain([carry_out])
+                    .enumerate()
+                    .map(|(bit, value)| format!("(stage_{i}_{bit} <=> {value})")),
+            );
+
+            (0..input_width)
+                .map(|bit| format!("stage_{i}_{bit}"))
                 .collect()
         };
 
@@ -158,7 +166,16 @@ fn main() {
         known_ports.extend((0..output_width).map(|bit| format!("port_out_{bit}")));
     }
 
+    known_ports.extend(
+        (0..input_width - 1)
+            .flat_map(|stage| (0..input_width + 1).map(move |bit| format!("stage_{stage}_{bit}"))),
+    );
+
     println!("any {} #", known_ports.join(","));
+
+    for assignment in assignments {
+        println!("{} &", assignment);
+    }
 
     for (i, adder) in outputs.iter().enumerate() {
         println!("(port_out_{i} <=> {}) &", adder.sum);
