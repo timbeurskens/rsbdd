@@ -26,7 +26,7 @@ pub enum BDD<Symbol: BDDSymbol> {
     #[default]
     False,
     True,
-    // Choice (true-subtree, symbol, false-subtree)
+    /// Choice (true-subtree, symbol, false-subtree)
     Choice(Rc<BDD<Symbol>>, Symbol, Rc<BDD<Symbol>>),
 }
 
@@ -107,8 +107,8 @@ impl<S: BDDSymbol> BDDEnv<S> {
         self.nodes.borrow().len()
     }
 
-    // clean tries to reduce all duplicate subtrees to single nodes in the lookup table
-    // this function currently has no effect, might be removed later
+    /// clean tries to reduce all duplicate subtrees to single nodes in the lookup table
+    /// this function currently has no effect, might be removed later
     pub fn clean(&self, root: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match root.as_ref() {
             BDD::Choice(l, s, r) => {
@@ -281,7 +281,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         )
     }
 
-    // exclusive disjunction
+    /// exclusive disjunction
     pub fn xor(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         self.or(
             self.and(self.not(Rc::clone(&a)), Rc::clone(&b)),
@@ -289,12 +289,12 @@ impl<S: BDDSymbol> BDDEnv<S> {
         )
     }
 
-    // joint denial (nor)
+    /// joint denial (nor)
     pub fn nor(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         self.and(self.not(a), self.not(b))
     }
 
-    // alternative denial (nand)
+    /// alternative denial (nand)
     pub fn nand(&self, a: Rc<BDD<S>>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         self.not(self.and(a, b))
     }
@@ -400,7 +400,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    // existential quantification
+    /// existential quantification
     pub fn exists_impl(&self, s: &S, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         match b.as_ref() {
             BDD::False | &BDD::True => b,
@@ -413,7 +413,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    // forall quantification
+    /// forall quantification
     pub fn all(&self, s: Vec<S>, b: Rc<BDD<S>>) -> Rc<BDD<S>> {
         self.not(self.exists(s, self.not(b)))
     }
@@ -451,9 +451,9 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    // determine whether variable b is always true or false for a given bdd a
-    // returns a tuple (bool, bool) where the first item determines whether b is bound
-    // the second item determines the truth value for b
+    /// determine whether variable b is always true or false for a given bdd a
+    /// returns a tuple (bool, bool) where the first item determines whether b is bound
+    /// the second item determines the truth value for b
     pub fn infer(&self, a: Rc<BDD<S>>, b: S) -> (bool, bool) {
         let ff = self.implies(a, self.var(b));
         match ff.as_ref() {
@@ -463,7 +463,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
-    // simplify removes a choice node if both subtrees are equivalent
+    /// simplify removes a choice node if both subtrees are equivalent
     pub fn simplify(&self, a: &Rc<BDD<S>>) -> Rc<BDD<S>> {
         match a.as_ref() {
             BDD::Choice(t, _, f) if t.as_ref() == f.as_ref() => Rc::clone(t),
@@ -471,6 +471,7 @@ impl<S: BDDSymbol> BDDEnv<S> {
         }
     }
 
+    /// retain choice variables only if their truth value changes the bdd
     pub fn retain_choice_bottom_up(&self, src: Rc<BDD<S>>, filter: TruthTableEntry) -> Rc<BDD<S>> {
         match filter {
             // if we don't filter, we can just return the source
@@ -478,29 +479,27 @@ impl<S: BDDSymbol> BDDEnv<S> {
             // otherwise, remove nodes depending on truth value of the filter
             _ => {
                 match src.as_ref() {
-                    BDD::Choice(left, symbol, right) => {
+                    BDD::Choice(lhs, symbol, rhs) => {
                         // recursively run the retain function
-                        let left = self.retain_choice_bottom_up(Rc::clone(left), filter);
-                        let right = self.retain_choice_bottom_up(Rc::clone(right), filter);
+                        let true_subtree = self.retain_choice_bottom_up(Rc::clone(lhs), filter);
+                        let false_subtree = self.retain_choice_bottom_up(Rc::clone(rhs), filter);
 
-                        if left.is_const() && right.is_choice() {
-                            if left.is_true() != filter.is_true() {
-                                // omit choice
-                                eprintln!("omitted choice {symbol}");
-                                right
+                        if filter.is_true() {
+                            if true_subtree.is_true() || true_subtree.is_choice() {
+                                // retain choice
+                                self.mk_choice(true_subtree, symbol.clone(), false_subtree)
                             } else {
-                                self.mk_choice(left, symbol.clone(), right)
-                            }
-                        } else if right.is_const() && left.is_choice() {
-                            if right.is_true() != filter.is_true() {
-                                // omit choice
+                                // return true subtree
                                 eprintln!("omitted choice {symbol}");
-                                left
-                            } else {
-                                self.mk_choice(left, symbol.clone(), right)
+                                false_subtree
                             }
+                        } else if false_subtree.is_true() || true_subtree.is_choice() {
+                            // retain choice
+                            self.mk_choice(true_subtree, symbol.clone(), false_subtree)
                         } else {
-                            self.mk_choice(left, symbol.clone(), right)
+                            // return false subtree
+                            eprintln!("omitted choice {symbol}");
+                            true_subtree
                         }
                     }
                     // if the node is a constant, we can just return it
