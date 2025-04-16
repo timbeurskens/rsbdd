@@ -484,47 +484,23 @@ impl<S: BDDSymbol> BDDEnv<S> {
                         let true_subtree = self.retain_choice_bottom_up(Rc::clone(lhs), filter);
                         let false_subtree = self.retain_choice_bottom_up(Rc::clone(rhs), filter);
 
-                        // if retain value is True, then we want to retain if false subtree is const false or choice
-                        // if retain value is False, then we want to retain if true subtree is const false or choice
-                        // else replace choice with subtree
-
                         if filter.is_true() {
-                            if false_subtree.is_false() || false_subtree.is_choice() {
+                            if true_subtree.is_true() || true_subtree.is_choice() {
                                 // retain choice
                                 self.mk_choice(true_subtree, symbol.clone(), false_subtree)
                             } else {
                                 // return true subtree
                                 eprintln!("omitted choice {symbol}");
-                                true_subtree
+                                false_subtree
                             }
-                        } else if true_subtree.is_false() || true_subtree.is_choice() {
+                        } else if false_subtree.is_true() || true_subtree.is_choice() {
                             // retain choice
                             self.mk_choice(true_subtree, symbol.clone(), false_subtree)
                         } else {
                             // return false subtree
                             eprintln!("omitted choice {symbol}");
-                            false_subtree
+                            true_subtree
                         }
-
-                        // if true_subtree.is_const() && false_subtree.is_choice() {
-                        //     if true_subtree.is_true() != filter.is_true() {
-                        //         // omit choice
-                        //         eprintln!("omitted choice {symbol}");
-                        //         false_subtree
-                        //     } else {
-                        //         self.mk_choice(true_subtree, symbol.clone(), false_subtree)
-                        //     }
-                        // } else if false_subtree.is_const() && true_subtree.is_choice() {
-                        //     if false_subtree.is_true() != filter.is_true() {
-                        //         // omit choice
-                        //         eprintln!("omitted choice {symbol}");
-                        //         true_subtree
-                        //     } else {
-                        //         self.mk_choice(true_subtree, symbol.clone(), false_subtree)
-                        //     }
-                        // } else {
-                        //     self.mk_choice(true_subtree, symbol.clone(), false_subtree)
-                        // }
                     }
                     // if the node is a constant, we can just return it
                     _ => src,
