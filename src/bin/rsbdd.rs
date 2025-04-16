@@ -129,9 +129,7 @@ fn main() -> anyhow::Result<()> {
 
     // Simplify the output when retain_choices is on
     if !args.retain_choices.is_any() {
-        result = input_parsed
-            .env
-            .retain_choice_bottom_up(result, args.retain_choices);
+        result = BDDEnv::retain_choice_bottom_up(result, args.retain_choices);
     }
 
     // only print performance results when the benchmark flag is available, and more than 1 run has completed
