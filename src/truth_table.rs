@@ -22,11 +22,13 @@ pub enum TruthTableEntry {
     False,
     /// Assigned when the variable can either be true or false
     Any,
+    /// Assigned when the variable can neither be true or false
+    None,
 }
 
 impl TruthTableEntry {
     const fn variants<'a>() -> &'a [Self] {
-        &[Self::True, Self::False, Self::Any]
+        &[Self::True, Self::False, Self::Any, Self::None]
     }
 
     fn matches(&self, s: &str) -> bool {
@@ -34,19 +36,24 @@ impl TruthTableEntry {
             Self::True => matches!(s, "true" | "True" | "t" | "T" | "1"),
             Self::False => matches!(s, "false" | "False" | "f" | "F" | "0"),
             Self::Any => matches!(s, "any" | "Any" | "a" | "A" | "*"),
+            Self::None => matches!(s, "none" | "None" | "n" | "N" | "-"),
         }
     }
 
-    pub fn is_true(self) -> bool {
-        self == Self::True
+    pub const fn is_true(self) -> bool {
+        matches!(self, Self::True)
     }
 
-    pub fn is_false(self) -> bool {
-        self == Self::False
+    pub const fn is_false(self) -> bool {
+        matches!(self, Self::False)
     }
 
-    pub fn is_any(self) -> bool {
-        self == Self::Any
+    pub const fn is_any(self) -> bool {
+        matches!(self, Self::Any)
+    }
+
+    pub const fn is_none(self) -> bool {
+        matches!(self, Self::None)
     }
 }
 
@@ -56,6 +63,7 @@ impl Display for TruthTableEntry {
             Self::True => "True",
             Self::False => "False",
             Self::Any => "Any",
+            Self::None => "None",
         })
     }
 }
