@@ -3,6 +3,23 @@ use std::{fmt::Display, num::NonZeroUsize};
 use clap::Parser;
 use itertools::Itertools;
 
+// todo: implement selftest (prove multiplication is implemented correctly):
+// forall a, b: 
+//   a * b == b * a (commutativity)
+//   x * 1 == x (identity)
+//   x * 0 == 0 (zero)
+//   x * (y + z) == (x * y) + (x * z) (distributivity)
+//   (x * y) * z == x * (y * z) (associativity)
+// or:
+//   x * 0 == 0
+//   x * (y + 1) == (x * y) + x
+
+// todo: implement primality check:
+// forall port_a, port_b: if multiplication holds, either port_a == 1 or port_b == 1
+
+// bug: multiplication is not commutative if #bits is even
+
+
 #[derive(Debug, Parser)]
 struct Args {
     #[clap(long, short, default_value = "8")]
@@ -18,6 +35,9 @@ struct Args {
 
     #[clap(long)]
     hide_known: bool,
+
+    #[clap(long)]
+    is_prime: bool,
 }
 
 fn check_bits(value: usize, bits: usize) -> bool {
@@ -94,6 +114,15 @@ fn produce_adder_array(
             adder
         })
         .collect()
+}
+
+fn produce_multiplier(bits_a: impl ExactSizeIterator<Item = impl Display>, bits_b: impl ExactSizeIterator<Item = impl Display>) -> Vec<AdderOutput> {
+    assert_eq!(bits_a.len(), bits_b.len(), "input sizes should match");
+
+    let input_width = bits_a.len();
+    let output_width = input_width * 2;
+
+    todo!()
 }
 
 fn main() {
