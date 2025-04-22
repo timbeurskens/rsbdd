@@ -6,7 +6,7 @@ use pretty_assertions::{assert_eq, assert_ne};
 
 use rsbdd::bdd::*;
 use rsbdd::bdd_io::*;
-use rsbdd::{bdd, TruthTableEntry};
+use rsbdd::{TruthTableEntry, bdd};
 
 type BDD = bdd::BDD<usize>;
 

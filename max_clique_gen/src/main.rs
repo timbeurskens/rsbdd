@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io;
-use std::io::prelude::*;
 use std::io::Write;
+use std::io::prelude::*;
 use std::io::*;
 use std::path::PathBuf;
 
@@ -32,8 +32,8 @@ fn main() -> Result<()> {
     let version = env!("CARGO_PKG_VERSION");
     let args = Args::parse();
 
-    let reader = if args.input.is_some() {
-        let file = File::open(args.input.unwrap())?;
+    let reader = if let Some(input) = args.input {
+        let file = File::open(input)?;
         Box::new(BufReader::new(file)) as Box<dyn BufRead>
     } else {
         Box::new(BufReader::new(io::stdin())) as Box<dyn BufRead>
@@ -78,8 +78,8 @@ fn main() -> Result<()> {
         }
     }
 
-    let mut writer = if args.output.is_some() {
-        let file = File::create(args.output.unwrap())?;
+    let mut writer = if let Some(output) = args.output {
+        let file = File::create(output)?;
         Box::new(BufWriter::new(file)) as Box<dyn Write>
     } else {
         Box::new(BufWriter::new(io::stdout())) as Box<dyn Write>
@@ -115,7 +115,10 @@ fn main() -> Result<()> {
     if show_all {
         writeln!(writer, "true")?;
     } else {
-        writeln!(writer, "\"No larger clique exists (every other clique is at most as big as the clique defined above)\"")?;
+        writeln!(
+            writer,
+            "\"No larger clique exists (every other clique is at most as big as the clique defined above)\""
+        )?;
         writeln!(writer)?;
 
         writeln!(

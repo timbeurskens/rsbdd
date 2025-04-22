@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use itertools::Itertools;
 
-use crate::{bdd::*, BDDSymbol, TruthTableEntry};
+use crate::{BDDSymbol, TruthTableEntry, bdd::*};
 
 type GraphEdge<S> = (Rc<BDD<S>>, bool, Rc<BDD<S>>);
 type GraphNode<S> = Rc<BDD<S>>;

@@ -58,6 +58,7 @@ fn main() -> anyhow::Result<()> {
             ))?
         }
 
+        #[allow(clippy::unwrap_used)]
         let vertices = args.vertices.unwrap();
 
         let edges = if args.undirected {
@@ -73,6 +74,7 @@ fn main() -> anyhow::Result<()> {
                 "Must provide vertices and edges if not converting a graph"
             ))?
         }
+        #[allow(clippy::unwrap_used)]
         generate_graph(args.vertices.unwrap(), args.edges.unwrap(), args.undirected)?
     };
 
@@ -139,7 +141,7 @@ fn generate_graph(
     num_edges: usize,
     undirected: bool,
 ) -> anyhow::Result<Vec<(String, String)>> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     let vertices = (0..num_vertices)
         .map(|vi| format!("v{}", vi))
@@ -169,13 +171,14 @@ fn generate_graph(
 
     edges.shuffle(&mut rng);
 
-    if let Some(edges) = edges.get(0..num_edges) {
-        Ok(edges.to_vec())
-    } else {
-        Err(anyhow::anyhow!(
-            "Cannot satisfy the desired amount of edges"
-        ))
-    }
+    edges.get(0..num_edges).map_or_else(
+        || {
+            Err(anyhow::anyhow!(
+                "Cannot satisfy the desired amount of edges"
+            ))
+        },
+        |edges| Ok(edges.to_vec()),
+    )
 }
 
 fn augment_colors(

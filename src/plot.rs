@@ -17,7 +17,10 @@ pub fn write_gnuplot_normal_distribution<S: Write>(
     writeln!(writer, "set autoscale y")?;
 
     writeln!(writer, "invsqrt2pi = 0.398942280401433")?;
-    writeln!(writer, "normal(x,mu,sigma) = sigma<=0 ? 1/0 : invsqrt2pi / sigma * exp(-0.5 * ((x - mu) / sigma) ** 2)")?;
+    writeln!(
+        writer,
+        "normal(x,mu,sigma) = sigma<=0 ? 1/0 : invsqrt2pi / sigma * exp(-0.5 * ((x - mu) / sigma) ** 2)"
+    )?;
     writeln!(
         writer,
         "plot normal(x,{},{}) with lines lw 2 notitle",
