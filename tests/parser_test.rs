@@ -5,9 +5,9 @@ use std::rc::Rc;
 
 use pretty_assertions::assert_eq;
 
+use rsbdd::NamedSymbol;
 use rsbdd::bdd::*;
 use rsbdd::parser::*;
-use rsbdd::NamedSymbol;
 
 #[test]
 fn test_basic_tokens() -> io::Result<()> {

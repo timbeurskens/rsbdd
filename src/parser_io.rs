@@ -100,20 +100,16 @@ impl<'a> dot::Labeller<'a, GraphNode, GraphEdge> for SymbolicParseTree {
 
     fn node_label(&self, n: &GraphNode) -> dot::LabelText<'a> {
         match &self.nodes[*n] {
-            SymbolicBDD::BinaryOp(ref op, _, _) => dot::LabelText::label(format!("{:?}", op)),
-            SymbolicBDD::Quantifier(op, ref v, _) => dot::LabelText::label(format!(
+            SymbolicBDD::BinaryOp(op, _, _) => dot::LabelText::label(format!("{:?}", op)),
+            SymbolicBDD::Quantifier(op, v, _) => dot::LabelText::label(format!(
                 "{:?} [{}]",
                 op,
                 v.iter().map(|s| s.name.as_ref()).cloned().join(", ")
             )),
             SymbolicBDD::Not(_) => dot::LabelText::label("Not".to_string()),
-            SymbolicBDD::CountableConst(ref v, _, n) => {
-                dot::LabelText::label(format!("{:?} {}", v, n))
-            }
-            SymbolicBDD::CountableVariable(ref v, _, _) => {
-                dot::LabelText::label(format!("{:?}", v))
-            }
-            SymbolicBDD::FixedPoint(ref v, init, _) => {
+            SymbolicBDD::CountableConst(v, _, n) => dot::LabelText::label(format!("{:?} {}", v, n)),
+            SymbolicBDD::CountableVariable(v, _, _) => dot::LabelText::label(format!("{:?}", v)),
+            SymbolicBDD::FixedPoint(v, init, _) => {
                 if *init {
                     dot::LabelText::label(format!("GFP {}", v))
                 } else {

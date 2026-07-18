@@ -11,14 +11,14 @@ use std::time::{Duration, Instant};
 
 use clap::Parser;
 
+use rsbdd::BDDSymbol;
+use rsbdd::NamedSymbol;
+use rsbdd::TruthTableEntry;
 use rsbdd::bdd::*;
 use rsbdd::bdd_io::*;
 use rsbdd::parser::*;
 use rsbdd::parser_io::*;
 use rsbdd::plot::*;
-use rsbdd::BDDSymbol;
-use rsbdd::NamedSymbol;
-use rsbdd::TruthTableEntry;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -329,7 +329,7 @@ fn print_true_vars_recursive(
     parsed: &ParsedFormula,
 ) {
     match root.as_ref() {
-        BDD::Choice(ref l, s, ref r) => {
+        BDD::Choice(l, s, r) => {
             // first visit the false subtree
             let mut r_vals = values.clone();
             r_vals[parsed.to_free_index(s)] = TruthTableEntry::False;
@@ -366,7 +366,7 @@ fn print_truth_table_recursive<A>(
     A: Index<usize, Output = usize>,
 {
     match root.as_ref() {
-        BDD::Choice(ref l, s, ref r) => {
+        BDD::Choice(l, s, r) => {
             // first visit the false subtree
             let mut r_vars = vars.clone();
             r_vars[parsed.to_free_index(s)] = TruthTableEntry::False;

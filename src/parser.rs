@@ -12,8 +12,8 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use rustc_hash::FxHashMap;
 
-use crate::bdd::{BDDEnv, BDD};
 use crate::NamedSymbol;
+use crate::bdd::{BDD, BDDEnv};
 
 lazy_static! {
     static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+|>=|=|>|<|\[|\]|,|\(|\))|(?P<countable>\d+)|\{(?P<reference>[\w']+)\}|(?P<identifier>[\w']+)|(?P<eof>$)|(?P<comment>"[^"]*")"#).expect("Error setting-up tokenizer regex");

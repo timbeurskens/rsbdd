@@ -5,9 +5,9 @@ use std::rc::Rc;
 
 use pretty_assertions::assert_eq;
 
+use rsbdd::NamedSymbol;
 use rsbdd::bdd::*;
 use rsbdd::parser::*;
-use rsbdd::NamedSymbol;
 
 fn file_assert_eq<P: AsRef<Path>>(file1: P, file2: P, ordering: &[&str]) {
     let ord: Vec<NamedSymbol> = ordering
