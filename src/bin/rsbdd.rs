@@ -6,7 +6,6 @@ use std::io::{BufRead, BufReader};
 use std::ops::Index;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use clap::Parser;
@@ -74,6 +73,23 @@ struct Args {
     #[clap(short = 'r', long)]
     /// Export the automatically derived ordering to stdout.
     export_ordering: bool,
+
+    #[clap(short = 'l', long, value_parser, value_name = "MiB")]
+    /// Limit the memory used by the solver, nodes exceeding the limit are paged to disk [default: 75% of available memory]
+    memory_limit: Option<usize>,
+}
+
+fn default_memory_limit() -> Option<usize> {
+    std::fs::read_to_string("/proc/meminfo")
+        .ok()?
+        .lines()
+        .find_map(|l| l.strip_prefix("MemAvailable:"))?
+        .trim()
+        .trim_end_matches("kB")
+        .trim()
+        .parse::<usize>()
+        .ok()
+        .map(|kb| kb / 4 * 3 * 1024)
 }
 
 fn main() -> anyhow::Result<()> {
@@ -107,6 +123,14 @@ fn main() -> anyhow::Result<()> {
 
     let input_parsed = ParsedFormula::new(&mut reader, pre_variable_ordering)?;
 
+    if let Some(limit) = args
+        .memory_limit
+        .map(|mb| mb * 1024 * 1024)
+        .or_else(default_memory_limit)
+    {
+        input_parsed.env.set_memory_limit(limit);
+    }
+
     if let Some(parsetree_filename) = args.parsetree {
         let mut f = File::create(parsetree_filename)?;
 
@@ -115,7 +139,7 @@ fn main() -> anyhow::Result<()> {
         graph.render_dot(&mut f)?;
     }
 
-    let mut result: Rc<BDD<NamedSymbol>> = Rc::default();
+    let mut result = input_parsed.env.mk_const(false);
     let mut exec_times = Vec::new();
 
     // Benchmark: repeat n times and log runtime per iteration
@@ -228,11 +252,7 @@ where
     }
     println!(
         " {:indent$} |",
-        match result {
-            BDD::True => "True",
-            BDD::False => "False",
-            _ => unreachable!(),
-        },
+        if result.is_true() { "True" } else { "False" },
         indent = widths[len]
     );
 }
@@ -323,24 +343,24 @@ fn plot_performance_results(results: &[Duration]) -> anyhow::Result<()> {
 
 // print all variables which can take a 'true' value in the bdd
 fn print_true_vars_recursive(
-    root: &Rc<BDD<NamedSymbol>>,
+    root: &BDD<NamedSymbol>,
     values: Vec<TruthTableEntry>,
     vars: &[String],
     parsed: &ParsedFormula,
 ) {
-    match root.as_ref() {
-        BDD::Choice(l, s, r) => {
+    match root.node() {
+        Node::Choice(ref l, s, ref r) => {
             // first visit the false subtree
             let mut r_vals = values.clone();
-            r_vals[parsed.to_free_index(s)] = TruthTableEntry::False;
+            r_vals[parsed.to_free_index(&s)] = TruthTableEntry::False;
             print_true_vars_recursive(r, r_vals, vars, parsed);
 
             // then visit the true subtree
             let mut l_vals = values;
-            l_vals[parsed.to_free_index(s)] = TruthTableEntry::True;
+            l_vals[parsed.to_free_index(&s)] = TruthTableEntry::True;
             print_true_vars_recursive(l, l_vals, vars, parsed);
         }
-        BDD::True => {
+        Node::True => {
             let mut vars_str = Vec::new();
             for (i, v) in values.iter().enumerate() {
                 if *v == TruthTableEntry::True {
@@ -357,7 +377,7 @@ fn print_true_vars_recursive(
 
 // recursively walk through the bdd and assign values to the variables until every permutation is assigned a true or false value
 fn print_truth_table_recursive<A>(
-    root: &Rc<BDD<NamedSymbol>>,
+    root: &BDD<NamedSymbol>,
     vars: Vec<TruthTableEntry>,
     filter: TruthTableEntry,
     parsed: &ParsedFormula,
@@ -365,23 +385,23 @@ fn print_truth_table_recursive<A>(
 ) where
     A: Index<usize, Output = usize>,
 {
-    match root.as_ref() {
-        BDD::Choice(l, s, r) => {
+    match root.node() {
+        Node::Choice(ref l, s, ref r) => {
             // first visit the false subtree
             let mut r_vars = vars.clone();
-            r_vars[parsed.to_free_index(s)] = TruthTableEntry::False;
+            r_vars[parsed.to_free_index(&s)] = TruthTableEntry::False;
             print_truth_table_recursive(r, r_vars, filter, parsed, sizes);
 
             // then visit the true subtree
             let mut l_vars = vars;
-            l_vars[parsed.to_free_index(s)] = TruthTableEntry::True;
+            l_vars[parsed.to_free_index(&s)] = TruthTableEntry::True;
             print_truth_table_recursive(l, l_vars, filter, parsed, sizes);
         }
-        c if (filter == TruthTableEntry::Any)
-            || (filter == TruthTableEntry::True && *c == BDD::True)
-            || (filter == TruthTableEntry::False && *c == BDD::False) =>
+        _ if (filter == TruthTableEntry::Any)
+            || (filter == TruthTableEntry::True && root.is_true())
+            || (filter == TruthTableEntry::False && root.is_false()) =>
         {
-            print_sized_line(&vars, sizes, c);
+            print_sized_line(&vars, sizes, root);
         }
         _ => {}
     }

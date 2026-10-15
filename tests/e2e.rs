@@ -5,8 +5,6 @@ use std::rc::Rc;
 
 use pretty_assertions::assert_eq;
 
-use rsbdd::NamedSymbol;
-use rsbdd::bdd::*;
 use rsbdd::parser::*;
 
 fn file_assert_eq<P: AsRef<Path>>(file1: P, file2: P, ordering: &[&str]) {
@@ -33,7 +31,7 @@ fn file_assert_eq<P: AsRef<Path>>(file1: P, file2: P, ordering: &[&str]) {
     assert_eq!(input_evaluated_1, input_evaluated_2);
 }
 
-fn file_assert_const<P: AsRef<Path>>(file: P, expected: &BDD<NamedSymbol>) {
+fn file_assert_const<P: AsRef<Path>>(file: P, expected: bool) {
     let f1 = File::open(file).unwrap();
 
     let input_parsed =
@@ -41,7 +39,7 @@ fn file_assert_const<P: AsRef<Path>>(file: P, expected: &BDD<NamedSymbol>) {
 
     let input_evaluated = input_parsed.eval();
 
-    assert_eq!(input_evaluated.as_ref(), expected);
+    assert_eq!(input_evaluated, input_parsed.env.mk_const(expected));
 }
 
 #[test]
@@ -65,7 +63,7 @@ fn test_files_true() {
     for file in glob::glob("tests/data/*_is_true.txt").unwrap() {
         let f = file.unwrap();
         println!("testing {}", f.display());
-        file_assert_const(f, &BDD::True);
+        file_assert_const(f, true);
     }
 }
 
@@ -74,6 +72,6 @@ fn test_files_false() {
     for file in glob::glob("tests/data/*_is_false.txt").unwrap() {
         let f = file.unwrap();
         println!("testing {}", f.display());
-        file_assert_const(f, &BDD::False);
+        file_assert_const(f, false);
     }
 }

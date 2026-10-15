@@ -95,7 +95,7 @@ pub enum SymbolicBDD {
     FixedPoint(NamedSymbol, bool, Box<Self>),
     Ite(Box<Self>, Box<Self>, Box<Self>),
     BinaryOp(BinaryOperator, Box<Self>, Box<Self>),
-    Subtree(Rc<BDD<NamedSymbol>>),
+    Subtree(BDD<NamedSymbol>),
     Reference(String),
 }
 
@@ -118,7 +118,7 @@ pub struct ParsedFormula {
 #[derive(Debug, Clone)]
 pub enum ReferenceContents {
     Syntax(SymbolicBDD),
-    BDD(Rc<BDD<NamedSymbol>>),
+    BDD(BDD<NamedSymbol>),
 }
 
 type TokenReader<'a> = Peekable<Iter<'a, SymbolicBDDToken>>;
@@ -274,7 +274,7 @@ impl ParsedFormula {
         Ok(result)
     }
 
-    pub fn eval(&self) -> Rc<BDD<NamedSymbol>> {
+    pub fn eval(&self) -> BDD<NamedSymbol> {
         self.eval_recursive(&self.bdd)
     }
 
@@ -315,7 +315,7 @@ impl ParsedFormula {
         }
     }
 
-    fn eval_recursive(&self, root: &SymbolicBDD) -> Rc<BDD<NamedSymbol>> {
+    fn eval_recursive(&self, root: &SymbolicBDD) -> BDD<NamedSymbol> {
         match root {
             SymbolicBDD::False => self.env.mk_const(false),
             SymbolicBDD::True => self.env.mk_const(true),
@@ -328,7 +328,7 @@ impl ParsedFormula {
                 self.env.all(v.clone(), self.eval_recursive(b))
             }
             SymbolicBDD::CountableConst(op, bs, n) => {
-                let branches: Vec<Rc<BDD<NamedSymbol>>> =
+                let branches: Vec<BDD<NamedSymbol>> =
                     bs.iter().map(|b| self.eval_recursive(b)).collect();
 
                 match op {
@@ -340,9 +340,9 @@ impl ParsedFormula {
                 }
             }
             SymbolicBDD::CountableVariable(op, l, r) => {
-                let l_branches: Vec<Rc<BDD<NamedSymbol>>> =
+                let l_branches: Vec<BDD<NamedSymbol>> =
                     l.iter().map(|b| self.eval_recursive(b)).collect();
-                let r_branches: Vec<Rc<BDD<NamedSymbol>>> =
+                let r_branches: Vec<BDD<NamedSymbol>> =
                     r.iter().map(|b| self.eval_recursive(b)).collect();
 
                 match op {
@@ -384,7 +384,7 @@ impl ParsedFormula {
                     ))
                 })
             }
-            SymbolicBDD::Subtree(t) => Rc::clone(t),
+            SymbolicBDD::Subtree(t) => t.clone(),
             SymbolicBDD::Reference(name) => self.get_definition(name).map_or_else(
                 || self.env.mk_const(false),
                 |t| match t {
