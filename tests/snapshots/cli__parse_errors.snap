@@ -1,0 +1,67 @@
+---
+source: tests/cli.rs
+expression: "run_formulas(&[\"\", \"a &\", \"&\", \"(a\", \"a)\", \"a b\", \"[a, b\", \"[a] = \",\n\"exists # a\", \"if a then b\",])"
+---
+$ rsbdd -t --evaluate=
+status: 1
+--- stdout
+--- stderr
+Error: Unexpected EOF
+
+$ rsbdd -t --evaluate=a &
+status: 1
+--- stdout
+--- stderr
+Error: Unexpected EOF
+
+$ rsbdd -t --evaluate=&
+status: 1
+--- stdout
+--- stderr
+Error: Unexpected token And
+
+$ rsbdd -t --evaluate=(a
+status: 1
+--- stdout
+--- stderr
+Error: Expected CloseParen, got Some(Eof)
+
+$ rsbdd -t --evaluate=a)
+status: 1
+--- stdout
+--- stderr
+Error: Expected Eof, got Some(CloseParen)
+
+$ rsbdd -t --evaluate=a b
+status: 1
+--- stdout
+--- stderr
+Error: Expected Eof, got Some(Var(NamedSymbol { name: "b", id: 1 }))
+
+$ rsbdd -t --evaluate=[a, b
+status: 1
+--- stdout
+--- stderr
+Error: Expected CloseSquare, got Some(Eof)
+
+$ rsbdd -t --evaluate=[a] = 
+status: 1
+--- stdout
+--- stderr
+Error: Expected number, got Some(Eof)
+
+$ rsbdd -t --evaluate=exists # a
+status: 0
+--- stdout
+| a     | *     |
+|-------|-------|
+| False | False |
+| True  | True  |
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -t --evaluate=if a then b
+status: 1
+--- stdout
+--- stderr
+Error: Expected Else, got Some(Eof)

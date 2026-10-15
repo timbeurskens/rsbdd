@@ -1,0 +1,10 @@
+((gfp X # X) <=> true) &
+((lfp X # X) <=> false) &
+((nu X # a) <=> a) &
+((mu X # a) <=> a) &
+(nu X # true) &
+(-(mu X # false)) &
+((mu X # (X | a)) <=> a) &
+((nu X # (X & a)) <=> a) &
+((mu X # (a | (X & b))) <=> a) &
+((nu X # (a | (X & b))) <=> (a | b))

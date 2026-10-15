@@ -1,0 +1,29 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: tests/data/true_is_true.txt
+---
+$ rsbdd -t -f true tests/data/true_is_true.txt
+status: 0
+--- stdout
+| *     |
+|-------|
+| True  |
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -v tests/data/true_is_true.txt
+status: 0
+--- stdout
+;
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -m -t -f true tests/data/true_is_true.txt
+status: 0
+--- stdout
+| *     |
+|-------|
+| True  |
+--- stderr
+finished 1/1 runs

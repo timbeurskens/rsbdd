@@ -1,0 +1,25 @@
+"constant bounds"
+([a, b, c] >= 0) &
+(-([a, b] > 2)) &
+(-([a, b] < 0)) &
+([a, b] <= 2) &
+(([a, b] = 2) <=> (a & b)) &
+(([a, b] = 0) <=> -(a | b)) &
+(([a, b, c] = 1) => ([a, b, c] <= 1)) &
+(([a, b, c] > 1) <=> ([a, b, c] >= 2)) &
+(([a, b, c] < 1) <=> ([a, b, c] = 0)) &
+(([a, b, c] = 3) <=> (a & b & c)) &
+
+"repeated and compound expressions are counted individually"
+(-([a, a] = 1)) &
+([a, -a] = 1) &
+(([a & b, a] = 2) <=> (a & b)) &
+
+"comparing two sets of expressions"
+(([a] = [b]) <=> (a <=> b)) &
+([a, b] = [b, a]) &
+([a] >= []) &
+(([a] > []) <=> a) &
+(([a, b] < [c]) <=> (-a & -b & c)) &
+(([a, b, c] >= [d, e, f]) <=> -([a, b, c] < [d, e, f])) &
+(([a, b, c] <= [d, e, f]) <=> ([d, e, f] >= [a, b, c]))

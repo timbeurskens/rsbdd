@@ -1,0 +1,6 @@
+"comments may appear between tokens"
+((((true)))) & "comment" (
+    "whitespace and newlines are ignored"
+    a_long_variable_name'
+        | -a_long_variable_name'
+) & (x1 <=> (x1)) & (-(-(-(false))))

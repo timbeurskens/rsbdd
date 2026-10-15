@@ -1,0 +1,29 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: tests/data/nu_empty.txt
+---
+$ rsbdd -t -f true tests/data/nu_empty.txt
+status: 0
+--- stdout
+| *     |
+|-------|
+| True  |
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -v tests/data/nu_empty.txt
+status: 0
+--- stdout
+;
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -m -t -f true tests/data/nu_empty.txt
+status: 0
+--- stdout
+| *     |
+|-------|
+| True  |
+--- stderr
+finished 1/1 runs

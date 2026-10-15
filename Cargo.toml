@@ -62,6 +62,7 @@ wild.workspace = true
 [dev-dependencies]
 glob.workspace = true
 pretty_assertions.workspace = true
+insta = { workspace = true, features = ["glob"] }
 
 [lints]
 workspace = true

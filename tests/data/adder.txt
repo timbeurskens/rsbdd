@@ -1,0 +1,9 @@
+"a two bit adder: (s2 s1 s0) = (a1 a0) + (b1 b0), with the carry bit hidden"
+exists c0 # (
+    (s0 <=> (a0 ^ b0)) &
+    (c0 <=> (a0 & b0)) &
+    (s1 <=> (a1 ^ b1 ^ c0)) &
+    (s2 <=> ([a1, b1, c0] >= 2)) &
+    "only show sums equal to three"
+    (-s2 & s1 & s0)
+)

@@ -1,0 +1,26 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: tests/data/pigeonhole_is_false.txt
+---
+$ rsbdd -t -f true tests/data/pigeonhole_is_false.txt
+status: 0
+--- stdout
+| p1h1  | p1h2  | p2h1  | p2h2  | p3h1  | p3h2  | *     |
+|-------|-------|-------|-------|-------|-------|-------|
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -v tests/data/pigeonhole_is_false.txt
+status: 0
+--- stdout
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -m -t -f true tests/data/pigeonhole_is_false.txt
+status: 0
+--- stdout
+| p1h1  | p1h2  | p2h1  | p2h2  | p3h1  | p3h2  | *     |
+|-------|-------|-------|-------|-------|-------|-------|
+--- stderr
+finished 1/1 runs

@@ -152,7 +152,7 @@ fn main() -> anyhow::Result<()> {
 
     if args.export_ordering {
         let mut ordered_variables = input_parsed.vars.clone();
-        ordered_variables.sort_by(|a, b| a.id.cmp(&b.id));
+        ordered_variables.sort_by_key(|a| a.id);
         let ordered_variable_names = ordered_variables
             .iter()
             .map(|v| v.name.as_ref())

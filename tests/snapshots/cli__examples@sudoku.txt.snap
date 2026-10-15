@@ -1,0 +1,22 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: examples/sudoku.txt
+---
+$ rsbdd -t -f true examples/sudoku.txt
+status: 1
+--- stdout
+--- stderr
+Error: Unexpected token Countable(4)
+
+$ rsbdd -v examples/sudoku.txt
+status: 1
+--- stdout
+--- stderr
+Error: Unexpected token Countable(4)
+
+$ rsbdd -m -t -f true examples/sudoku.txt
+status: 1
+--- stdout
+--- stderr
+Error: Unexpected token Countable(4)

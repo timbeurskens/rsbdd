@@ -1,0 +1,26 @@
+"every binary operator agrees with its definition in terms of and, or and not"
+((a nand b) <=> -(a & b)) &
+((a nor b) <=> -(a | b)) &
+((a ^ b) <=> ((a | b) & -(a & b))) &
+((a xor b) <=> (a ^ b)) &
+((a => b) <=> (-a | b)) &
+((a <= b) <=> (b => a)) &
+((a in b) <=> (a implies b)) &
+((a <=> b) <=> ((a => b) & (b => a))) &
+((a iff b) <=> (a eq b)) &
+
+"textual and symbolic spellings are interchangeable"
+((a and b) <=> (a & b)) &
+((a * b) <=> (a & b)) &
+((a or b) <=> (a | b)) &
+((a + b) <=> (a | b)) &
+((not a) <=> (-a)) &
+((!a) <=> (-a)) &
+
+"constants"
+(true) &
+(-false) &
+((a & true) <=> a) &
+((a | false) <=> a) &
+(-(a & false)) &
+(a | true)

@@ -87,14 +87,14 @@ pub enum SymbolicBDD {
     False,
     True,
     Var(NamedSymbol),
-    Not(Box<SymbolicBDD>),
-    Quantifier(QuantifierType, Vec<NamedSymbol>, Box<SymbolicBDD>),
-    CountableConst(CountableOperator, Vec<SymbolicBDD>, usize),
-    CountableVariable(CountableOperator, Vec<SymbolicBDD>, Vec<SymbolicBDD>),
+    Not(Box<Self>),
+    Quantifier(QuantifierType, Vec<NamedSymbol>, Box<Self>),
+    CountableConst(CountableOperator, Vec<Self>, usize),
+    CountableVariable(CountableOperator, Vec<Self>, Vec<Self>),
     // the fixed-point operator with a single transformer variable, initial value (as bool), and the transformer function as a symbolic bdd description
-    FixedPoint(NamedSymbol, bool, Box<SymbolicBDD>),
-    Ite(Box<SymbolicBDD>, Box<SymbolicBDD>, Box<SymbolicBDD>),
-    BinaryOp(BinaryOperator, Box<SymbolicBDD>, Box<SymbolicBDD>),
+    FixedPoint(NamedSymbol, bool, Box<Self>),
+    Ite(Box<Self>, Box<Self>, Box<Self>),
+    BinaryOp(BinaryOperator, Box<Self>, Box<Self>),
     Subtree(Rc<BDD<NamedSymbol>>),
     Reference(String),
 }
@@ -244,7 +244,7 @@ impl ParsedFormula {
         let tokens = SymbolicBDD::tokenize(contents, variable_ordering)?;
 
         let mut vars: Vec<NamedSymbol> = Self::extract_vars(&tokens);
-        vars.sort_by(|a, b| a.id.cmp(&b.id));
+        vars.sort_by_key(|a| a.id);
 
         let formula = SymbolicBDD::parse_formula(&mut tokens.iter().peekable())?;
 
