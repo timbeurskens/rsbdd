@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::io;
 use std::io::Write;
 
-use itertools::Itertools;
+use rustc_hash::FxHashSet;
 
 use crate::{BDDSymbol, TruthTableEntry, bdd::*};
 
@@ -12,7 +12,8 @@ type GraphEdge<S> = (BDD<S>, bool, BDD<S>);
 type GraphNode<S> = BDD<S>;
 
 pub struct BDDGraph<S: BDDSymbol> {
-    root: BDD<S>,
+    nodes: Vec<GraphNode<S>>,
+    edges: Vec<GraphEdge<S>>,
     filter: TruthTableEntry,
 }
 
@@ -22,10 +23,41 @@ impl<S: BDDSymbol> BDDGraph<S> {
     }
 
     pub fn new(root: &BDD<S>, filter: TruthTableEntry) -> Self {
-        Self {
-            root: root.clone(),
+        let mut graph = Self {
+            nodes: Vec::new(),
+            edges: Vec::new(),
             filter,
+        };
+
+        if graph.keep(root) {
+            let mut visited = FxHashSet::default();
+            visited.insert(root.get_hash());
+            let mut stack = vec![root.clone()];
+
+            while let Some(node) = stack.pop() {
+                if let Node::Choice(l, _, r) = node.node() {
+                    for (e, child) in [(true, l), (false, r)] {
+                        if !graph.keep(&child) {
+                            continue;
+                        }
+                        graph.edges.push((node.clone(), e, child.clone()));
+                        if visited.insert(child.get_hash()) {
+                            stack.push(child);
+                        }
+                    }
+                }
+                graph.nodes.push(node);
+            }
         }
+
+        graph
+    }
+
+    fn keep(&self, b: &BDD<S>) -> bool {
+        b.is_choice()
+            || self.filter == TruthTableEntry::Any
+            || (self.filter == TruthTableEntry::True && b.is_true())
+            || (self.filter == TruthTableEntry::False && b.is_false())
     }
 }
 
@@ -56,6 +88,10 @@ impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<S>, GraphEdge<S>> for BDDGrap
         }
     }
 
+    fn node_shape(&'a self, n: &GraphNode<S>) -> Option<dot::LabelText<'a>> {
+        n.is_const().then(|| dot::LabelText::label("box"))
+    }
+
     fn edge_label(&self, (_, e, _): &GraphEdge<S>) -> dot::LabelText<'a> {
         if *e {
             dot::LabelText::LabelStr(Cow::Borrowed("T"))
@@ -63,15 +99,23 @@ impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<S>, GraphEdge<S>> for BDDGrap
             dot::LabelText::LabelStr(Cow::Borrowed("F"))
         }
     }
+
+    fn edge_style(&'a self, (_, e, _): &GraphEdge<S>) -> dot::Style {
+        if *e {
+            dot::Style::None
+        } else {
+            dot::Style::Dashed
+        }
+    }
 }
 
 impl<'a, S: BDDSymbol> dot::GraphWalk<'a, GraphNode<S>, GraphEdge<S>> for BDDGraph<S> {
-    fn nodes(&self) -> dot::Nodes<'a, GraphNode<S>> {
-        self.nodes_recursive(self.root.clone())
+    fn nodes(&'a self) -> dot::Nodes<'a, GraphNode<S>> {
+        Cow::Borrowed(&self.nodes)
     }
 
-    fn edges(&self) -> dot::Edges<'a, GraphEdge<S>> {
-        self.edges_recursive(self.root.clone())
+    fn edges(&'a self) -> dot::Edges<'a, GraphEdge<S>> {
+        Cow::Borrowed(&self.edges)
     }
 
     fn source(&self, (a, _, _): &GraphEdge<S>) -> GraphNode<S> {
@@ -80,67 +124,5 @@ impl<'a, S: BDDSymbol> dot::GraphWalk<'a, GraphNode<S>, GraphEdge<S>> for BDDGra
 
     fn target(&self, (_, _, b): &GraphEdge<S>) -> GraphNode<S> {
         b.clone()
-    }
-}
-
-impl<'a, S: BDDSymbol> BDDGraph<S> {
-    fn nodes_recursive(&self, root: BDD<S>) -> dot::Nodes<'a, GraphNode<S>> {
-        match root.node() {
-            Node::Choice(l, _, r) => {
-                let l_nodes = self.nodes_recursive(l);
-                let r_nodes = self.nodes_recursive(r);
-
-                l_nodes
-                    .iter()
-                    .chain(&vec![root])
-                    .chain(r_nodes.iter())
-                    .unique()
-                    .cloned()
-                    .collect()
-            }
-            _ if (self.filter == TruthTableEntry::Any)
-                || (self.filter == TruthTableEntry::True && root.is_true())
-                || (self.filter == TruthTableEntry::False && root.is_false()) =>
-            {
-                vec![root].into()
-            }
-            _ => vec![].into(),
-        }
-    }
-
-    fn edges_recursive(&self, root: BDD<S>) -> dot::Edges<'a, GraphEdge<S>> {
-        match root.node() {
-            Node::Choice(l, _, r) => {
-                let l_edges = self.edges_recursive(l.clone());
-                let r_edges = self.edges_recursive(r.clone());
-
-                let mut self_edges = Vec::with_capacity(2);
-
-                if (self.filter == TruthTableEntry::Any)
-                    || l.is_choice()
-                    || (l.is_true() && self.filter == TruthTableEntry::True)
-                    || (l.is_false() && self.filter == TruthTableEntry::False)
-                {
-                    self_edges.push((root.clone(), true, l));
-                }
-
-                if (self.filter == TruthTableEntry::Any)
-                    || r.is_choice()
-                    || (r.is_true() && self.filter == TruthTableEntry::True)
-                    || (r.is_false() && self.filter == TruthTableEntry::False)
-                {
-                    self_edges.push((root, false, r));
-                }
-
-                l_edges
-                    .iter()
-                    .chain(r_edges.iter())
-                    .chain(self_edges.iter())
-                    .unique() // disable unique edges when testing for duplicates
-                    .cloned()
-                    .collect()
-            }
-            _ => vec![].into(),
-        }
     }
 }
