@@ -357,7 +357,7 @@ impl ParsedFormula {
             result.define(&name, ReferenceContents::Syntax(definition));
         }
 
-        if uses_rewriting(&tokens) {
+        if result.uses_rewriting(&result.bdd) {
             let (bdd, atoms) = Rewriter::rewrite(&result)?;
             result.bdd = bdd;
             result.vars.extend(atoms);
@@ -377,6 +377,19 @@ impl ParsedFormula {
         }
 
         Ok(result)
+    }
+
+    fn uses_rewriting(&self, formula: &SymbolicBDD) -> bool {
+        match formula {
+            SymbolicBDD::Summation(_, _)
+            | SymbolicBDD::RuleApplication(_)
+            | SymbolicBDD::BinaryOp(BinaryOperator::Rewrite | BinaryOperator::Equals, _, _) => true,
+            SymbolicBDD::Reference(name) => matches!(
+                self.get_definition(name),
+                Some(ReferenceContents::Syntax(definition)) if self.uses_rewriting(&definition)
+            ),
+            other => other.children().into_iter().any(|c| self.uses_rewriting(c)),
+        }
     }
 
     pub fn eval(&self) -> BDD<NamedSymbol> {
@@ -522,6 +535,35 @@ impl ParsedFormula {
 }
 
 impl SymbolicBDD {
+    /// The direct sub-formulas of this formula
+    pub fn children(&self) -> Vec<&Self> {
+        match self {
+            Self::Not(f)
+            | Self::Quantifier(_, _, f)
+            | Self::FixedPoint(_, _, f)
+            | Self::Summation(_, f) => vec![f],
+            Self::BinaryOp(_, l, r) => vec![l, r],
+            Self::Ite(c, t, e) => vec![c, t, e],
+            Self::CountableConst(_, fs, _) => fs.iter().collect(),
+            Self::CountableVariable(_, l, r) => l.iter().chain(r).collect(),
+            _ => vec![],
+        }
+    }
+
+    /// Build `l op r`, folding the constants `true` and `false` for `&`, `|` and `=>`
+    pub fn binop(op: BinaryOperator, l: Self, r: Self) -> Self {
+        use BinaryOperator::{And, Implies, Or};
+        use SymbolicBDD::{False, True};
+
+        match (op, l, r) {
+            (And, False, _) | (And, _, False) => False,
+            (Or, True, _) | (Or, _, True) | (Implies, False, _) | (Implies, _, True) => True,
+            (And | Implies, True, r) | (Or, False, r) => r,
+            (And, l, True) | (Or, l, False) => l,
+            (op, l, r) => Self::BinaryOp(op, Box::new(l), Box::new(r)),
+        }
+    }
+
     fn parse_formula(tokens: &mut TokenReader) -> io::Result<(Vec<(String, Self)>, Self)> {
         let mut definitions = Vec::new();
 
@@ -1011,21 +1053,6 @@ impl SymbolicBDD {
 
         Ok(result)
     }
-}
-
-fn uses_rewriting(tokens: &[SymbolicBDDToken]) -> bool {
-    tokens
-        .iter()
-        .any(|t| matches!(t, SymbolicBDDToken::Rewrite | SymbolicBDDToken::Sum))
-        || tokens.windows(2).any(|w| {
-            matches!(
-                w,
-                [
-                    SymbolicBDDToken::Ident(_),
-                    SymbolicBDDToken::OpenParen | SymbolicBDDToken::Eq
-                ]
-            )
-        })
 }
 
 // precedence and right-associativity of a binary operator token
