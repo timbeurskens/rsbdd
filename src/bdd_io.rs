@@ -1,6 +1,3 @@
-extern crate dot;
-
-use std::borrow::Cow;
 use std::io;
 use std::io::Write;
 
@@ -14,7 +11,6 @@ type GraphNode<S> = BDD<S>;
 pub struct BDDGraph<S: BDDSymbol> {
     nodes: Vec<GraphNode<S>>,
     edges: Vec<GraphEdge<S>>,
-    filter: TruthTableEntry,
 }
 
 impl<S: BDDSymbol> BDDGraph<S> {
@@ -23,41 +19,40 @@ impl<S: BDDSymbol> BDDGraph<S> {
     }
 
     pub fn new(root: &BDD<S>, filter: TruthTableEntry) -> Self {
-        let mut graph = Self {
-            nodes: Vec::new(),
-            edges: Vec::new(),
-            filter,
+        let keep = |b: &BDD<S>| {
+            b.is_choice()
+                || match filter {
+                    TruthTableEntry::Any => true,
+                    TruthTableEntry::True => b.is_true(),
+                    TruthTableEntry::False => b.is_false(),
+                    TruthTableEntry::None => false,
+                }
         };
 
-        if graph.keep(root) {
-            let mut visited = FxHashSet::default();
-            visited.insert(root.get_hash());
-            let mut stack = vec![root.clone()];
+        let mut nodes = Vec::new();
+        let mut edges = Vec::new();
 
-            while let Some(node) = stack.pop() {
-                if let Node::Choice(l, _, r) = node.node() {
-                    for (e, child) in [(true, l), (false, r)] {
-                        if !graph.keep(&child) {
-                            continue;
-                        }
-                        graph.edges.push((node.clone(), e, child.clone()));
-                        if visited.insert(child.get_hash()) {
-                            stack.push(child);
-                        }
-                    }
-                }
-                graph.nodes.push(node);
-            }
+        if !keep(root) {
+            return Self { nodes, edges };
         }
 
-        graph
-    }
+        let mut visited = FxHashSet::default();
+        visited.insert(root.get_hash());
+        let mut stack = vec![root.clone()];
 
-    fn keep(&self, b: &BDD<S>) -> bool {
-        b.is_choice()
-            || self.filter == TruthTableEntry::Any
-            || (self.filter == TruthTableEntry::True && b.is_true())
-            || (self.filter == TruthTableEntry::False && b.is_false())
+        while let Some(node) = stack.pop() {
+            if let Node::Choice(l, _, r) = node.node() {
+                for (e, child) in [(true, l), (false, r)].into_iter().filter(|(_, c)| keep(c)) {
+                    edges.push((node.clone(), e, child.clone()));
+                    if visited.insert(child.get_hash()) {
+                        stack.push(child);
+                    }
+                }
+            }
+            nodes.push(node);
+        }
+
+        Self { nodes, edges }
     }
 }
 
@@ -67,17 +62,15 @@ impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<S>, GraphEdge<S>> for BDDGrap
     }
 
     fn node_id(&self, n: &GraphNode<S>) -> dot::Id<'a> {
-        match n.node() {
-            // use grep -v n_true or grep -v n_false to filter nodes adjacent to true or false
-            Node::True => {
-                dot::Id::new("n_true".to_string()).expect("cannot create Id named 'n_true'")
-            }
-            Node::False => {
-                dot::Id::new("n_false".to_string()).expect("cannot create Id named 'n_false'")
-            }
-            Node::Choice(..) => dot::Id::new(format!("n_{}", n.get_hash()))
-                .unwrap_or_else(|_| panic!("cannot create Id named 'n_{}'", n.get_hash())),
-        }
+        // use grep -v n_true or grep -v n_false to filter nodes adjacent to true or false
+        let id = if n.is_true() {
+            "n_true".to_string()
+        } else if n.is_false() {
+            "n_false".to_string()
+        } else {
+            format!("n_{}", n.get_hash())
+        };
+        dot::Id::new(id.clone()).unwrap_or_else(|_| panic!("cannot create Id named '{id}'"))
     }
 
     fn node_label(&self, n: &GraphNode<S>) -> dot::LabelText<'a> {
@@ -93,11 +86,7 @@ impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<S>, GraphEdge<S>> for BDDGrap
     }
 
     fn edge_label(&self, (_, e, _): &GraphEdge<S>) -> dot::LabelText<'a> {
-        if *e {
-            dot::LabelText::LabelStr(Cow::Borrowed("T"))
-        } else {
-            dot::LabelText::LabelStr(Cow::Borrowed("F"))
-        }
+        dot::LabelText::label(if *e { "T" } else { "F" })
     }
 
     fn edge_style(&'a self, (_, e, _): &GraphEdge<S>) -> dot::Style {
@@ -111,11 +100,11 @@ impl<'a, S: BDDSymbol> dot::Labeller<'a, GraphNode<S>, GraphEdge<S>> for BDDGrap
 
 impl<'a, S: BDDSymbol> dot::GraphWalk<'a, GraphNode<S>, GraphEdge<S>> for BDDGraph<S> {
     fn nodes(&'a self) -> dot::Nodes<'a, GraphNode<S>> {
-        Cow::Borrowed(&self.nodes)
+        self.nodes.as_slice().into()
     }
 
     fn edges(&'a self) -> dot::Edges<'a, GraphEdge<S>> {
-        Cow::Borrowed(&self.edges)
+        self.edges.as_slice().into()
     }
 
     fn source(&self, (a, _, _): &GraphEdge<S>) -> GraphNode<S> {
