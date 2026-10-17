@@ -4,26 +4,23 @@ expression: output
 input_file: examples/fp.txt
 ---
 $ rsbdd -t -f true examples/fp.txt
-status: 0
+status: 10
 --- stdout
 | a     | b     | c     | *     |
 |-------|-------|-------|-------|
 | False | False | False | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -v examples/fp.txt
-status: 0
+status: 10
 --- stdout
 ;
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -m -t -f true examples/fp.txt
-status: 0
+status: 10
 --- stdout
 | a     | b     | c     | *     |
 |-------|-------|-------|-------|
 | False | False | False | True  |
 --- stderr
-finished 1/1 runs

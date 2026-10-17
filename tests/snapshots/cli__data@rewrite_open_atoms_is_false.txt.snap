@@ -4,23 +4,20 @@ expression: output
 input_file: tests/data/rewrite_open_atoms_is_false.txt
 ---
 $ rsbdd -t -f true tests/data/rewrite_open_atoms_is_false.txt
-status: 0
+status: 20
 --- stdout
 | color(H1, Red) | *     |
 |----------------|-------|
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -v tests/data/rewrite_open_atoms_is_false.txt
-status: 0
+status: 20
 --- stdout
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -m -t -f true tests/data/rewrite_open_atoms_is_false.txt
-status: 0
+status: 20
 --- stdout
 | color(H1, Red) | *     |
 |----------------|-------|
 --- stderr
-finished 1/1 runs

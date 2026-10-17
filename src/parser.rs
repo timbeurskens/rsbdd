@@ -106,6 +106,72 @@ impl Display for DomainConstant {
     }
 }
 
+impl Display for BinaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::And => "&",
+            Self::Or => "|",
+            Self::Xor => "^",
+            Self::Nor => "nor",
+            Self::Nand => "nand",
+            Self::Implies => "=>",
+            Self::ImpliesInv => "<=",
+            Self::Iff => "<=>",
+            Self::Equals => "=",
+            Self::Rewrite => "->",
+        })
+    }
+}
+
+impl Display for CountableOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::AtMost => "<=",
+            Self::LessThan => "<",
+            Self::AtLeast => ">=",
+            Self::MoreThan => ">",
+            Self::Exactly => "=",
+        })
+    }
+}
+
+impl Display for SymbolicBDD {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::False => write!(f, "false"),
+            Self::True => write!(f, "true"),
+            Self::Var(v) => write!(f, "{}", v),
+            Self::Not(e) => write!(f, "-({})", e),
+            Self::Quantifier(QuantifierType::Exists, vars, e) => {
+                write!(f, "(exists {} # {})", vars.iter().join(", "), e)
+            }
+            Self::Quantifier(QuantifierType::Forall, vars, e) => {
+                write!(f, "(forall {} # {})", vars.iter().join(", "), e)
+            }
+            Self::CountableConst(op, es, n) => {
+                write!(f, "([{}] {} {})", es.iter().join(", "), op, n)
+            }
+            Self::CountableVariable(op, l, r) => write!(
+                f,
+                "([{}] {} [{}])",
+                l.iter().join(", "),
+                op,
+                r.iter().join(", ")
+            ),
+            Self::FixedPoint(v, true, e) => write!(f, "(gfp {} # {})", v, e),
+            Self::FixedPoint(v, false, e) => write!(f, "(lfp {} # {})", v, e),
+            Self::Ite(c, t, e) => write!(f, "(if {} then {} else {})", c, t, e),
+            Self::BinaryOp(op, l, r) => write!(f, "({} {} {})", l, op, r),
+            Self::Summation(vars, e) => write!(f, "(sum {} # {})", vars.iter().join(", "), e),
+            Self::RuleApplication(t) => write!(f, "{}", t),
+            Self::Subtree(t) if t.is_true() => write!(f, "true"),
+            Self::Subtree(t) if t.is_false() => write!(f, "false"),
+            Self::Subtree(_) => write!(f, "{{bdd}}"),
+            Self::Reference(name) => write!(f, "{{{}}}", name),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SymbolicBDD {
     False,

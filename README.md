@@ -315,6 +315,9 @@ peano_puzzle.dot`, has a single path to `true`: the unique solution `a = 1`, `b 
 
 ![peano puzzle bdd](docs/images/peano_puzzle.svg)
 
+To inspect the ground formula produced by the rewrite rules, use `-w <file>` (or `-w -` for stdout). The output is a
+plain rsbdd formula and can be solved again, e.g. `rsbdd examples/peano_puzzle.txt -w - | rsbdd -`.
+
 ### Design
 
 Rewrite rules introduce rewriting of domain-based variables and constants into logical primitives.
@@ -556,24 +559,49 @@ A BDD-based SAT solver
 Usage: rsbdd [OPTIONS] [FILE]
 
 Arguments:
-  [FILE]  The input file containing a logic formula in rsbdd format
+  [FILE]  The input file containing a logic formula in rsbdd format, or '-' for stdin
 
 Options:
-  -p, --parsetree <PARSETREE>            Write the parse tree in dot format to the specified file
-  -t, --truthtable                       Print the truth table to stdout
-  -d, --dot <DOT>                        Write the bdd to a dot graphviz file
-  -m, --model                            Compute a single satisfying model as output
-  -v, --vars                             Print all satisfying variables leading to a truth value
-  -f, --filter <FILTER>                  Only show true or false entries in the output [default: Any]
-  -c, --retain-choices <RETAIN_CHOICES>  Only retain choice variables when filtering [default: Any]
-  -b, --benchmark <N>                    Repeat the solving process n times for more accurate performance reports
-  -g, --plot                             Use GNUPlot to plot the runtime distribution
-  -e, --evaluate <EVALUATE>              Parse the formula as string
-  -o, --ordering <ORDERING>              Read a custom variable ordering from file
-  -r, --export-ordering                  Export the automatically derived ordering to stdout
-  -h, --help                             Print help
-  -V, --version                          Print version
+  -h, --help     Print help
+  -V, --version  Print version
 
+Input:
+  -e, --evaluate <EVALUATE>  Parse the formula as string
+  -o, --ordering <FILE>      Read a custom variable ordering from file
+
+Output:
+  -t, --truthtable        Print the truth table to stdout
+  -v, --vars              Print all satisfying variables leading to a truth value
+  -d, --dot <FILE>        Write the bdd to a dot graphviz file ('-' for stdout)
+  -p, --parsetree <FILE>  Write the parse tree in dot format to the specified file ('-' for stdout)
+  -w, --rewritten <FILE>  Write the formula after applying rewrite rules to the specified file ('-'
+                          for stdout)
+  -r, --export-ordering   Export the automatically derived ordering to stdout
+
+Filtering:
+  -m, --model
+          Compute a single satisfying model as output
+  -f, --filter <true|false|any>
+          Only show true or false entries in the output [default: true without output options, any
+          otherwise]
+  -c, --retain-choices <true|false|any>
+          Only retain choice variables when filtering [default: Any]
+
+Benchmarking:
+  -b, --benchmark <N>  Repeat the solving process n times for more accurate performance reports
+  -g, --plot           Use GNUPlot to plot the runtime distribution
+
+Solver:
+  -l, --memory-limit <MiB>  Limit the memory used by the solver, nodes exceeding the limit are paged
+                            to disk [default: 75% of available memory]
+
+Without output options, the satisfying rows of the truth table are printed.
+Exit status: 10 if the formula is satisfiable, 20 if it is unsatisfiable, 1 or 2 on errors.
+
+Examples:
+  rsbdd examples/4_queens.txt
+  rsbdd -e "a & -b" -t
+  rsbdd examples/peano_puzzle.txt -w -
 ```
 
 ### max_clique_gen

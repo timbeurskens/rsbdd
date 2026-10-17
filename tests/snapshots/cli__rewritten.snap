@@ -1,0 +1,9 @@
+---
+source: tests/cli.rs
+expression: "run(&[\"-w\", \"-\", \"tests/data/rewrite_open_atoms_is_true.txt\"])"
+---
+$ rsbdd -w - tests/data/rewrite_open_atoms_is_true.txt
+status: 10
+--- stdout
+((color(H1, Red) | -(color(H1, Red))) & (color(H1, Red) <=> color(H1, Red)))
+--- stderr

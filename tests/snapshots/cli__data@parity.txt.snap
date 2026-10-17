@@ -4,7 +4,7 @@ expression: output
 input_file: tests/data/parity.txt
 ---
 $ rsbdd -t -f true tests/data/parity.txt
-status: 0
+status: 10
 --- stdout
 | a     | b     | c     | d     | *     |
 |-------|-------|-------|-------|-------|
@@ -17,10 +17,9 @@ status: 0
 | True  | True  | False | True  | True  |
 | True  | True  | True  | False | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -v tests/data/parity.txt
-status: 0
+status: 10
 --- stdout
 d;
 c;
@@ -31,13 +30,11 @@ a, c, d;
 a, b, d;
 a, b, c;
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -m -t -f true tests/data/parity.txt
-status: 0
+status: 10
 --- stdout
 | a     | b     | c     | d     | *     |
 |-------|-------|-------|-------|-------|
 | True  | True  | True  | False | True  |
 --- stderr
-finished 1/1 runs

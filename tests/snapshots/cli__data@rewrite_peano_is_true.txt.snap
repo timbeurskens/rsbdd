@@ -4,26 +4,23 @@ expression: output
 input_file: tests/data/rewrite_peano_is_true.txt
 ---
 $ rsbdd -t -f true tests/data/rewrite_peano_is_true.txt
-status: 0
+status: 10
 --- stdout
 | *     |
 |-------|
 | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -v tests/data/rewrite_peano_is_true.txt
-status: 0
+status: 10
 --- stdout
 ;
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -m -t -f true tests/data/rewrite_peano_is_true.txt
-status: 0
+status: 10
 --- stdout
 | *     |
 |-------|
 | True  |
 --- stderr
-finished 1/1 runs

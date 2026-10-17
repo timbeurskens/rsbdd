@@ -98,3 +98,17 @@ fn test_formula_edge_cases() {
         "a and b or not c",
     ]));
 }
+
+#[test]
+fn test_default_output() {
+    insta::assert_snapshot!(run(&["examples/4_queens.txt"]));
+}
+
+#[test]
+fn test_rewritten() {
+    insta::assert_snapshot!(run(&[
+        "-w",
+        "-",
+        "tests/data/rewrite_open_atoms_is_true.txt"
+    ]));
+}

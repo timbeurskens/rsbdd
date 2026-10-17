@@ -4,26 +4,23 @@ expression: output
 input_file: examples/rewrite_simple.txt
 ---
 $ rsbdd -t -f true examples/rewrite_simple.txt
-status: 0
+status: 10
 --- stdout
 | *     |
 |-------|
 | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -v examples/rewrite_simple.txt
-status: 0
+status: 10
 --- stdout
 ;
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -m -t -f true examples/rewrite_simple.txt
-status: 0
+status: 10
 --- stdout
 | *     |
 |-------|
 | True  |
 --- stderr
-finished 1/1 runs

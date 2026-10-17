@@ -3,64 +3,58 @@ source: tests/cli.rs
 expression: "run_formulas(&[\"true & false\", \"-(-a)\", \"a & -a\", \"a ^ a\", \"a nand a\",\n\"a nor a\", \"a <= b\", \"a <=> b\", \"if a then b else c\", \"[a, b] = 3\",\n\"[a, b] >= 0\", \"[a, b] < 0\", \"[a, b] > 2\", \"[a, a] = 1\", \"[a] = [b]\",\n\"[a, b] < [c]\", \"[a] > []\", \"exists z # a\", \"exists a, a # a & b\",\n\"forall a # a\", \"forall a # a | -a\", \"nu X # X & a\", \"mu X # X | a\",\n\"mu X # X\", \"nu X # X\", \"{undefined}\", \"\\\"only a comment\\\" a\",\n\"a and b or not c\",])"
 ---
 $ rsbdd -t --evaluate=true & false
-status: 0
+status: 20
 --- stdout
 | *     |
 |-------|
 | False |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=-(-a)
-status: 0
+status: 10
 --- stdout
 | a     | *     |
 |-------|-------|
 | False | False |
 | True  | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=a & -a
-status: 0
+status: 20
 --- stdout
 | a     | *     |
 |-------|-------|
 | Any   | False |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=a ^ a
-status: 0
+status: 20
 --- stdout
 | a     | *     |
 |-------|-------|
 | Any   | False |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=a nand a
-status: 0
+status: 10
 --- stdout
 | a     | *     |
 |-------|-------|
 | False | True  |
 | True  | False |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=a nor a
-status: 0
+status: 10
 --- stdout
 | a     | *     |
 |-------|-------|
 | False | True  |
 | True  | False |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=a <= b
-status: 0
+status: 10
 --- stdout
 | a     | b     | *     |
 |-------|-------|-------|
@@ -68,10 +62,9 @@ status: 0
 | False | True  | False |
 | True  | Any   | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=a <=> b
-status: 0
+status: 10
 --- stdout
 | a     | b     | *     |
 |-------|-------|-------|
@@ -80,10 +73,9 @@ status: 0
 | True  | False | False |
 | True  | True  | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=if a then b else c
-status: 0
+status: 10
 --- stdout
 | a     | b     | c     | *     |
 |-------|-------|-------|-------|
@@ -92,55 +84,49 @@ status: 0
 | True  | False | Any   | False |
 | True  | True  | Any   | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=[a, b] = 3
-status: 0
+status: 20
 --- stdout
 | a     | b     | *     |
 |-------|-------|-------|
 | Any   | Any   | False |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=[a, b] >= 0
-status: 0
+status: 10
 --- stdout
 | a     | b     | *     |
 |-------|-------|-------|
 | Any   | Any   | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=[a, b] < 0
-status: 0
+status: 20
 --- stdout
 | a     | b     | *     |
 |-------|-------|-------|
 | Any   | Any   | False |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=[a, b] > 2
-status: 0
+status: 20
 --- stdout
 | a     | b     | *     |
 |-------|-------|-------|
 | Any   | Any   | False |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=[a, a] = 1
-status: 0
+status: 20
 --- stdout
 | a     | *     |
 |-------|-------|
 | Any   | False |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=[a] = [b]
-status: 0
+status: 10
 --- stdout
 | a     | b     | *     |
 |-------|-------|-------|
@@ -149,10 +135,9 @@ status: 0
 | True  | False | False |
 | True  | True  | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=[a, b] < [c]
-status: 0
+status: 10
 --- stdout
 | a     | b     | c     | *     |
 |-------|-------|-------|-------|
@@ -161,115 +146,103 @@ status: 0
 | False | True  | Any   | False |
 | True  | Any   | Any   | False |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=[a] > []
-status: 0
+status: 10
 --- stdout
 | a     | *     |
 |-------|-------|
 | False | False |
 | True  | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=exists z # a
-status: 0
+status: 10
 --- stdout
 | a     | *     |
 |-------|-------|
 | False | False |
 | True  | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=exists a, a # a & b
-status: 0
+status: 10
 --- stdout
 | b     | *     |
 |-------|-------|
 | False | False |
 | True  | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=forall a # a
-status: 0
+status: 20
 --- stdout
 | *     |
 |-------|
 | False |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=forall a # a | -a
-status: 0
+status: 10
 --- stdout
 | *     |
 |-------|
 | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=nu X # X & a
-status: 0
+status: 10
 --- stdout
 | a     | *     |
 |-------|-------|
 | False | False |
 | True  | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=mu X # X | a
-status: 0
+status: 10
 --- stdout
 | a     | *     |
 |-------|-------|
 | False | False |
 | True  | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=mu X # X
-status: 0
+status: 20
 --- stdout
 | *     |
 |-------|
 | False |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=nu X # X
-status: 0
+status: 10
 --- stdout
 | *     |
 |-------|
 | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate={undefined}
-status: 0
+status: 20
 --- stdout
 | *     |
 |-------|
 | False |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate="only a comment" a
-status: 0
+status: 10
 --- stdout
 | a     | *     |
 |-------|-------|
 | False | False |
 | True  | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=a and b or not c
-status: 0
+status: 10
 --- stdout
 | a     | b     | c     | *     |
 |-------|-------|-------|-------|
@@ -279,4 +252,3 @@ status: 0
 | True  | False | True  | False |
 | True  | True  | Any   | True  |
 --- stderr
-finished 1/1 runs

@@ -4,26 +4,23 @@ expression: output
 input_file: examples/transitivity.txt
 ---
 $ rsbdd -t -f true examples/transitivity.txt
-status: 0
+status: 10
 --- stdout
 | a1    | a2    | a3    | a4    | b1    | b2    | b3    | b4    | c1    | c2    | c3    | c4    | *     |
 |-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
 | Any   | Any   | Any   | Any   | Any   | Any   | Any   | Any   | Any   | Any   | Any   | Any   | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -v examples/transitivity.txt
-status: 0
+status: 10
 --- stdout
 a1*, a2*, a3*, a4*, b1*, b2*, b3*, b4*, c1*, c2*, c3*, c4*;
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -m -t -f true examples/transitivity.txt
-status: 0
+status: 10
 --- stdout
 | a1    | a2    | a3    | a4    | b1    | b2    | b3    | b4    | c1    | c2    | c3    | c4    | *     |
 |-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
 | Any   | Any   | Any   | Any   | Any   | Any   | Any   | Any   | Any   | Any   | Any   | Any   | True  |
 --- stderr
-finished 1/1 runs
