@@ -1,0 +1,35 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: tests/data/adder.txt
+---
+$ rsbdd -t -f true tests/data/adder.txt
+status: 0
+--- stdout
+| s0    | a0    | b0    | s1    | a1    | b1    | s2    | *     |
+|-------|-------|-------|-------|-------|-------|-------|-------|
+| True  | False | True  | True  | False | True  | False | True  |
+| True  | False | True  | True  | True  | False | False | True  |
+| True  | True  | False | True  | False | True  | False | True  |
+| True  | True  | False | True  | True  | False | False | True  |
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -v tests/data/adder.txt
+status: 0
+--- stdout
+s0, b0, s1, b1;
+s0, b0, s1, a1;
+s0, a0, s1, b1;
+s0, a0, s1, a1;
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -m -t -f true tests/data/adder.txt
+status: 0
+--- stdout
+| s0    | a0    | b0    | s1    | a1    | b1    | s2    | *     |
+|-------|-------|-------|-------|-------|-------|-------|-------|
+| True  | True  | False | True  | True  | False | False | True  |
+--- stderr
+finished 1/1 runs

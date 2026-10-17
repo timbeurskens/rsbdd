@@ -1,0 +1,6 @@
+"three pigeons cannot be placed in two holes without sharing"
+[p1h1, p1h2] >= 1 &
+[p2h1, p2h2] >= 1 &
+[p3h1, p3h2] >= 1 &
+[p1h1, p2h1, p3h1] <= 1 &
+[p1h2, p2h2, p3h2] <= 1

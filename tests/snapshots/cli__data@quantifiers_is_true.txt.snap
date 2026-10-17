@@ -1,0 +1,29 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: tests/data/quantifiers_is_true.txt
+---
+$ rsbdd -t -f true tests/data/quantifiers_is_true.txt
+status: 0
+--- stdout
+| b     | y     | c     | *     |
+|-------|-------|-------|-------|
+| Any   | Any   | Any   | True  |
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -v tests/data/quantifiers_is_true.txt
+status: 0
+--- stdout
+b*, y*, c*;
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -m -t -f true tests/data/quantifiers_is_true.txt
+status: 0
+--- stdout
+| b     | y     | c     | *     |
+|-------|-------|-------|-------|
+| Any   | Any   | Any   | True  |
+--- stderr
+finished 1/1 runs

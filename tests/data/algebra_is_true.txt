@@ -1,0 +1,15 @@
+"commutativity, associativity, distribution, absorption and De Morgan"
+((a & b) <=> (b & a)) &
+((a | b) <=> (b | a)) &
+(((a & b) & c) <=> (a & (b & c))) &
+(((a | b) | c) <=> (a | (b | c))) &
+((a & (b | c)) <=> ((a & b) | (a & c))) &
+((a | (b & c)) <=> ((a | b) & (a | c))) &
+((a & (a | b)) <=> a) &
+((a | (a & b)) <=> a) &
+(-(a & b) <=> (-a | -b)) &
+(-(a | b) <=> (-a & -b)) &
+((--a) <=> a) &
+((a ^ a) <=> false) &
+((a ^ -a) <=> true) &
+(((a ^ b) ^ c) <=> (a ^ (b ^ c)))

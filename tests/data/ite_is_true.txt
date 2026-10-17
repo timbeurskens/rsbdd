@@ -1,0 +1,7 @@
+((if a then b else c) <=> ((a => b) & (-a => c))) &
+((if true then a else b) <=> a) &
+((if false then a else b) <=> b) &
+((if a then true else false) <=> a) &
+((if a then false else true) <=> -a) &
+((if a then b else b) <=> b) &
+((if (a & b) then c else (if a then -c else c)) <=> (if a then (b <=> c) else c))

@@ -1,0 +1,2 @@
+"odd parity of four variables"
+a ^ b ^ c ^ d

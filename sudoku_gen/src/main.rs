@@ -66,10 +66,10 @@ fn main() -> io::Result<()> {
     writeln!(writer)?;
 
     for i in 0..numcells {
-        if let Some(ch) = puzzle_input.chars().nth(i) {
-            if char::is_digit(ch, 10) {
-                writeln!(writer, "_{}_is_{} &", i, ch)?;
-            }
+        if let Some(ch) = puzzle_input.chars().nth(i)
+            && char::is_digit(ch, 10)
+        {
+            writeln!(writer, "_{}_is_{} &", i, ch)?;
         }
     }
 

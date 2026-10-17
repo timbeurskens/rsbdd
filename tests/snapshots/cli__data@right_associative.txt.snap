@@ -1,0 +1,31 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: tests/data/right_associative.txt
+---
+$ rsbdd -t -f true tests/data/right_associative.txt
+status: 0
+--- stdout
+| a     | b     | c     | *     |
+|-------|-------|-------|-------|
+| True  | False | True  | True  |
+| True  | True  | Any   | True  |
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -v tests/data/right_associative.txt
+status: 0
+--- stdout
+a, c;
+a, b, c*;
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -m -t -f true tests/data/right_associative.txt
+status: 0
+--- stdout
+| a     | b     | c     | *     |
+|-------|-------|-------|-------|
+| True  | True  | Any   | True  |
+--- stderr
+finished 1/1 runs

@@ -1,0 +1,18 @@
+(forall a # true) &
+(-(forall a # a)) &
+(exists a # a) &
+(-(exists a # false)) &
+((forall a # (a | b)) <=> b) &
+((exists a # (a & b)) <=> b) &
+((exists x # y) <=> y) &
+(exists a, b # (a & -b)) &
+(forall a, b # exists c # ((c | a) & (c | b))) &
+(-(exists c # forall a # (c <=> a))) &
+
+"duality between the quantifiers"
+((forall a # (a | b | c)) <=> -(exists a # -(a | b | c))) &
+((exists a, b # (a ^ b ^ c)) <=> -(forall a, b # -(a ^ b ^ c))) &
+
+"keyword aliases"
+((all a # (a => b)) <=> (forall a # (a => b))) &
+((any a # (a & b)) <=> (exists a # (a & b)))

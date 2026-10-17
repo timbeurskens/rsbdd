@@ -1,0 +1,33 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: examples/fixedpoint.txt
+---
+$ rsbdd -t -f true examples/fixedpoint.txt
+status: 0
+--- stdout
+| a     | b     | c     | *     |
+|-------|-------|-------|-------|
+| False | False | True  | True  |
+| False | True  | Any   | True  |
+| True  | Any   | Any   | True  |
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -v examples/fixedpoint.txt
+status: 0
+--- stdout
+c;
+b, c*;
+a, b*, c*;
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -m -t -f true examples/fixedpoint.txt
+status: 0
+--- stdout
+| a     | b     | c     | *     |
+|-------|-------|-------|-------|
+| True  | Any   | Any   | True  |
+--- stderr
+finished 1/1 runs

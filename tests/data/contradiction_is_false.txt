@@ -1,0 +1,1 @@
+(a & -a) | (exists b # (b & -b)) | (forall c # c) | ([a, b] > 2) | (mu X # X)

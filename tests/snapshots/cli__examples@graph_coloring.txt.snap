@@ -1,0 +1,51 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: examples/graph_coloring.txt
+---
+$ rsbdd -t -f true examples/graph_coloring.txt
+status: 0
+--- stdout
+| a1    | a2    | a3    | b1    | b2    | b3    | c1    | c2    | c3    | d1    | d2    | d3    | *     |
+|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
+| False | False | True  | False | True  | False | False | False | True  | True  | False | False | True  |
+| False | False | True  | False | True  | False | True  | False | False | False | False | True  | True  |
+| False | False | True  | True  | False | False | False | False | True  | False | True  | False | True  |
+| False | False | True  | True  | False | False | False | True  | False | False | False | True  | True  |
+| False | True  | False | False | False | True  | False | True  | False | True  | False | False | True  |
+| False | True  | False | False | False | True  | True  | False | False | False | True  | False | True  |
+| False | True  | False | True  | False | False | False | False | True  | False | True  | False | True  |
+| False | True  | False | True  | False | False | False | True  | False | False | False | True  | True  |
+| True  | False | False | False | False | True  | False | True  | False | True  | False | False | True  |
+| True  | False | False | False | False | True  | True  | False | False | False | True  | False | True  |
+| True  | False | False | False | True  | False | False | False | True  | True  | False | False | True  |
+| True  | False | False | False | True  | False | True  | False | False | False | False | True  | True  |
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -v examples/graph_coloring.txt
+status: 0
+--- stdout
+a3, b2, c3, d1;
+a3, b2, c1, d3;
+a3, b1, c3, d2;
+a3, b1, c2, d3;
+a2, b3, c2, d1;
+a2, b3, c1, d2;
+a2, b1, c3, d2;
+a2, b1, c2, d3;
+a1, b3, c2, d1;
+a1, b3, c1, d2;
+a1, b2, c3, d1;
+a1, b2, c1, d3;
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -m -t -f true examples/graph_coloring.txt
+status: 0
+--- stdout
+| a1    | a2    | a3    | b1    | b2    | b3    | c1    | c2    | c3    | d1    | d2    | d3    | *     |
+|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
+| True  | False | False | False | True  | False | True  | False | False | False | False | True  | True  |
+--- stderr
+finished 1/1 runs
