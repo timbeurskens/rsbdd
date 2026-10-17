@@ -318,6 +318,45 @@ peano_puzzle.dot`, has a single path to `true`: the unique solution `a = 1`, `b 
 To inspect the ground formula produced by the rewrite rules, use `-w <file>` (or `-w -` for stdout). The output is a
 plain rsbdd formula and can be solved again, e.g. `rsbdd examples/peano_puzzle.txt -w - | rsbdd -`.
 
+### Combining rewrite rules and fixed points
+
+Rewrite rules and fixed points can be used in the same formula. The example in
+[examples/rooms.txt](examples/rooms.txt) asks which rooms of a house can be reached from the hall. Rooms and doors are
+facts, `step(x, y)` is a rule over them, and `at(room)` maps every room to a 3-bit encoding. The least fixpoint then
+computes the set of reachable encodings, without knowing the number of steps in advance.
+
+```
+let T := exists x, y # step(x, y) & at(x)[b2 := p2, b1 := p1, b0 := p0] & at(y);
+let Reach := lfp R # at(Hall) | exists p2, p1, p0 # R[b2 := p2, b1 := p1, b0 := p0] & T;
+
+door(Hall, Kitchen) -> true;
+trapdoor(Attic, Hall) -> true;
+...
+sum x, y # step(x, y) -> door(x, y) | door(y, x) | trapdoor(x, y);
+
+at(Hall)    -> -b2 & -b1 & -b0;
+at(Kitchen) -> -b2 & -b1 &  b0;
+...
+
+forall r # room(r) => (reachable(r) <=> exists b2, b1, b0 # at(r) & Reach)
+```
+
+The trapdoor only leads from the attic to the hall, so the attic and the cellar cannot be reached.
+
+![rooms house](docs/images/rooms_house.svg)
+
+The BDD obtained with `rsbdd examples/rooms.txt -d rooms.dot` has a single path to `true`:
+
+![rooms bdd](docs/images/rooms_bdd.svg)
+
+```bash
+rsbdd examples/rooms.txt -t -ft
+```
+
+| reachable(Hall) | reachable(Kitchen) | reachable(Garden) | reachable(Shed) | reachable(Attic) | reachable(Cellar) | *    |
+|-----------------|--------------------|-------------------|-----------------|------------------|-------------------|------|
+| True            | True               | True              | True            | False            | False             | True |
+
 ### Design
 
 Rewrite rules introduce rewriting of domain-based variables and constants into logical primitives.
