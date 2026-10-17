@@ -1,0 +1,26 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: examples/peano.txt
+---
+$ rsbdd -t -f true examples/peano.txt
+status: 10
+--- stdout
+| *     |
+|-------|
+| True  |
+--- stderr
+
+$ rsbdd -v examples/peano.txt
+status: 10
+--- stdout
+;
+--- stderr
+
+$ rsbdd -m -t -f true examples/peano.txt
+status: 10
+--- stdout
+| *     |
+|-------|
+| True  |
+--- stderr

@@ -1,0 +1,6 @@
+"ground facts: an application matching a rule with a 'true' right-hand side is true"
+is_person(Alice) -> true;
+is_person(Bob) -> true;
+is_person(Chair) -> false;
+
+is_person(Alice) & is_person(Bob) & -is_person(Chair)

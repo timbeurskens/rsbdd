@@ -1,0 +1,2 @@
+"term equality holds only for structurally identical terms"
+(A = A) & -(A = B) & (f(A, B) = f(A, B)) & -(f(A, B) = f(B, A)) & -(f(A) = g(A)) & -(f(A) = A)

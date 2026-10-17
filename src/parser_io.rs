@@ -34,7 +34,8 @@ impl SymbolicParseTree {
                     .chain(this_node)
                     .collect()
             }
-            SymbolicBDD::Quantifier(_, _, f)
+            SymbolicBDD::Summation(_, f)
+            | SymbolicBDD::Quantifier(_, _, f)
             | SymbolicBDD::Not(f)
             | SymbolicBDD::FixedPoint(_, _, f) => {
                 let new_nodes = Self::nodes_recursive(f);
@@ -75,6 +76,7 @@ impl SymbolicParseTree {
             SymbolicBDD::True
             | SymbolicBDD::False
             | SymbolicBDD::Var(_)
+            | SymbolicBDD::RuleApplication(_)
             | SymbolicBDD::Subtree(_)
             | SymbolicBDD::Reference(_) => this_node,
         }
@@ -101,6 +103,7 @@ impl<'a> dot::Labeller<'a, GraphNode, GraphEdge> for SymbolicParseTree {
     fn node_label(&self, n: &GraphNode) -> dot::LabelText<'a> {
         match &self.nodes[*n] {
             SymbolicBDD::BinaryOp(op, _, _) => dot::LabelText::label(format!("{:?}", op)),
+            SymbolicBDD::Summation(v, _) => dot::LabelText::label(format!("Sum {:?}", v)),
             SymbolicBDD::Quantifier(op, v, _) => dot::LabelText::label(format!(
                 "{:?} [{}]",
                 op,
@@ -120,6 +123,7 @@ impl<'a> dot::Labeller<'a, GraphNode, GraphEdge> for SymbolicParseTree {
             SymbolicBDD::False => dot::LabelText::label("False".to_string()),
             SymbolicBDD::True => dot::LabelText::label("True".to_string()),
             SymbolicBDD::Var(v) => dot::LabelText::label(format!("Var {}", v)),
+            SymbolicBDD::RuleApplication(m) => dot::LabelText::label(format!("Rewrite {}", m)),
             SymbolicBDD::Subtree(_) => dot::LabelText::label("BDD".to_string()),
             SymbolicBDD::Reference(name) => dot::LabelText::label(format!("Ref {name}")),
         }
@@ -158,7 +162,8 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                             .expect("cannot find position"),
                     ));
                 }
-                SymbolicBDD::Quantifier(_, _, f)
+                SymbolicBDD::Summation(_, f)
+                | SymbolicBDD::Quantifier(_, _, f)
                 | SymbolicBDD::Not(f)
                 | SymbolicBDD::FixedPoint(_, _, f) => {
                     edges.push((
@@ -233,6 +238,7 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                 SymbolicBDD::False
                 | SymbolicBDD::True
                 | SymbolicBDD::Var(_)
+                | SymbolicBDD::RuleApplication(_)
                 | SymbolicBDD::Subtree(_)
                 | SymbolicBDD::Reference(_) => {}
             }

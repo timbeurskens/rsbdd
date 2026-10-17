@@ -1,0 +1,4 @@
+"patterns match nested terms structurally"
+sum x, y # swap(pair(x, y), pair(y, x)) -> true;
+
+swap(pair(A, B), pair(B, A)) & -swap(pair(A, B), pair(A, B)) & -swap(pair(A, B), other(B, A))

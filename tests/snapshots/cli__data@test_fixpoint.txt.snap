@@ -4,7 +4,7 @@ expression: output
 input_file: tests/data/test_fixpoint.txt
 ---
 $ rsbdd -t -f true tests/data/test_fixpoint.txt
-status: 0
+status: 10
 --- stdout
 | a     | b     | c     | *     |
 |-------|-------|-------|-------|
@@ -12,22 +12,19 @@ status: 0
 | False | True  | Any   | True  |
 | True  | Any   | Any   | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -v tests/data/test_fixpoint.txt
-status: 0
+status: 10
 --- stdout
 c;
 b, c*;
 a, b*, c*;
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -m -t -f true tests/data/test_fixpoint.txt
-status: 0
+status: 10
 --- stdout
 | a     | b     | c     | *     |
 |-------|-------|-------|-------|
 | True  | Any   | Any   | True  |
 --- stderr
-finished 1/1 runs

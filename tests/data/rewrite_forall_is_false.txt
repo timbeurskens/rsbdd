@@ -1,0 +1,8 @@
+"forall over a term variable ranges over all ground terms in the formula"
+person(Alice) -> true;
+person(Bob) -> true;
+likes(Alice, Tea) -> true;
+likes(Bob, Tea) -> true;
+likes(Bob, Coffee) -> true;
+
+forall p # person(p) => likes(p, Coffee)

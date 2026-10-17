@@ -276,6 +276,258 @@ Currently the RsBDD language relies heavily on logical primitives. Integer arith
 introducing the primitive 'bits' of a number. Rewrite rules could significantly simplify this process by introducting
 domains other than boolean variables. Embedding rewrite rules in the BDD could prove to be a challenge.
 
+## Rewrite rules (experimental)
+
+### Usage
+
+Problems can be described as propositions over terms such as `Alice`, `suc(_0)` or `next(H1, H2)`, together with
+rewrite rules defining some of these propositions.
+
+```
+"facts and rules"
+house(H1) -> true;
+house(H2) -> true;
+left(H1, H2) -> true;
+sum x, y # next(x, y) -> left(x, y) | left(y, x);
+
+"constraints"
+forall h # house(h) => [has_color(h, Red), has_color(h, Blue)] = 1;
+has_color(H1, Red)
+```
+
+- `p(t1, .., tn) -> formula` is a rewrite rule. Like `=>` it binds weaker than `&` and `|`, so a rule in a `&`-chain
+  needs parentheses: `(p(A) -> true) & ...`. Rules can also be separated using `;`.
+- `sum x, y # rule` introduces pattern variables `x` and `y` which match any term. Every pattern variable must occur
+  in the left-hand side of the rule.
+- `t1 = t2` holds if both terms are identical.
+- A proposition `p(..)` for which rules exist is rewritten to the conjunction of the right-hand sides of all matching
+  rules. If no rule matches, or the rewriting is cyclic, the proposition is false.
+- A proposition without any rules is an unknown: every distinct proposition, such as `has_color(H1, Red)`, becomes a
+  boolean variable for the solver.
+- `forall` and `exists` over a variable used as a term range over all ground terms occurring in the formula.
+- Rewrite rules must be top-level conjuncts of the formula.
+
+See [examples/peano.txt](examples/peano.txt), [examples/peano_puzzle.txt](examples/peano_puzzle.txt) and [examples/einstein.txt](examples/einstein.txt).
+
+The puzzle in [examples/peano_puzzle.txt](examples/peano_puzzle.txt) asks for natural numbers `a`, `b` and `c` such
+that `a + b = c`, `b + c = 5` and `a < b`. The BDD below, obtained with `rsbdd examples/peano_puzzle.txt -d
+peano_puzzle.dot`, has a single path to `true`: the unique solution `a = 1`, `b = 2` and `c = 3`.
+
+![peano puzzle bdd](docs/images/peano_puzzle.svg)
+
+To inspect the ground formula produced by the rewrite rules, use `-w <file>` (or `-w -` for stdout). The output is a
+plain rsbdd formula and can be solved again, e.g. `rsbdd examples/peano_puzzle.txt -w - | rsbdd -`.
+
+### Combining rewrite rules and fixed points
+
+Rewrite rules and fixed points can be used in the same formula. The example in
+[examples/rooms.txt](examples/rooms.txt) asks which rooms of a house can be reached from the hall. Rooms and doors are
+facts, `step(x, y)` is a rule over them, and `at(room)` maps every room to a 3-bit encoding. The least fixpoint then
+computes the set of reachable encodings, without knowing the number of steps in advance.
+
+```
+let T := exists x, y # step(x, y) & at(x)[b2 := p2, b1 := p1, b0 := p0] & at(y);
+let Reach := lfp R # at(Hall) | exists p2, p1, p0 # R[b2 := p2, b1 := p1, b0 := p0] & T;
+
+door(Hall, Kitchen) -> true;
+trapdoor(Attic, Hall) -> true;
+...
+sum x, y # step(x, y) -> door(x, y) | door(y, x) | trapdoor(x, y);
+
+at(Hall)    -> -b2 & -b1 & -b0;
+at(Kitchen) -> -b2 & -b1 &  b0;
+...
+
+forall r # room(r) => (reachable(r) <=> exists b2, b1, b0 # at(r) & Reach)
+```
+
+The trapdoor only leads from the attic to the hall, so the attic and the cellar cannot be reached.
+
+![rooms house](docs/images/rooms_house.svg)
+
+The BDD obtained with `rsbdd examples/rooms.txt -d rooms.dot` has a single path to `true`:
+
+![rooms bdd](docs/images/rooms_bdd.svg)
+
+```bash
+rsbdd examples/rooms.txt -t -ft
+```
+
+| reachable(Hall) | reachable(Kitchen) | reachable(Garden) | reachable(Shed) | reachable(Attic) | reachable(Cellar) | *    |
+|-----------------|--------------------|-------------------|-----------------|------------------|-------------------|------|
+| True            | True               | True              | True            | False            | False             | True |
+
+### Design
+
+Rewrite rules introduce rewriting of domain-based variables and constants into logical primitives.
+The rewrite system introduces two basic types, variables and constants, and some new operators.
+
+- Summation (`sum`): introduce a new variable which can take any value.
+- Rewrite (`->`): binary operator specifying a uni-directional rewrite rule.
+- Bi-directional rewrite (`<->`): the symmetric version of the rewrite operator.
+- Equivalence (`=`): binary relation specifying the equivalence of the left and right variables / constants.
+
+A rewrite rule, yields a truth value similar to an implication. 
+It is therefore possible that the rewrite operator and the implication operator will share the same symbol.
+For extra clarity, the rewrite operator `->` differs from the implication operator `=>` in this design document.
+For every formula requiring a rewrite, every rewrite rule must be satisfied (conjunction of all rules).
+
+_this information is outdated_
+
+Rewrite rules should be specified in a separate file with the `-r` or `--rules` parameter _Note: this complicates unix piping unfortunately._ The formula to be evaluated should not contain any rewrite rules. Rewrite rules are allowed in input formulas (and actually encouraged!).
+
+**Rewriting:**
+
+For every rewrite application in the formula, the rule application is replaced by a conjunction of all rewrite rules.
+The environment is updated (recursively), where the rule application is now an assumption / goal.
+Until the formula is closed (no remaining variables), the algorithm tries to match any open rewrite rule to an assumption in the environment.
+If a match has been found for some rewrite rule `x -> y`, `x` is replaced by `true`. If no match can be found for the rule, `x` is replaced by `false`.
+A rewrite rule `false -> y` can be rewritten to `true` by `rewrite elimination`. A rewrite rule `true -> y` can be rewritten to `y` by `rewrite elimination`.
+This approach could result in hidden bugs: if none of the rules match, the formula evaluates to `true` and terminates. In reality, the formula is likely unsolvable. A possible solution: the original formula is kept, subject to the environment of all rewrite rules (and introduced assumption(s) as a rewrite rule mapping to true). This environment is then recursively solved by invoking the SAT solver and rewriter alternatingly. 
+
+The rewrite system allows for modularity in theories: the peano axioms can be expressed in a separate `peano.l` theory file, which can be dynamically loaded upon invoking `rsbdd -l peano.l` (or the shorthand `rsbdd -lpeano`). Any evaluations will be subject to the included theories, e.g. `rsbdd -lpeano -e "1+1=2"`.
+
+**Matching:**
+
+**Quantification:**
+
+Quantifiers (`forall`, `exists`) convert a rewrite rule to a logically equivalent rule application with additional conditions.
+Suppose a formula has variables `Alice`, `Bob`, and `Neighbour(p)`. The formula `forall q # has_house(q)` can be converted to `has_house(Alice) & has_house(Bob) & (forall q # has_house(Neighbour(q)))`.
+
+A rewrite rule is embedded into the BDD. New rewrite rules can be introduced later in the formula, and rewrites can be influenced by early assumptions.
+This property is illustrated in example 'assumption rewriting'.
+
+**A basic example is provided below:**
+
+```
+Given rule:
+sum p # is_person(p) -> p = Alice
+
+Formula:
+is_person(Alice)
+
+Rewrites to:
+sum p # is_person(Alice) -> Alice = Alice   [p -> Alice; summation]
+is_person(Alice) -> Alice = Alice           [sum elimination]
+is_person(Alice) -> true                    [(Alice = Alice) -> true; equivalence]
+true -> true                                [is_person(Alice) -> true; goal/assumption]
+true                                        [logical equivalence]
+
+Alternatively: (conditional rewriting)
+sum p # (p = Alice) -> (is_person(p) -> true)
+
+Formula:
+is_person(Alice)
+
+Rewrites to:
+sum p # (Alice = Alice) -> (is_person(Alice) -> true)   [p -> Alice; summation]
+(Alice = Alice) -> (is_person(Alice) -> true)           [sum elimination]
+(true) -> (is_person(Alice) -> true)                    [(Alice = Alice) -> true; equivalence]
+(true) -> (true -> true)                                [is_person(Alice) -> true; goal/assumption]
+(true) -> (true)                                        [logical equivalence]
+(true)                                                  [logical equivalence]
+```
+
+**Multiple rules:**
+
+```
+Given rules:
+is_person(Alice) -> true &
+is_person(Bob) -> true &
+is_person(Chair) -> false
+
+Formula:
+is_person(Bob)
+
+Rewrites to:
+(is_person(Alice) -> true) & (true -> true) & (is_person(Chair) -> false)   [is_person(Bob) -> true; goal/assumption]
+(false -> true) & (true -> true) & (is_person(Chair) -> false)              [is_person(Alice) -> false; no match for closed rewrite rule]
+(false -> true) & (true -> true) & (false -> false)                         [is_person(Chair) -> false; no match for closed rewrite rule]
+(true) & (true) & (true)                                                    [logical equivalence]
+(true)                                                                      [logical equivalence]
+```
+
+**Assumption rewriting:**
+
+```
+Formula:
+(sum p # is_person(p) -> (p = Alice)) &
+(forall p # is_person(p) => (p = Alice))
+
+Rewrites to:
+(sum p # is_person(p) -> (p = Alice)) & (forall p # is_person(p) => (p = Alice))
+
+
+Formula:
+(sum p # is_person(p) -> (p = Alice) | (p = Bob)) &
+(forall p # is_person(p) => (p = Alice))
+
+Rewrites to:
+
+Formula:
+(sum p # is_person(p) -> (p = Alice) | (p = Bob)) &
+(exists p # is_person(p) => (p = Alice))
+
+Rewrites to:
+
+```
+
+**Quantifiers:**
+
+```
+X
+```
+
+**Peano natural numbers:**
+
+Recursive rewrite rules can be illustrated by an implementation of peanos natural numbers.
+This example contains two constants: `_0` and `suc(n)`, where `suc` accepts a variable `n`.
+
+```
+Formula:
+(is_nat(_0) -> true) &
+(sum n # is_nat(suc(n)) -> is_nat(n)) &
+is_nat(suc(suc(_0)))
+
+Rewrites to:
+assume: is_nat(suc(suc(_0)))                                                        [goal]
+(is_nat(_0) -> true) & (sum n # is_nat(suc(n)) -> is_nat(n))                        [insert rules]
+(false -> true) & (is_nat(suc(suc(_0))) -> is_nat(suc(_0)))                         [match n = suc(_0)]
+(false -> true) & (true -> is_nat(suc(_0)))                                         [match goal]
+(true) & (is_nat(suc(_0)))                                                          [rewrite elimination]
+--
+assume: is_nat(suc(_0))                                                             [new goal (recursive)]
+(true) & ((is_nat(_0) -> true) & (sum n # is_nat(suc(n)) -> is_nat(n)))             [insert rules]
+(true) & ((false -> true) & (is_nat(suc(_0)) -> is_nat(_0)))                        [match n = _0]
+(true) & ((false -> true) & (true -> is_nat(_0)))                                   [match goal]
+(true) & ((true) & (is_nat(_0)))                                                    [rewrite elimination]
+---
+assume: is_nat(_0)                                                                  [new goal (recursive)]
+(true) & ((true) & ((is_nat(_0) -> true) & (sum n # is_nat(suc(n)) -> is_nat(n))))  [insert rules]
+(true) & ((true) & ((true -> true) & (sum n # is_nat(suc(n)) -> is_nat(n))))        [match goal]
+(true) & ((true) & ((true -> true) & (false -> is_nat(n))))                         [no match (difficult operation!)]
+(true) & ((true) & ((true) & (true)))                                               [rewrite elimination]
+---
+(true)                                                                              [logical equivalence]
+```
+
+**Deferred evaluation:**
+
+In some cases, rewriting only is not sufficient to reach a closed formula.
+The example below shows equivalence testing on unknown variables. 
+By replacing these equivalence tests with boolean variables the obtained formula can be evaluated by the SAT solver.
+
+```
+const(Alice) -> true &
+const(Bob) -> true &
+forall d # ((d = _0) & (d = _1)) => (_0 = _1)
+(((Alice = _0) & (Alice = _1)) => (_0 = _1)) & (((Bob = _0) & (Bob = _1)) => (_0 = _1)) [forall elimination]
+(((Alice = _0) & (Alice = _1)) => (_0 = _1)) & (((Bob = _0) & (Bob = _1)) => (_0 = _1)) [Alice = _0 -> a; Alice = _1 -> b; boolean variable introduction]
+
+this needs work!
+
+```
+
 ## Examples
 
 ### Example 1: transitivity of the `>=` operator
@@ -336,6 +588,68 @@ rsbdd -i examples/4_queens.txt -t -ft
 | False | False | True  | False | True  | False | False | False | False | False | False | True  | False | True  | False | False | True |
 | False | True  | False | False | False | False | False | True  | True  | False | False | False | False | False | True  | False | True |
 
+### Example 3: model checking Peterson's protocol
+
+Peterson's algorithm lets two processes share a critical section using nothing but two flags and a `turn` variable.
+A process that wants to enter raises its flag and politely gives the turn to the other process. It then waits until
+the other process is not interested (its flag is down) or it is its own turn. On leaving, it lowers its flag.
+
+[examples/peterson.txt](examples/peterson.txt) encodes the protocol as a transition system `T` over the program
+counters of both processes and the turn bit, and checks four properties using fixed points:
+
+- `mutex`: no reachable state has both processes in the critical section (least fixpoint for reachability)
+- `deadlock_free`: every reachable state has a successor
+- `recoverable`: from every reachable state, P0 can still reach its critical section (least fixpoint)
+- `no_overtaking`: while P0 waits, P1 cannot keep moving forever on its own (greatest fixpoint)
+
+```
+let Reach := lfp R # init |
+    (exists a1, a0, b1, b0, t # R & T)[a1' := a1, a0' := a0, b1' := b1, b0' := b0, t' := t];
+
+mutex <=> forall a1, a0, b1, b0, t # Reach => -(crit0 & crit1);
+...
+```
+
+```bash
+rsbdd examples/peterson.txt -t -ft
+```
+
+| mutex | deadlock_free | recoverable | no_overtaking | *    |
+|-------|---------------|-------------|---------------|------|
+| True  | True          | True        | True          | True |
+
+#### Finding bugs
+
+Suppose P0 is "optimized" to enter the critical section without checking the flag and turn of P1:
+
+```diff
+-    wait0 & (idle1 | -t) & crit0[a1 := a1', a0 := a0'] & keept |
++    wait0 & crit0[a1 := a1', a0 := a0'] & keept |
+```
+
+Running the checks again shows that mutual exclusion is violated:
+
+| mutex | deadlock_free | recoverable | no_overtaking | *    |
+|-------|---------------|-------------|---------------|------|
+| False | True          | True        | True          | True |
+
+To find a counterexample, replace the four properties at the end of the file by a query for the bad states:
+
+```
+Reach & crit0 & crit1
+```
+
+| a1   | a0    | b1   | b0    | t    | *    |
+|------|-------|------|-------|------|------|
+| True | False | True | False | True | True |
+
+Both processes are in the critical section (`10`) while the turn belongs to P1. This state is reached when P1 starts
+waiting, P0 starts waiting and hands the turn to P1, P1 enters, and P0 barges in after it.
+
+Other mistakes are found the same way. If neither process looks at `turn`, so a process only enters when the other is
+idle, `deadlock_free` and `recoverable` fail: both processes can wait for each other forever. If P1 keeps the turn to
+itself instead of handing it to P0, both `mutex` and `no_overtaking` fail.
+
 ## CLI Usage
 
 ### rsbdd
@@ -346,23 +660,45 @@ A BDD-based SAT solver
 Usage: rsbdd [OPTIONS] [FILE]
 
 Arguments:
-  [FILE]  The input file containing a logic formula in rsbdd format
+  [FILE]  The input file containing a logic formula in rsbdd format, or '-' for stdin
 
 Options:
-  -p, --parsetree <PARSETREE>            Write the parse tree in dot format to the specified file
-  -t, --truthtable                       Print the truth table to stdout
-  -d, --dot <DOT>                        Write the bdd to a dot graphviz file
+  -h, --help     Print help
+  -V, --version  Print version
+
+Input:
+  -e, --evaluate <EVALUATE>  Parse the formula as string
+  -o, --ordering <FILE>      Read a custom variable ordering from file
+
+Output:
+  -t, --truthtable        Print the truth table to stdout
+  -v, --vars              Print all satisfying variables leading to a truth value
+  -d, --dot <FILE>        Write the bdd to a dot graphviz file ('-' for stdout)
+  -p, --parsetree <FILE>  Write the parse tree in dot format to the specified file ('-' for stdout)
+  -w, --rewritten <FILE>  Write the formula after applying rewrite rules to the specified file ('-' for stdout)
+  -r, --export-ordering   Export the automatically derived ordering to stdout
+
+Filtering:
   -m, --model                            Compute a single satisfying model as output
-  -v, --vars                             Print all satisfying variables leading to a truth value
-  -f, --filter <FILTER>                  Only show true or false entries in the output [default: Any]
-  -c, --retain-choices <RETAIN_CHOICES>  Only retain choice variables when filtering [default: Any]
-  -b, --benchmark <N>                    Repeat the solving process n times for more accurate performance reports
-  -g, --plot                             Use GNUPlot to plot the runtime distribution
-  -e, --evaluate <EVALUATE>              Parse the formula as string
-  -o, --ordering <ORDERING>              Read a custom variable ordering from file
-  -r, --export-ordering                  Export the automatically derived ordering to stdout
-  -h, --help                             Print help
-  -V, --version                          Print version
+  -f, --filter <true|false|any>          Only show true or false entries in the output [default: true without output options, any
+                                         otherwise]
+  -c, --retain-choices <true|false|any>  Only retain choice variables when filtering [default: Any]
+
+Benchmarking:
+  -b, --benchmark <N>  Repeat the solving process n times for more accurate performance reports
+  -g, --plot           Use GNUPlot to plot the runtime distribution
+
+Solver:
+  -l, --memory-limit <MiB>  Limit the memory used by the solver, nodes exceeding the limit are paged to disk [default: 75% of available
+                            memory]
+
+Without output options, the satisfying rows of the truth table are printed.
+Exit status: 10 if the formula is satisfiable, 20 if it is unsatisfiable, 1 or 2 on errors.
+
+Examples:
+  rsbdd examples/4_queens.txt
+  rsbdd -e "a & -b" -t
+  rsbdd examples/peano_puzzle.txt -w -
 
 ```
 

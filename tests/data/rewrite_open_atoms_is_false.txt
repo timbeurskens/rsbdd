@@ -1,0 +1,2 @@
+"applications without rules are boolean unknowns; identical applications share a variable"
+color(H1, Red) & -color(H1, Red)

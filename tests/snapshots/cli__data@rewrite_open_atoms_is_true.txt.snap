@@ -1,0 +1,26 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: tests/data/rewrite_open_atoms_is_true.txt
+---
+$ rsbdd -t -f true tests/data/rewrite_open_atoms_is_true.txt
+status: 10
+--- stdout
+| color(H1, Red) | *     |
+|----------------|-------|
+| Any            | True  |
+--- stderr
+
+$ rsbdd -v tests/data/rewrite_open_atoms_is_true.txt
+status: 10
+--- stdout
+color(H1, Red)*;
+--- stderr
+
+$ rsbdd -m -t -f true tests/data/rewrite_open_atoms_is_true.txt
+status: 10
+--- stdout
+| color(H1, Red) | *     |
+|----------------|-------|
+| Any            | True  |
+--- stderr

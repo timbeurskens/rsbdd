@@ -1,0 +1,4 @@
+"a pattern variable occurring twice only matches identical terms"
+sum x # same(x, x) -> true;
+
+same(A, A) & -same(A, B) & same(f(A), f(A)) & -same(f(A), f(B))

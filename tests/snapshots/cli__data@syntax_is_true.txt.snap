@@ -4,26 +4,23 @@ expression: output
 input_file: tests/data/syntax_is_true.txt
 ---
 $ rsbdd -t -f true tests/data/syntax_is_true.txt
-status: 0
+status: 10
 --- stdout
 | a_long_variable_name' | x1    | *     |
 |-----------------------|-------|-------|
 | Any                   | Any   | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -v tests/data/syntax_is_true.txt
-status: 0
+status: 10
 --- stdout
 a_long_variable_name'*, x1*;
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -m -t -f true tests/data/syntax_is_true.txt
-status: 0
+status: 10
 --- stdout
 | a_long_variable_name' | x1    | *     |
 |-----------------------|-------|-------|
 | Any                   | Any   | True  |
 --- stderr
-finished 1/1 runs

@@ -4,7 +4,7 @@ expression: output
 input_file: examples/eurovision_2021.txt
 ---
 $ rsbdd -t -f true examples/eurovision_2021.txt
-status: 0
+status: 10
 --- stdout
 | Serbia | Austria | Czech_Republic | Denmark | Ireland | Romania | San_Marino | Australia | Norway | Germany | North_Macedonia | Netherlands | Poland | Slovenia | United_Kingdom | Latvia | Belgium | Albania | Lithuania | Georgia | Spain | Moldova | Croatia | Malta | Estonia | Switzerland | Greece | Israel | Cyprus | Iceland | Azerbaijan | Sweden | Russia | Portugal | Bulgaria | Finland | France | Ukraine | Italy | *     |
 |--------|---------|----------------|---------|---------|---------|------------|-----------|--------|---------|-----------------|-------------|--------|----------|----------------|--------|---------|---------|-----------|---------|-------|---------|---------|-------|---------|-------------|--------|--------|--------|---------|------------|--------|--------|----------|----------|---------|--------|---------|-------|-------|
@@ -12,22 +12,19 @@ status: 0
 | False  | False   | False          | False   | False   | False   | False      | False     | True   | False   | False           | False       | False  | False    | False          | False  | False   | False   | True      | False   | False | False   | False   | True  | False   | False       | False  | False  | False  | True    | False      | False  | False  | False    | False    | True    | False  | True    | True  | True  |
 | False  | False   | False          | False   | False   | False   | False      | False     | True   | False   | False           | False       | False  | False    | False          | False  | False   | False   | True      | False   | False | False   | False   | True  | False   | False       | False  | False  | False  | True    | False      | True   | False  | False    | False    | True    | False  | True    | False | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -v examples/eurovision_2021.txt
-status: 0
+status: 10
 --- stdout
 Lithuania, Malta, Switzerland, Iceland, Sweden, Finland, Ukraine;
 Norway, Lithuania, Malta, Iceland, Finland, Ukraine, Italy;
 Norway, Lithuania, Malta, Iceland, Sweden, Finland, Ukraine;
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -m -t -f true examples/eurovision_2021.txt
-status: 0
+status: 10
 --- stdout
 | Serbia | Austria | Czech_Republic | Denmark | Ireland | Romania | San_Marino | Australia | Norway | Germany | North_Macedonia | Netherlands | Poland | Slovenia | United_Kingdom | Latvia | Belgium | Albania | Lithuania | Georgia | Spain | Moldova | Croatia | Malta | Estonia | Switzerland | Greece | Israel | Cyprus | Iceland | Azerbaijan | Sweden | Russia | Portugal | Bulgaria | Finland | France | Ukraine | Italy | *     |
 |--------|---------|----------------|---------|---------|---------|------------|-----------|--------|---------|-----------------|-------------|--------|----------|----------------|--------|---------|---------|-----------|---------|-------|---------|---------|-------|---------|-------------|--------|--------|--------|---------|------------|--------|--------|----------|----------|---------|--------|---------|-------|-------|
 | False  | False   | False          | False   | False   | False   | False      | False     | True   | False   | False           | False       | False  | False    | False          | False  | False   | False   | True      | False   | False | False   | False   | True  | False   | False       | False  | False  | False  | True    | False      | True   | False  | False    | False    | True    | False  | True    | False | True  |
 --- stderr
-finished 1/1 runs

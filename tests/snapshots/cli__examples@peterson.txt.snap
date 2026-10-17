@@ -1,0 +1,26 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: examples/peterson.txt
+---
+$ rsbdd -t -f true examples/peterson.txt
+status: 10
+--- stdout
+| mutex | deadlock_free | recoverable | no_overtaking | *     |
+|-------|---------------|-------------|---------------|-------|
+| True  | True          | True        | True          | True  |
+--- stderr
+
+$ rsbdd -v examples/peterson.txt
+status: 10
+--- stdout
+mutex, deadlock_free, recoverable, no_overtaking;
+--- stderr
+
+$ rsbdd -m -t -f true examples/peterson.txt
+status: 10
+--- stdout
+| mutex | deadlock_free | recoverable | no_overtaking | *     |
+|-------|---------------|-------------|---------------|-------|
+| True  | True          | True        | True          | True  |
+--- stderr

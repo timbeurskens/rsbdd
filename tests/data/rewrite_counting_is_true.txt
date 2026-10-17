@@ -1,0 +1,2 @@
+"open atoms in counting constraints: if exactly one house is red and H1 is red, H2 is not"
+([has_color(H1, Red), has_color(H2, Red)] = 1 & has_color(H1, Red)) => -has_color(H2, Red)

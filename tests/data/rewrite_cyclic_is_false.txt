@@ -1,0 +1,5 @@
+"cyclic rewriting is false"
+sum x # p(x) -> q(x);
+sum x # q(x) -> p(x);
+
+p(A)

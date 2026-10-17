@@ -4,28 +4,25 @@ expression: output
 input_file: examples/reachability.txt
 ---
 $ rsbdd -t -f true examples/reachability.txt
-status: 0
+status: 10
 --- stdout
 | x1    | x0    | *     |
 |-------|-------|-------|
 | False | Any   | True  |
 | True  | False | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -v examples/reachability.txt
-status: 0
+status: 10
 --- stdout
 x0*;
 x1;
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -m -t -f true examples/reachability.txt
-status: 0
+status: 10
 --- stdout
 | x1    | x0    | *     |
 |-------|-------|-------|
 | True  | False | True  |
 --- stderr
-finished 1/1 runs

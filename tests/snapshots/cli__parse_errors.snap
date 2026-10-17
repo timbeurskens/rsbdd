@@ -36,7 +36,7 @@ $ rsbdd -t --evaluate=a b
 status: 1
 --- stdout
 --- stderr
-Error: Expected Eof, got Some(Var(NamedSymbol { name: "b", id: 1 }))
+Error: Expected Eof, got Some(Ident(NamedSymbol { name: "b", id: 1 }))
 
 $ rsbdd -t --evaluate=[a, b
 status: 1
@@ -51,14 +51,13 @@ status: 1
 Error: Expected number, got Some(Eof)
 
 $ rsbdd -t --evaluate=exists # a
-status: 0
+status: 10
 --- stdout
 | a     | *     |
 |-------|-------|
 | False | False |
 | True  | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -t --evaluate=if a then b
 status: 1

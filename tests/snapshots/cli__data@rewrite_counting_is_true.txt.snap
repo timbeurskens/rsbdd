@@ -1,0 +1,26 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: tests/data/rewrite_counting_is_true.txt
+---
+$ rsbdd -t -f true tests/data/rewrite_counting_is_true.txt
+status: 10
+--- stdout
+| has_color(H1, Red) | has_color(H2, Red) | *     |
+|--------------------|--------------------|-------|
+| Any                | Any                | True  |
+--- stderr
+
+$ rsbdd -v tests/data/rewrite_counting_is_true.txt
+status: 10
+--- stdout
+has_color(H1, Red)*, has_color(H2, Red)*;
+--- stderr
+
+$ rsbdd -m -t -f true tests/data/rewrite_counting_is_true.txt
+status: 10
+--- stdout
+| has_color(H1, Red) | has_color(H2, Red) | *     |
+|--------------------|--------------------|-------|
+| Any                | Any                | True  |
+--- stderr

@@ -2,13 +2,14 @@ use std::cmp::max;
 use std::fmt::Display;
 use std::fs::File;
 use std::io;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, IsTerminal, Write};
 use std::ops::Index;
-use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::path::{Path, PathBuf};
+use std::process::{Command, ExitCode, Stdio};
 use std::time::{Duration, Instant};
 
-use clap::Parser;
+use anyhow::Context;
+use clap::{CommandFactory, Parser, ValueHint};
 
 use rsbdd::BDDSymbol;
 use rsbdd::NamedSymbol;
@@ -20,61 +21,105 @@ use rsbdd::parser_io::*;
 use rsbdd::plot::*;
 
 #[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
+#[clap(
+    author,
+    version,
+    about,
+    long_about = None,
+    after_help = "Without output options, the satisfying rows of the truth table are printed.\n\
+Exit status: 10 if the formula is satisfiable, 20 if it is unsatisfiable, 1 or 2 on errors.\n\n\
+Examples:\n  \
+rsbdd examples/4_queens.txt\n  \
+rsbdd -e \"a & -b\" -t\n  \
+rsbdd examples/peano_puzzle.txt -w -"
+)]
 struct Args {
-    #[clap(value_parser, value_name = "FILE")]
-    /// The input file containing a logic formula in rsbdd format.
+    #[clap(value_parser, value_name = "FILE", value_hint = ValueHint::FilePath)]
+    /// The input file containing a logic formula in rsbdd format, or '-' for stdin.
     input: Option<PathBuf>,
 
-    #[clap(short, long, value_parser)]
-    /// Write the parse tree in dot format to the specified file.
-    parsetree: Option<PathBuf>,
-
-    #[clap(short, long)]
-    /// Print the truth table to stdout.
-    truthtable: bool,
-
-    #[clap(short, long, value_parser)]
-    /// Write the bdd to a dot graphviz file.
-    dot: Option<PathBuf>,
-
-    #[clap(short, long)]
-    /// Compute a single satisfying model as output.
-    model: bool,
-
-    #[clap(short, long)]
-    /// Print all satisfying variables leading to a truth value.
-    vars: bool,
-
-    #[clap(short, long, value_parser, default_value_t = TruthTableEntry::Any)]
-    /// Only show true or false entries in the output.
-    filter: TruthTableEntry,
-
-    #[clap(short = 'c', long, value_parser, default_value_t = TruthTableEntry::Any)]
-    /// Only retain choice variables when filtering.
-    retain_choices: TruthTableEntry,
-
-    #[clap(short, long, value_parser, value_name = "N")]
-    /// Repeat the solving process n times for more accurate performance reports.
-    benchmark: Option<usize>,
-
-    #[clap(short = 'g', long)]
-    /// Use GNUPlot to plot the runtime distribution.
-    plot: bool,
-
-    #[clap(short, long, value_parser)]
+    #[clap(
+        short,
+        long,
+        value_parser,
+        conflicts_with = "input",
+        help_heading = "Input"
+    )]
     /// Parse the formula as string.
     evaluate: Option<String>,
 
-    #[clap(short, long, value_parser)]
+    #[clap(short, long, value_parser, value_name = "FILE", value_hint = ValueHint::FilePath, help_heading = "Input")]
     /// Read a custom variable ordering from file.
     ordering: Option<PathBuf>,
 
-    #[clap(short = 'r', long)]
+    #[clap(short, long, help_heading = "Output")]
+    /// Print the truth table to stdout.
+    truthtable: bool,
+
+    #[clap(short, long, help_heading = "Output")]
+    /// Print all satisfying variables leading to a truth value.
+    vars: bool,
+
+    #[clap(short, long, value_parser, value_name = "FILE", value_hint = ValueHint::FilePath, help_heading = "Output")]
+    /// Write the bdd to a dot graphviz file ('-' for stdout).
+    dot: Option<PathBuf>,
+
+    #[clap(short, long, value_parser, value_name = "FILE", value_hint = ValueHint::FilePath, help_heading = "Output")]
+    /// Write the parse tree in dot format to the specified file ('-' for stdout).
+    parsetree: Option<PathBuf>,
+
+    #[clap(short = 'w', long, value_parser, value_name = "FILE", value_hint = ValueHint::FilePath, help_heading = "Output")]
+    /// Write the formula after applying rewrite rules to the specified file ('-' for stdout).
+    rewritten: Option<PathBuf>,
+
+    #[clap(short = 'r', long, help_heading = "Output")]
     /// Export the automatically derived ordering to stdout.
     export_ordering: bool,
 
-    #[clap(short = 'l', long, value_parser, value_name = "MiB")]
+    #[clap(short, long, help_heading = "Filtering")]
+    /// Compute a single satisfying model as output.
+    model: bool,
+
+    #[clap(
+        short,
+        long,
+        value_parser,
+        value_name = "true|false|any",
+        help_heading = "Filtering"
+    )]
+    /// Only show true or false entries in the output [default: true without output options, any otherwise]
+    filter: Option<TruthTableEntry>,
+
+    #[clap(short = 'c', long, value_parser, value_name = "true|false|any", default_value_t = TruthTableEntry::Any, help_heading = "Filtering")]
+    /// Only retain choice variables when filtering.
+    retain_choices: TruthTableEntry,
+
+    #[clap(
+        short,
+        long,
+        value_parser,
+        value_name = "N",
+        help_heading = "Benchmarking"
+    )]
+    /// Repeat the solving process n times for more accurate performance reports.
+    benchmark: Option<usize>,
+
+    #[clap(
+        short = 'g',
+        long,
+        requires = "benchmark",
+        help_heading = "Benchmarking"
+    )]
+    /// Use GNUPlot to plot the runtime distribution.
+    plot: bool,
+
+    #[clap(
+        short = 'l',
+        long,
+        value_parser,
+        value_name = "MiB",
+        help_heading = "Solver"
+    )]
     /// Limit the memory used by the solver, nodes exceeding the limit are paged to disk [default: 75% of available memory]
     memory_limit: Option<usize>,
 }
@@ -92,27 +137,57 @@ fn default_memory_limit() -> Option<usize> {
         .map(|kb| kb / 4 * 3 * 1024)
 }
 
-fn main() -> anyhow::Result<()> {
+fn is_stdio(path: &Path) -> bool {
+    path.as_os_str() == "-"
+}
+
+fn output(path: &Path) -> anyhow::Result<Box<dyn Write>> {
+    if is_stdio(path) {
+        Ok(Box::new(io::stdout()))
+    } else {
+        let file =
+            File::create(path).with_context(|| format!("cannot create {}", path.display()))?;
+        Ok(Box::new(file))
+    }
+}
+
+fn main() -> anyhow::Result<ExitCode> {
     let wild_args = wild::args_os();
     let args_in = argfile::expand_args_from(wild_args, argfile::parse_fromfile, argfile::PREFIX)?;
-    let args = Args::parse_from(args_in);
+    let mut args = Args::parse_from(args_in);
+
+    if args.evaluate.is_none() && args.input.is_none() && io::stdin().is_terminal() {
+        Args::command().print_help()?;
+        return Ok(ExitCode::from(2));
+    }
+
+    if !(args.truthtable
+        || args.vars
+        || args.export_ordering
+        || args.dot.is_some()
+        || args.parsetree.is_some()
+        || args.rewritten.is_some()
+        || args.benchmark.is_some())
+    {
+        args.truthtable = true;
+        args.filter.get_or_insert(TruthTableEntry::True);
+    }
+    let filter = args.filter.unwrap_or(TruthTableEntry::Any);
 
     let repeat = args.benchmark.unwrap_or(1);
 
-    let inline_eval = args.evaluate;
-    let input_filename = args.input;
-
-    let mut reader = if let Some(inline_str) = &inline_eval {
+    let mut reader = if let Some(inline_str) = &args.evaluate {
         Box::new(BufReader::new(inline_str.as_bytes())) as Box<dyn BufRead>
-    } else if let Some(some_input_filename) = input_filename {
-        let file = File::open(some_input_filename)?;
+    } else if let Some(path) = args.input.as_ref().filter(|p| !is_stdio(p)) {
+        let file = File::open(path).with_context(|| format!("cannot open {}", path.display()))?;
         Box::new(BufReader::new(file)) as Box<dyn BufRead>
     } else {
         Box::new(BufReader::new(io::stdin())) as Box<dyn BufRead>
     };
 
     let pre_variable_ordering = if let Some(ord_filename) = args.ordering {
-        let file = File::open(ord_filename)?;
+        let file = File::open(&ord_filename)
+            .with_context(|| format!("cannot open {}", ord_filename.display()))?;
         let mut contents = Box::new(BufReader::new(file)) as Box<dyn BufRead>;
         let tokens = SymbolicBDD::tokenize(&mut contents, None)?;
         let vars = ParsedFormula::extract_vars(&tokens);
@@ -132,11 +207,13 @@ fn main() -> anyhow::Result<()> {
     }
 
     if let Some(parsetree_filename) = args.parsetree {
-        let mut f = File::create(parsetree_filename)?;
-
         let graph = SymbolicParseTree::new(&input_parsed.bdd);
 
-        graph.render_dot(&mut f)?;
+        graph.render_dot(&mut output(&parsetree_filename)?)?;
+    }
+
+    if let Some(rewritten_filename) = args.rewritten {
+        writeln!(output(&rewritten_filename)?, "{}", input_parsed.bdd)?;
     }
 
     let mut result = input_parsed.env.mk_const(false);
@@ -148,9 +225,12 @@ fn main() -> anyhow::Result<()> {
         result = input_parsed.eval();
         exec_times.push(tick.elapsed());
 
-        eprintln!("finished {}/{} runs", i + 1, repeat);
+        if args.benchmark.is_some() {
+            eprintln!("finished {}/{} runs", i + 1, repeat);
+        }
     }
 
+    let satisfiable = !result.is_false();
     // Simplify the output when retain_choices is on
     if !args.retain_choices.is_any() {
         result = input_parsed
@@ -209,7 +289,7 @@ fn main() -> anyhow::Result<()> {
                 .iter()
                 .map(|_| TruthTableEntry::Any)
                 .collect(),
-            args.filter,
+            filter,
             &input_parsed,
             &widths,
         );
@@ -229,14 +309,12 @@ fn main() -> anyhow::Result<()> {
     }
 
     if let Some(dot_filename) = args.dot {
-        let mut f = File::create(dot_filename)?;
+        let graph = BDDGraph::new(&result, filter);
 
-        let graph = BDDGraph::new(&result, args.filter);
-
-        graph.render_dot(&mut f)?
+        graph.render_dot(&mut output(&dot_filename)?)?
     }
 
-    Ok(())
+    Ok(ExitCode::from(if satisfiable { 10 } else { 20 }))
 }
 
 fn print_sized_line<B, C, D>(labels: &[D], widths: &B, result: &BDD<C>)

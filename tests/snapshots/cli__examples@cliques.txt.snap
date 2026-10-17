@@ -4,26 +4,23 @@ expression: output
 input_file: examples/cliques.txt
 ---
 $ rsbdd -t -f true examples/cliques.txt
-status: 0
+status: 10
 --- stdout
 | a     | f     | g     | b     | d     | e     | c     | *     |
 |-------|-------|-------|-------|-------|-------|-------|-------|
 | False | True  | True  | False | True  | True  | False | True  |
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -v examples/cliques.txt
-status: 0
+status: 10
 --- stdout
 f, g, d, e;
 --- stderr
-finished 1/1 runs
 
 $ rsbdd -m -t -f true examples/cliques.txt
-status: 0
+status: 10
 --- stdout
 | a     | f     | g     | b     | d     | e     | c     | *     |
 |-------|-------|-------|-------|-------|-------|-------|-------|
 | False | True  | True  | False | True  | True  | False | True  |
 --- stderr
-finished 1/1 runs
