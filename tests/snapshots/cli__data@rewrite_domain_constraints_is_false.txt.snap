@@ -1,0 +1,26 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: tests/data/rewrite_domain_constraints_is_false.txt
+---
+$ rsbdd -t -f true tests/data/rewrite_domain_constraints_is_false.txt
+status: 0
+--- stdout
+| likes(Alice, Tea) | likes(Bob, Tea) | *     |
+|-------------------|-----------------|-------|
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -v tests/data/rewrite_domain_constraints_is_false.txt
+status: 0
+--- stdout
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -m -t -f true tests/data/rewrite_domain_constraints_is_false.txt
+status: 0
+--- stdout
+| likes(Alice, Tea) | likes(Bob, Tea) | *     |
+|-------------------|-----------------|-------|
+--- stderr
+finished 1/1 runs

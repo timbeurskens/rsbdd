@@ -1,0 +1,5 @@
+"recursive rules: a successor chain not ending in _0 is not a natural number"
+is_nat(_0) -> true;
+sum n # is_nat(suc(n)) -> is_nat(n);
+
+is_nat(suc(suc(Zero)))

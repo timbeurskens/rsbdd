@@ -84,3 +84,10 @@ fn test_einstein() -> io::Result<()> {
     ))?);
     Ok(())
 }
+
+#[test]
+fn test_term_equality_without_rules() -> io::Result<()> {
+    assert!(is_true("(A = A) & -(A = B)")?);
+    assert!(is_false("A = B")?);
+    Ok(())
+}

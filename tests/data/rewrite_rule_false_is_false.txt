@@ -1,0 +1,5 @@
+"a matching rule with a 'false' right-hand side makes the application false"
+is_person(Alice) -> true;
+is_person(Chair) -> false;
+
+is_person(Chair)

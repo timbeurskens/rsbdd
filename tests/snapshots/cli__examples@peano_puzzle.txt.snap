@@ -1,0 +1,29 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: examples/peano_puzzle.txt
+---
+$ rsbdd -t -f true examples/peano_puzzle.txt
+status: 0
+--- stdout
+| val(A, _0) | val(A, suc(suc(suc(suc(suc(_0)))))) | val(A, suc(suc(suc(suc(_0))))) | val(A, suc(suc(suc(_0)))) | val(A, suc(suc(_0))) | val(A, suc(_0)) | val(B, _0) | val(B, suc(suc(suc(suc(suc(_0)))))) | val(B, suc(suc(suc(suc(_0))))) | val(B, suc(suc(suc(_0)))) | val(B, suc(suc(_0))) | val(B, suc(_0)) | val(C, _0) | val(C, suc(suc(suc(suc(suc(_0)))))) | val(C, suc(suc(suc(suc(_0))))) | val(C, suc(suc(suc(_0)))) | val(C, suc(suc(_0))) | val(C, suc(_0)) | *     |
+|------------|-------------------------------------|--------------------------------|---------------------------|----------------------|-----------------|------------|-------------------------------------|--------------------------------|---------------------------|----------------------|-----------------|------------|-------------------------------------|--------------------------------|---------------------------|----------------------|-----------------|-------|
+| False      | False                               | False                          | False                     | False                | True            | False      | False                               | False                          | False                     | True                 | False           | False      | False                               | False                          | True                      | False                | False           | True  |
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -v examples/peano_puzzle.txt
+status: 0
+--- stdout
+val(A, suc(_0)), val(B, suc(suc(_0))), val(C, suc(suc(suc(_0))));
+--- stderr
+finished 1/1 runs
+
+$ rsbdd -m -t -f true examples/peano_puzzle.txt
+status: 0
+--- stdout
+| val(A, _0) | val(A, suc(suc(suc(suc(suc(_0)))))) | val(A, suc(suc(suc(suc(_0))))) | val(A, suc(suc(suc(_0)))) | val(A, suc(suc(_0))) | val(A, suc(_0)) | val(B, _0) | val(B, suc(suc(suc(suc(suc(_0)))))) | val(B, suc(suc(suc(suc(_0))))) | val(B, suc(suc(suc(_0)))) | val(B, suc(suc(_0))) | val(B, suc(_0)) | val(C, _0) | val(C, suc(suc(suc(suc(suc(_0)))))) | val(C, suc(suc(suc(suc(_0))))) | val(C, suc(suc(suc(_0)))) | val(C, suc(suc(_0))) | val(C, suc(_0)) | *     |
+|------------|-------------------------------------|--------------------------------|---------------------------|----------------------|-----------------|------------|-------------------------------------|--------------------------------|---------------------------|----------------------|-----------------|------------|-------------------------------------|--------------------------------|---------------------------|----------------------|-----------------|-------|
+| False      | False                               | False                          | False                     | False                | True            | False      | False                               | False                          | False                     | True                 | False           | False      | False                               | False                          | True                      | False                | False           | True  |
+--- stderr
+finished 1/1 runs

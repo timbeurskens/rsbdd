@@ -1,0 +1,6 @@
+"rules defining a domain combined with open atoms as unknowns"
+person(Alice) -> true;
+person(Bob) -> true;
+
+forall p # person(p) => likes(p, Tea);
+-likes(Bob, Tea)

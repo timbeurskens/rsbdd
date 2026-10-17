@@ -1,0 +1,8 @@
+"recursion through an existential quantifier; cycles in the search are cut off"
+parent(Alice, Bob) -> true;
+parent(Bob, Carol) -> true;
+parent(Carol, Dave) -> true;
+
+sum x, y # ancestor(x, y) -> parent(x, y) | exists z # parent(x, z) & ancestor(z, y);
+
+ancestor(Alice, Dave) & ancestor(Bob, Dave) & -ancestor(Dave, Alice) & -ancestor(Alice, Alice)

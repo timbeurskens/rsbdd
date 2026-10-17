@@ -1,0 +1,5 @@
+"an application of a predicate with rules, but without a matching rule, is false"
+is_person(Alice) -> true;
+is_person(Bob) -> true;
+
+is_person(Dave)

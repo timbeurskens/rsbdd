@@ -1,0 +1,4 @@
+"pattern variables match any term and are substituted in the right-hand side"
+sum p # is_person(p) -> p = Alice;
+
+is_person(Bob)

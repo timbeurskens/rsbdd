@@ -1,0 +1,6 @@
+"exists over a term variable ranges over all ground terms in the formula"
+person(Alice) -> true;
+person(Bob) -> true;
+likes(Bob, Coffee) -> true;
+
+exists p # person(p) & likes(p, Coffee)

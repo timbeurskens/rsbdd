@@ -1,0 +1,42 @@
+"
+Solve a puzzle over peano numerals: find natural numbers a, b and c such that
+
+1) a + b = c
+2) b + c = 5
+3) a < b
+
+The natural numbers, addition and the less-than relation are defined by rewrite rules.
+The unknowns val(v, n) state that variable v has value n. They have no rules, so every combination is a boolean
+variable for the solver. Quantifiers range over all terms in the formula, so each quantified value is first checked
+to be a natural number; this keeps meaningless unknowns such as val(A, B) out of the solution.
+The numerals in the formula go up to 5, which bounds the search; constraint 2 ensures no solution is missed.
+The only solution is a = 1, b = 2 and c = 3.
+
+Run with:
+    rsbdd examples/peano_puzzle.txt -t -ft
+"
+
+"0 is a natural number, and so is the successor of every natural number"
+is_nat(_0) -> true;
+sum n # is_nat(suc(n)) -> is_nat(n);
+
+"plus(x, y, z) holds if x + y = z"
+sum x # plus(x, _0, x) -> true;
+sum x, y, z # plus(x, suc(y), suc(z)) -> plus(x, y, z);
+
+"lt(x, y) holds if x < y"
+sum y # lt(_0, suc(y)) -> true;
+sum x, y # lt(suc(x), suc(y)) -> lt(x, y);
+
+"the variables of the puzzle"
+var(A) -> true;
+var(B) -> true;
+var(C) -> true;
+
+"every variable has exactly one value"
+forall v # var(v) => exists n # is_nat(n) & val(v, n) & forall m # (is_nat(m) & val(v, m)) => m = n;
+
+"the constraints"
+forall x, y, z # (is_nat(x) & is_nat(y) & is_nat(z) & val(A, x) & val(B, y) & val(C, z)) => plus(x, y, z);
+forall y, z # (is_nat(y) & is_nat(z) & val(B, y) & val(C, z)) => plus(y, z, suc(suc(suc(suc(suc(_0))))));
+forall x, y # (is_nat(x) & is_nat(y) & val(A, x) & val(B, y)) => lt(x, y)

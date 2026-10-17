@@ -307,7 +307,13 @@ has_color(H1, Red)
 - `forall` and `exists` over a variable used as a term range over all ground terms occurring in the formula.
 - Rewrite rules must be top-level conjuncts of the formula.
 
-See [examples/peano.txt](examples/peano.txt) and [examples/einstein.txt](examples/einstein.txt).
+See [examples/peano.txt](examples/peano.txt), [examples/peano_puzzle.txt](examples/peano_puzzle.txt) and [examples/einstein.txt](examples/einstein.txt).
+
+The puzzle in [examples/peano_puzzle.txt](examples/peano_puzzle.txt) asks for natural numbers `a`, `b` and `c` such
+that `a + b = c`, `b + c = 5` and `a < b`. The BDD below, obtained with `rsbdd examples/peano_puzzle.txt -d
+peano_puzzle.dot`, has a single path to `true`: the unique solution `a = 1`, `b = 2` and `c = 3`.
+
+![peano puzzle bdd](docs/images/peano_puzzle.svg)
 
 ### Design
 

@@ -1,0 +1,5 @@
+"recursive rules: three is a natural number"
+is_nat(_0) -> true;
+sum n # is_nat(suc(n)) -> is_nat(n);
+
+is_nat(suc(suc(suc(_0))))

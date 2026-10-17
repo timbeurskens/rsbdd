@@ -1,0 +1,5 @@
+"all matching rules apply: the application is rewritten to the conjunction of their right-hand sides"
+p(A) -> true;
+p(A) -> false;
+
+p(A)

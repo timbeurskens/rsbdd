@@ -951,9 +951,15 @@ fn uses_rewriting(tokens: &[SymbolicBDDToken]) -> bool {
     tokens
         .iter()
         .any(|t| matches!(t, SymbolicBDDToken::Rewrite | SymbolicBDDToken::Sum))
-        || tokens
-            .windows(2)
-            .any(|w| matches!(w, [SymbolicBDDToken::Ident(_), SymbolicBDDToken::OpenParen]))
+        || tokens.windows(2).any(|w| {
+            matches!(
+                w,
+                [
+                    SymbolicBDDToken::Ident(_),
+                    SymbolicBDDToken::OpenParen | SymbolicBDDToken::Eq
+                ]
+            )
+        })
 }
 
 // precedence and right-associativity of a binary operator token

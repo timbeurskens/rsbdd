@@ -1,0 +1,10 @@
+---
+source: tests/performance.rs
+expression: report
+---
+tests/perf/8_queens.txt: 596148 nodes, 33128448 bytes
+tests/perf/sudoku.txt: 940618 nodes, 46432256 bytes
+examples/einstein.txt: 73336 nodes, 4128768 bytes
+examples/eurovision_2021.txt: 86772 nodes, 4325376 bytes
+examples/state_machine.txt: 205 nodes, 116928 bytes
+examples/transitivity.txt: 225 nodes, 116928 bytes

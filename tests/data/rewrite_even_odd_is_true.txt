@@ -1,0 +1,7 @@
+"mutually recursive rules"
+even(_0) -> true;
+odd(_0) -> false;
+sum n # even(suc(n)) -> odd(n);
+sum n # odd(suc(n)) -> even(n);
+
+even(suc(suc(_0))) & odd(suc(suc(suc(_0)))) & -odd(suc(suc(_0))) & -even(suc(_0))

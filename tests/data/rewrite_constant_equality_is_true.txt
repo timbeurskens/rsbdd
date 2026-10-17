@@ -1,0 +1,2 @@
+"term equality without rules or applications"
+(A = A) & -(A = B)
