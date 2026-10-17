@@ -38,3 +38,18 @@ In this example, some details are already extracted from the text, although they
 A concrete example: the domain of houses, colors, and nationalities are collected to express their constraints.
 
 "
+
+"All nationalities"
+nationality(Brit) -> true &
+nationality(Swede) -> true &
+nationality(Dane) -> true &
+nationality(Norwegian) -> true &
+nationality(German) -> true &
+
+"All houses"
+house(Red) -> true &
+house(Green) -> true &
+house(White) -> true &
+house(Yellow) -> true &
+house(Blue) -> true &
+
