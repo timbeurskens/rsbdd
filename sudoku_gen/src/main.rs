@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fs::File;
 use std::io;
 use std::io::Read;
@@ -30,7 +31,6 @@ fn main() -> io::Result<()> {
 
     let root = args.root;
     let square = root * root;
-    let numcells = square * square;
 
     let mut writer = if let Some(output) = args.output {
         let file = File::create(output)?;
@@ -65,68 +65,74 @@ fn main() -> io::Result<()> {
 
     writeln!(writer)?;
 
-    for i in 0..numcells {
-        if let Some(ch) = puzzle_input.chars().nth(i)
-            && char::is_digit(ch, 10)
-        {
-            writeln!(writer, "_{}_is_{} &", i, ch)?;
-        }
+    let row_cells = move |r: usize| (0..square).map(move |c| r * square + c);
+    let col_cells = move |c: usize| (0..square).map(move |r| r * square + c);
+    let box_cells = move |b: usize| {
+        let lt = (b / root) * root * square + (b % root) * root;
+        (0..square).map(move |l| lt + (l / root) * square + l % root)
+    };
+    let box_of = move |cell: usize| (cell / square / root) * root + cell % square / root;
+
+    let hints = puzzle_input
+        .chars()
+        .take(square * square)
+        .enumerate()
+        .filter_map(|(i, ch)| ch.to_digit(10).map(|k| (i, k as usize)));
+
+    let mut eliminated = BTreeSet::new();
+    for (cell, k) in hints {
+        writeln!(writer, "_{}_is_{} &", cell, k)?;
+
+        eliminated.extend((1..=square).filter(|&j| j != k).map(|j| (cell, j)));
+
+        let peers = row_cells(cell / square)
+            .chain(col_cells(cell % square))
+            .chain(box_cells(box_of(cell)));
+        eliminated.extend(peers.filter(|&o| o != cell).map(|o| (o, k)));
+    }
+
+    writeln!(writer)?;
+
+    writeln!(writer, "\"values ruled out by the hints\"")?;
+
+    writeln!(writer)?;
+
+    for (cell, k) in eliminated {
+        writeln!(writer, "-_{}_is_{} &", cell, k)?;
     }
 
     writeln!(writer)?;
 
     writeln!(writer, "\"each cell can either be 1, 2, .., {}\"", square)?;
-
-    writeln!(writer)?;
-
-    for i in 0..numcells {
-        let vars = (1..=square)
-            .map(|j| format!("_{}_is_{}", i, j))
-            .collect::<Vec<_>>()
-            .join(", ");
-        writeln!(writer, "[{}] = 1 &", vars)?;
-    }
-
-    writeln!(writer)?;
-
     writeln!(
         writer,
-        "\"each row and every column contains every number exactly once\""
+        "\"each row, column and nonet contains every number exactly once\""
+    )?;
+    writeln!(
+        writer,
+        "\"constraints are added nonet by nonet, rows and columns as soon as all their nonets are added\""
     )?;
 
     writeln!(writer)?;
 
-    for i in 0..square {
-        for k in 1..=square {
-            let vars = (0..square)
-                .map(|j| format!("_{}_is_{}", i * square + j, k))
-                .collect::<Vec<_>>()
-                .join(", ");
-            writeln!(writer, "[{}] = 1 &", vars)?;
+    for b in 0..square {
+        let (bi, bj) = (b / root, b % root);
 
-            let vars = (0..square)
-                .map(|j| format!("_{}_is_{}", j * square + i, k))
-                .collect::<Vec<_>>()
-                .join(", ");
-            writeln!(writer, "[{}] = 1 &", vars)?;
+        for cell in box_cells(b) {
+            exactly_one(&mut writer, (1..=square).map(|k| (cell, k)))?;
         }
-    }
 
-    writeln!(writer)?;
+        each_value_once(&mut writer, square, box_cells(b))?;
 
-    writeln!(writer, "\"each nonet contains every number exactly once\"")?;
+        if bj == root - 1 {
+            for r in bi * root..(bi + 1) * root {
+                each_value_once(&mut writer, square, row_cells(r))?;
+            }
+        }
 
-    writeln!(writer)?;
-
-    for i in 0..root {
-        for j in 0..root {
-            let lt = (i * root) * square + (j * root);
-            for k in 1..=square {
-                let vars = (0..square)
-                    .map(|l| format!("_{}_is_{}", lt + ((l / root) * square + (l % root)), k))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                writeln!(writer, "[{}] = 1 &", vars)?;
+        if bi == root - 1 {
+            for c in bj * root..(bj + 1) * root {
+                each_value_once(&mut writer, square, col_cells(c))?;
             }
         }
     }
@@ -135,5 +141,27 @@ fn main() -> io::Result<()> {
 
     writer.flush()?;
 
+    Ok(())
+}
+
+fn exactly_one(
+    writer: &mut impl Write,
+    vars: impl Iterator<Item = (usize, usize)>,
+) -> io::Result<()> {
+    let vars = vars
+        .map(|(cell, k)| format!("_{}_is_{}", cell, k))
+        .collect::<Vec<_>>()
+        .join(", ");
+    writeln!(writer, "[{}] = 1 &", vars)
+}
+
+fn each_value_once(
+    writer: &mut impl Write,
+    square: usize,
+    cells: impl Iterator<Item = usize> + Clone,
+) -> io::Result<()> {
+    for k in 1..=square {
+        exactly_one(writer, cells.clone().map(|cell| (cell, k)))?;
+    }
     Ok(())
 }
