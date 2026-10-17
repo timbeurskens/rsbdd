@@ -36,7 +36,7 @@ $ rsbdd -t --evaluate=a b
 status: 1
 --- stdout
 --- stderr
-Error: Expected Eof, got Some(Var(NamedSymbol { name: "b", id: 1 }))
+Error: Expected Eof, got Some(Ident(NamedSymbol { name: "b", id: 1 }))
 
 $ rsbdd -t --evaluate=[a, b
 status: 1

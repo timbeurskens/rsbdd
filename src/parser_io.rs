@@ -73,16 +73,10 @@ impl SymbolicParseTree {
 
                 new_nodes
             }
-            SymbolicBDD::RewriteRule(_, f) => {
-                let mut new_nodes: Vec<SymbolicBDD> = this_node;
-
-                new_nodes.extend(SymbolicParseTree::nodes_recursive(f).into_iter());
-
-                new_nodes
-            }
             SymbolicBDD::True
             | SymbolicBDD::False
             | SymbolicBDD::Var(_)
+            | SymbolicBDD::RuleApplication(_)
             | SymbolicBDD::Subtree(_)
             | SymbolicBDD::Reference(_) => this_node,
         }
@@ -129,7 +123,6 @@ impl<'a> dot::Labeller<'a, GraphNode, GraphEdge> for SymbolicParseTree {
             SymbolicBDD::False => dot::LabelText::label("False".to_string()),
             SymbolicBDD::True => dot::LabelText::label("True".to_string()),
             SymbolicBDD::Var(v) => dot::LabelText::label(format!("Var {}", v)),
-            SymbolicBDD::RewriteRule(m, _) => dot::LabelText::label(format!("Rule {}", m)),
             SymbolicBDD::RuleApplication(m) => dot::LabelText::label(format!("Rewrite {}", m)),
             SymbolicBDD::Subtree(_) => dot::LabelText::label("BDD".to_string()),
             SymbolicBDD::Reference(name) => dot::LabelText::label(format!("Ref {name}")),
@@ -242,19 +235,10 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                             .expect("cannot find position"),
                     ));
                 }
-                SymbolicBDD::RewriteRule(_, f) => {
-                    edges.push((
-                        i,
-                        "".to_string(),
-                        self.nodes
-                            .iter()
-                            .position(|n| n == f.as_ref())
-                            .expect("cannot find position"),
-                    ));
-                }
                 SymbolicBDD::False
                 | SymbolicBDD::True
                 | SymbolicBDD::Var(_)
+                | SymbolicBDD::RuleApplication(_)
                 | SymbolicBDD::Subtree(_)
                 | SymbolicBDD::Reference(_) => {}
             }

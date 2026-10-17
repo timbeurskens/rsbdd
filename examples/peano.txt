@@ -10,7 +10,7 @@ Given these 2 properties, can we prove suc(suc(0)) (=2) is a natural number?
 (sum n # is_nat(suc(n)) -> is_nat(n)) &
 is_nat(suc(suc(_0)))
 
-
+"
 ------
 
 
@@ -28,3 +28,4 @@ subject to:
 ()
 (1 -> s(0)) &
 (2 -> s(1))
+"

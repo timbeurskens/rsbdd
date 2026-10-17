@@ -15,9 +15,10 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::NamedSymbol;
 use crate::bdd::{BDD, BDDEnv};
+use crate::rewriter::Rewriter;
 
 lazy_static! {
-    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+|>=|:=|=|>|<|\[|\]|,|;|\(|\)|->|-)|(?P<countable>\d+)|\{(?P<reference>[\w']+)\}|(?P<identifier>[\w']+)|(?P<eof>$)|(?P<comment>"[^"]*")"#).expect("Error setting-up tokenizer regex");
+    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|->|-|<=>|<=|\||\^|#|\*|\+|>=|:=|=|>|<|\[|\]|,|;|\(|\))|(?P<countable>\d+)|\{(?P<reference>[\w']+)\}|(?P<identifier>[\w']+)|(?P<eof>$)|(?P<comment>"[^"]*")"#).expect("Error setting-up tokenizer regex");
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,6 +73,7 @@ pub enum BinaryOperator {
     ImpliesInv,
     Iff,
     Equals,
+    Rewrite,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -91,15 +93,15 @@ pub enum QuantifierType {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DomainConstant {
-    Terminal(String),
-    Application(String, Box<DomainConstant>),
+    Terminal(NamedSymbol),
+    Application(NamedSymbol, Vec<Self>),
 }
 
 impl Display for DomainConstant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DomainConstant::Terminal(s) => write!(f, "{}", s),
-            DomainConstant::Application(s, c) => write!(f, "{}({})", s, c),
+            Self::Terminal(s) => write!(f, "{}", s),
+            Self::Application(s, args) => write!(f, "{}({})", s, args.iter().join(", ")),
         }
     }
 }
@@ -117,9 +119,8 @@ pub enum SymbolicBDD {
     FixedPoint(NamedSymbol, bool, Box<Self>),
     Ite(Box<Self>, Box<Self>, Box<Self>),
     BinaryOp(BinaryOperator, Box<Self>, Box<Self>),
-    Summation(Vec<String>, Box<Self>),
+    Summation(Vec<NamedSymbol>, Box<Self>),
     RuleApplication(DomainConstant),
-    RewriteRule(DomainConstant, Box<Self>),
     Subtree(BDD<NamedSymbol>),
     Reference(String),
 }
@@ -236,9 +237,9 @@ impl ParsedFormula {
             | SymbolicBDD::False
             | SymbolicBDD::Subtree(_)
             | SymbolicBDD::Var(_) => formula.clone(),
-            SymbolicBDD::Summation(_, _) => todo!(),
-            SymbolicBDD::RuleApplication(_) => todo!(),
-            SymbolicBDD::RewriteRule(_, _) => todo!(),
+            SymbolicBDD::Summation(_, _) | SymbolicBDD::RuleApplication(_) => {
+                unreachable!("removed by the rewriter")
+            }
         }
     }
 
@@ -290,6 +291,12 @@ impl ParsedFormula {
             result.define(&name, ReferenceContents::Syntax(definition));
         }
 
+        if uses_rewriting(&tokens) {
+            let (bdd, atoms) = Rewriter::rewrite(&result)?;
+            result.bdd = bdd;
+            result.vars.extend(atoms);
+        }
+
         let mut vi = 0;
         for v in &result.vars {
             result.raw2free.push(if result.var_is_free(&result.bdd, v) {
@@ -334,9 +341,9 @@ impl ParsedFormula {
             SymbolicBDD::FixedPoint(v, _, f) => v != var && self.var_is_free(f, var),
             SymbolicBDD::Subtree(_t) => unimplemented!(),
             SymbolicBDD::True | SymbolicBDD::False => false,
-            SymbolicBDD::Summation(_, _) => todo!(),
-            SymbolicBDD::RuleApplication(_) => todo!(),
-            SymbolicBDD::RewriteRule(_, _) => todo!(),
+            SymbolicBDD::Summation(_, _) | SymbolicBDD::RuleApplication(_) => {
+                unreachable!("removed by the rewriter")
+            }
             SymbolicBDD::Reference(name) => {
                 self.get_definition(name).map_or_else(
                     || true,
@@ -428,9 +435,9 @@ impl ParsedFormula {
                     ReferenceContents::BDD(bdd) => bdd,
                 },
             ),
-            SymbolicBDD::Summation(_, _) => todo!(),
-            SymbolicBDD::RuleApplication(_) => todo!(),
-            SymbolicBDD::RewriteRule(_, _) => todo!(),
+            SymbolicBDD::Summation(_, _) | SymbolicBDD::RuleApplication(_) => {
+                unreachable!("removed by the rewriter")
+            }
         }
     }
 
@@ -488,36 +495,17 @@ impl SymbolicBDD {
             Some(SymbolicBDDToken::Reference(_)) => {
                 Ok(Self::Reference(Self::parse_reference_name(tokens)?))
             }
-            Some(SymbolicBDDToken::Ident(_)) => {
-                // either a variable, or a constant, or a rewrite rule
-                let name = SymbolicBDD::parse_ident(tokens)?;
-
-                if check(SymbolicBDDToken::OpenParen, tokens).is_ok() {
-                    expect(SymbolicBDDToken::OpenParen, tokens)?;
-                    let inside = SymbolicBDD::parse_domain_constant(tokens)?;
-                    expect(SymbolicBDDToken::CloseParen, tokens)?;
-
-                    let apply = DomainConstant::Application(name, Box::new(inside));
-
-                    if check(SymbolicBDDToken::Rewrite, tokens).is_ok() {
-                        expect(SymbolicBDDToken::Rewrite, tokens)?;
-                        let inside = SymbolicBDD::parse_sub_formula(tokens)?;
-
-                        Ok(SymbolicBDD::RewriteRule(apply, Box::new(inside)))
-                    } else {
-                        Ok(SymbolicBDD::RuleApplication(apply))
-                    }
-                } else {
-                    Ok(SymbolicBDD::Var(name))
-                }
-            }
+            Some(SymbolicBDDToken::Ident(_)) => match Self::parse_domain_constant(tokens)? {
+                DomainConstant::Terminal(name) => Ok(Self::Var(name)),
+                application => Ok(Self::RuleApplication(application)),
+            },
             Some(SymbolicBDDToken::Not) => Self::parse_negation(tokens),
             Some(SymbolicBDDToken::Exists) => Self::parse_existence_quantifier(tokens),
             Some(SymbolicBDDToken::Forall) => Self::parse_universal_quantifier(tokens),
             Some(SymbolicBDDToken::GFP) => Self::parse_fixed_point(tokens, true),
             Some(SymbolicBDDToken::LFP) => Self::parse_fixed_point(tokens, false),
             Some(SymbolicBDDToken::If) => Self::parse_ite(tokens),
-            Some(SymbolicBDDToken::Sum) => SymbolicBDD::parse_summation(tokens),
+            Some(SymbolicBDDToken::Sum) => Self::parse_summation(tokens),
             None | Some(SymbolicBDDToken::Eof) => {
                 Err(io::Error::new(io::ErrorKind::InvalidData, "Unexpected EOF"))
             }
@@ -528,30 +516,21 @@ impl SymbolicBDD {
         }
     }
 
-    // parse formulas in the shape a(b), a(b(c)), a(b(c(...)))
-    fn parse_rule_application(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
-        let rulename = SymbolicBDD::parse_ident(tokens)?;
-        expect(SymbolicBDDToken::OpenParen, tokens)?;
-        let inside = SymbolicBDD::parse_domain_constant(tokens)?;
+    // parse terms in the shape a, a(b), a(b, c(d), ...)
+    fn parse_domain_constant(tokens: &mut TokenReader) -> io::Result<DomainConstant> {
+        let name = Self::parse_ident(tokens)?;
+
+        if !eat(SymbolicBDDToken::OpenParen, tokens) {
+            return Ok(DomainConstant::Terminal(name));
+        }
+
+        let mut args = vec![Self::parse_domain_constant(tokens)?];
+        while eat(SymbolicBDDToken::Comma, tokens) {
+            args.push(Self::parse_domain_constant(tokens)?);
+        }
         expect(SymbolicBDDToken::CloseParen, tokens)?;
 
-        Ok(SymbolicBDD::RuleApplication(DomainConstant::Application(
-            rulename,
-            Box::new(inside),
-        )))
-    }
-
-    fn parse_domain_constant(tokens: &mut TokenReader) -> io::Result<DomainConstant> {
-        let constname = SymbolicBDD::parse_ident(tokens)?;
-        if check(SymbolicBDDToken::OpenParen, tokens).is_ok() {
-            expect(SymbolicBDDToken::OpenParen, tokens)?;
-            let inside = SymbolicBDD::parse_domain_constant(tokens)?;
-            expect(SymbolicBDDToken::CloseParen, tokens)?;
-
-            Ok(DomainConstant::Application(constname, Box::new(inside)))
-        } else {
-            Ok(DomainConstant::Terminal(constname))
-        }
+        Ok(DomainConstant::Application(name, args))
     }
 
     fn parse_sub_formula(tokens: &mut TokenReader) -> io::Result<Self> {
@@ -814,14 +793,14 @@ impl SymbolicBDD {
         ))
     }
 
-    fn parse_summation(tokens: &mut TokenReader) -> io::Result<SymbolicBDD> {
+    fn parse_summation(tokens: &mut TokenReader) -> io::Result<Self> {
         expect(SymbolicBDDToken::Sum, tokens)?;
-        let vars = SymbolicBDD::parse_variable_list(tokens)?;
+        let vars = Self::parse_variable_list(tokens)?;
 
         expect(SymbolicBDDToken::Hash, tokens)?;
-        let formula = SymbolicBDD::parse_sub_formula(tokens)?;
+        let formula = Self::parse_sub_formula(tokens)?;
 
-        Ok(SymbolicBDD::Summation(vars, Box::new(formula)))
+        Ok(Self::Summation(vars, Box::new(formula)))
     }
 
     fn parse_negation(tokens: &mut TokenReader) -> io::Result<Self> {
@@ -968,11 +947,21 @@ impl SymbolicBDD {
     }
 }
 
+fn uses_rewriting(tokens: &[SymbolicBDDToken]) -> bool {
+    tokens
+        .iter()
+        .any(|t| matches!(t, SymbolicBDDToken::Rewrite | SymbolicBDDToken::Sum))
+        || tokens
+            .windows(2)
+            .any(|w| matches!(w, [SymbolicBDDToken::Ident(_), SymbolicBDDToken::OpenParen]))
+}
+
 // precedence and right-associativity of a binary operator token
 const fn binary_operator(token: &SymbolicBDDToken) -> Option<(BinaryOperator, u8, bool)> {
     match token {
         SymbolicBDDToken::Iff => Some((BinaryOperator::Iff, 1, false)),
         SymbolicBDDToken::Implies => Some((BinaryOperator::Implies, 2, true)),
+        SymbolicBDDToken::Rewrite => Some((BinaryOperator::Rewrite, 2, true)),
         SymbolicBDDToken::ImpliesInv => Some((BinaryOperator::ImpliesInv, 2, false)),
         SymbolicBDDToken::Or => Some((BinaryOperator::Or, 3, false)),
         SymbolicBDDToken::Nor => Some((BinaryOperator::Nor, 3, false)),

@@ -278,6 +278,39 @@ domains other than boolean variables. Embedding rewrite rules in the BDD could p
 
 ## Rewrite rules (experimental)
 
+### Usage
+
+Problems can be described as propositions over terms such as `Alice`, `suc(_0)` or `next(H1, H2)`, together with
+rewrite rules defining some of these propositions.
+
+```
+"facts and rules"
+house(H1) -> true;
+house(H2) -> true;
+left(H1, H2) -> true;
+sum x, y # next(x, y) -> left(x, y) | left(y, x);
+
+"constraints"
+forall h # house(h) => [has_color(h, Red), has_color(h, Blue)] = 1;
+has_color(H1, Red)
+```
+
+- `p(t1, .., tn) -> formula` is a rewrite rule. Like `=>` it binds weaker than `&` and `|`, so a rule in a `&`-chain
+  needs parentheses: `(p(A) -> true) & ...`. Rules can also be separated using `;`.
+- `sum x, y # rule` introduces pattern variables `x` and `y` which match any term. Every pattern variable must occur
+  in the left-hand side of the rule.
+- `t1 = t2` holds if both terms are identical.
+- A proposition `p(..)` for which rules exist is rewritten to the conjunction of the right-hand sides of all matching
+  rules. If no rule matches, or the rewriting is cyclic, the proposition is false.
+- A proposition without any rules is an unknown: every distinct proposition, such as `has_color(H1, Red)`, becomes a
+  boolean variable for the solver.
+- `forall` and `exists` over a variable used as a term range over all ground terms occurring in the formula.
+- Rewrite rules must be top-level conjuncts of the formula.
+
+See [examples/peano.txt](examples/peano.txt) and [examples/einstein.txt](examples/einstein.txt).
+
+### Design
+
 Rewrite rules introduce rewriting of domain-based variables and constants into logical primitives.
 The rewrite system introduces two basic types, variables and constants, and some new operators.
 

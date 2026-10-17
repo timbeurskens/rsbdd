@@ -1,0 +1,122 @@
+"
+Einstein's riddle
+
+The situation
+
+    There are 5 houses in five different colors.
+    In each house lives a person with a different nationality.
+    These five owners drink a certain type of beverage, smoke a certain brand of cigar and keep a certain pet.
+    No owners have the same pet, smoke the same brand of cigar or drink the same beverage.
+
+The question is: Who owns the fish?
+
+Hints
+
+1)  the Brit lives in the red house
+2)  the Swede keeps dogs as pets
+3)  the Dane drinks tea
+4)  the green house is on the left of the white house
+5)  the green house's owner drinks coffee
+6)  the person who smokes Pall Mall rears birds
+7)  the owner of the yellow house smokes Dunhill
+8)  the man living in the center house drinks milk
+9)  the Norwegian lives in the first house
+10) the man who smokes blends lives next to the one who keeps cats
+11) the man who keeps horses lives next to the man who smokes Dunhill
+12) the owner who smokes BlueMaster drinks beer
+13) the German smokes Prince
+14) the Norwegian lives next to the blue house
+15) the man who smokes blend has a neighbor who drinks water
+
+Einstein wrote this riddle this century. He said that 98% of the world could not solve it.
+
+From: https://udel.edu/~os/riddle.html
+
+---
+
+The domains (houses, nationalities, colors, ...) and the neighbour relation are described by rewrite rules.
+The unknowns has_nationality(h, n), has_color(h, c), drinks(h, d), smokes(h, s) and keeps(h, p) have no rules,
+so every combination of a house and a value is a boolean variable for the solver.
+
+Run with:
+    rsbdd examples/einstein.txt -t -ft
+"
+
+"All houses, from left to right"
+house(H1) -> true;
+house(H2) -> true;
+house(H3) -> true;
+house(H4) -> true;
+house(H5) -> true;
+
+left(H1, H2) -> true;
+left(H2, H3) -> true;
+left(H3, H4) -> true;
+left(H4, H5) -> true;
+
+sum x, y # next(x, y) -> left(x, y) | left(y, x);
+
+"All nationalities"
+nationality(Brit) -> true;
+nationality(Swede) -> true;
+nationality(Dane) -> true;
+nationality(Norwegian) -> true;
+nationality(German) -> true;
+
+"All colors"
+color(Red) -> true;
+color(Green) -> true;
+color(White) -> true;
+color(Yellow) -> true;
+color(Blue) -> true;
+
+"All beverages"
+drink(Tea) -> true;
+drink(Coffee) -> true;
+drink(Milk) -> true;
+drink(Beer) -> true;
+drink(Water) -> true;
+
+"All cigars"
+cigar(PallMall) -> true;
+cigar(Dunhill) -> true;
+cigar(Blends) -> true;
+cigar(BlueMaster) -> true;
+cigar(Prince) -> true;
+
+"All pets"
+pet(Dogs) -> true;
+pet(Birds) -> true;
+pet(Cats) -> true;
+pet(Horses) -> true;
+pet(Fish) -> true;
+
+"Every house has exactly one value of every kind, and every value belongs to exactly one house"
+forall h # house(h) => [has_nationality(h, Brit), has_nationality(h, Swede), has_nationality(h, Dane), has_nationality(h, Norwegian), has_nationality(h, German)] = 1;
+forall h # house(h) => [has_color(h, Red), has_color(h, Green), has_color(h, White), has_color(h, Yellow), has_color(h, Blue)] = 1;
+forall h # house(h) => [drinks(h, Tea), drinks(h, Coffee), drinks(h, Milk), drinks(h, Beer), drinks(h, Water)] = 1;
+forall h # house(h) => [smokes(h, PallMall), smokes(h, Dunhill), smokes(h, Blends), smokes(h, BlueMaster), smokes(h, Prince)] = 1;
+forall h # house(h) => [keeps(h, Dogs), keeps(h, Birds), keeps(h, Cats), keeps(h, Horses), keeps(h, Fish)] = 1;
+
+forall n # nationality(n) => [has_nationality(H1, n), has_nationality(H2, n), has_nationality(H3, n), has_nationality(H4, n), has_nationality(H5, n)] = 1;
+forall c # color(c) => [has_color(H1, c), has_color(H2, c), has_color(H3, c), has_color(H4, c), has_color(H5, c)] = 1;
+forall d # drink(d) => [drinks(H1, d), drinks(H2, d), drinks(H3, d), drinks(H4, d), drinks(H5, d)] = 1;
+forall s # cigar(s) => [smokes(H1, s), smokes(H2, s), smokes(H3, s), smokes(H4, s), smokes(H5, s)] = 1;
+forall p # pet(p) => [keeps(H1, p), keeps(H2, p), keeps(H3, p), keeps(H4, p), keeps(H5, p)] = 1;
+
+"Hints"
+forall h # house(h) => (has_nationality(h, Brit) <=> has_color(h, Red));
+forall h # house(h) => (has_nationality(h, Swede) <=> keeps(h, Dogs));
+forall h # house(h) => (has_nationality(h, Dane) <=> drinks(h, Tea));
+forall h # house(h) => (has_color(h, White) => exists g # left(g, h) & has_color(g, Green));
+forall h # house(h) => (has_color(h, Green) <=> drinks(h, Coffee));
+forall h # house(h) => (smokes(h, PallMall) <=> keeps(h, Birds));
+forall h # house(h) => (has_color(h, Yellow) <=> smokes(h, Dunhill));
+drinks(H3, Milk);
+has_nationality(H1, Norwegian);
+forall h # house(h) => (smokes(h, Blends) => exists g # next(h, g) & keeps(g, Cats));
+forall h # house(h) => (keeps(h, Horses) => exists g # next(h, g) & smokes(g, Dunhill));
+forall h # house(h) => (smokes(h, BlueMaster) <=> drinks(h, Beer));
+forall h # house(h) => (has_nationality(h, German) <=> smokes(h, Prince));
+forall h # house(h) => (has_nationality(h, Norwegian) => exists g # next(h, g) & has_color(g, Blue));
+forall h # house(h) => (smokes(h, Blends) => exists g # next(h, g) & drinks(g, Water));

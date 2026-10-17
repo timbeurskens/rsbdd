@@ -1,1 +1,1 @@
-(sum p # (is_person(p) -> p = Alice)) & is_person(Alice)
+(sum p # is_person(p) -> p = Alice) & is_person(Alice)
