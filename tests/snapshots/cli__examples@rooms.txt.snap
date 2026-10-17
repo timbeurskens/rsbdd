@@ -1,0 +1,26 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: examples/rooms.txt
+---
+$ rsbdd -t -f true examples/rooms.txt
+status: 10
+--- stdout
+| reachable(Hall) | reachable(Kitchen) | reachable(Garden) | reachable(Shed) | reachable(Attic) | reachable(Cellar) | *     |
+|-----------------|--------------------|-------------------|-----------------|------------------|-------------------|-------|
+| True            | True               | True              | True            | False            | False             | True  |
+--- stderr
+
+$ rsbdd -v examples/rooms.txt
+status: 10
+--- stdout
+reachable(Hall), reachable(Kitchen), reachable(Garden), reachable(Shed);
+--- stderr
+
+$ rsbdd -m -t -f true examples/rooms.txt
+status: 10
+--- stdout
+| reachable(Hall) | reachable(Kitchen) | reachable(Garden) | reachable(Shed) | reachable(Attic) | reachable(Cellar) | *     |
+|-----------------|--------------------|-------------------|-----------------|------------------|-------------------|-------|
+| True            | True               | True              | True            | False            | False             | True  |
+--- stderr

@@ -588,6 +588,68 @@ rsbdd -i examples/4_queens.txt -t -ft
 | False | False | True  | False | True  | False | False | False | False | False | False | True  | False | True  | False | False | True |
 | False | True  | False | False | False | False | False | True  | True  | False | False | False | False | False | True  | False | True |
 
+### Example 3: model checking Peterson's protocol
+
+Peterson's algorithm lets two processes share a critical section using nothing but two flags and a `turn` variable.
+A process that wants to enter raises its flag and politely gives the turn to the other process. It then waits until
+the other process is not interested (its flag is down) or it is its own turn. On leaving, it lowers its flag.
+
+[examples/peterson.txt](examples/peterson.txt) encodes the protocol as a transition system `T` over the program
+counters of both processes and the turn bit, and checks four properties using fixed points:
+
+- `mutex`: no reachable state has both processes in the critical section (least fixpoint for reachability)
+- `deadlock_free`: every reachable state has a successor
+- `recoverable`: from every reachable state, P0 can still reach its critical section (least fixpoint)
+- `no_overtaking`: while P0 waits, P1 cannot keep moving forever on its own (greatest fixpoint)
+
+```
+let Reach := lfp R # init |
+    (exists a1, a0, b1, b0, t # R & T)[a1' := a1, a0' := a0, b1' := b1, b0' := b0, t' := t];
+
+mutex <=> forall a1, a0, b1, b0, t # Reach => -(crit0 & crit1);
+...
+```
+
+```bash
+rsbdd examples/peterson.txt -t -ft
+```
+
+| mutex | deadlock_free | recoverable | no_overtaking | *    |
+|-------|---------------|-------------|---------------|------|
+| True  | True          | True        | True          | True |
+
+#### Finding bugs
+
+Suppose P0 is "optimized" to enter the critical section without checking the flag and turn of P1:
+
+```diff
+-    wait0 & (idle1 | -t) & crit0[a1 := a1', a0 := a0'] & keept |
++    wait0 & crit0[a1 := a1', a0 := a0'] & keept |
+```
+
+Running the checks again shows that mutual exclusion is violated:
+
+| mutex | deadlock_free | recoverable | no_overtaking | *    |
+|-------|---------------|-------------|---------------|------|
+| False | True          | True        | True          | True |
+
+To find a counterexample, replace the four properties at the end of the file by a query for the bad states:
+
+```
+Reach & crit0 & crit1
+```
+
+| a1   | a0    | b1   | b0    | t    | *    |
+|------|-------|------|-------|------|------|
+| True | False | True | False | True | True |
+
+Both processes are in the critical section (`10`) while the turn belongs to P1. This state is reached when P1 starts
+waiting, P0 starts waiting and hands the turn to P1, P1 enters, and P0 barges in after it.
+
+Other mistakes are found the same way. If neither process looks at `turn`, so a process only enters when the other is
+idle, `deadlock_free` and `recoverable` fail: both processes can wait for each other forever. If P1 keeps the turn to
+itself instead of handing it to P0, both `mutex` and `no_overtaking` fail.
+
 ## CLI Usage
 
 ### rsbdd

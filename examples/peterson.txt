@@ -1,0 +1,66 @@
+"
+Model checking Peterson's mutual exclusion protocol for two processes P0 and P1.
+
+Each process cycles through idle -> wait -> crit -> idle:
+
+    idle: raise the flag and give the turn to the other process
+    wait: enter the critical section if the other process is idle or it is our turn
+    crit: lower the flag and leave
+
+State variables (unprimed = current, primed = next):
+
+    a1, a0   program counter of P0   (idle = 00, wait = 01, crit = 10)
+    b1, b0   program counter of P1
+    t        turn (false = P0, true = P1)
+
+The flag of a process is raised exactly when it is not idle, so it is not a separate variable.
+
+Checked properties:
+
+    mutex          no reachable state has both processes in the critical section      (lfp)
+    deadlock_free  every reachable state has a successor
+    recoverable    from every reachable state, P0 can still reach its critical section (lfp)
+    no_overtaking  while P0 waits, P1 cannot keep moving forever on its own             (gfp)
+
+Run with:
+    rsbdd examples/peterson.txt -t
+"
+
+let idle0 := -a1 & -a0;
+let wait0 := -a1 &  a0;
+let crit0 :=  a1 & -a0;
+let idle1 := -b1 & -b0;
+let wait1 := -b1 &  b0;
+let crit1 :=  b1 & -b0;
+
+let keep0 := (a1' <=> a1) & (a0' <=> a0);
+let keep1 := (b1' <=> b1) & (b0' <=> b0);
+let keept := t' <=> t;
+
+let T0 :=
+    idle0 & wait0[a1 := a1', a0 := a0'] & t' |
+    wait0 & (idle1 | -t) & crit0[a1 := a1', a0 := a0'] & keept |
+    crit0 & idle0[a1 := a1', a0 := a0'] & keept;
+
+let T1 :=
+    idle1 & wait1[b1 := b1', b0 := b0'] & -t' |
+    wait1 & (idle0 | t) & crit1[b1 := b1', b0 := b0'] & keept |
+    crit1 & idle1[b1 := b1', b0 := b0'] & keept;
+
+let T := T0 & keep1 | T1 & keep0;
+
+let init := idle0 & idle1 & -t;
+
+let Reach := lfp R # init |
+    (exists a1, a0, b1, b0, t # R & T)[a1' := a1, a0' := a0, b1' := b1, b0' := b0, t' := t];
+
+let CanCrit0 := lfp Z # crit0 |
+    exists a1', a0', b1', b0', t' # T & Z[a1 := a1', a0 := a0', b1 := b1', b0 := b0', t := t'];
+
+let Overtaken := gfp Z # wait0 &
+    exists a1', a0', b1', b0', t' # T1 & keep0 & Z[a1 := a1', a0 := a0', b1 := b1', b0 := b0', t := t'];
+
+mutex <=> forall a1, a0, b1, b0, t # Reach => -(crit0 & crit1);
+deadlock_free <=> forall a1, a0, b1, b0, t # Reach => exists a1', a0', b1', b0', t' # T;
+recoverable <=> forall a1, a0, b1, b0, t # Reach => CanCrit0;
+no_overtaking <=> forall a1, a0, b1, b0, t # Reach => -Overtaken
