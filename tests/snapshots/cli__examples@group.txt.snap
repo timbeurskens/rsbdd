@@ -1,0 +1,27 @@
+---
+source: tests/cli.rs
+assertion_line: 31
+expression: output
+input_file: examples/group.txt
+---
+$ rsbdd -t -f true examples/group.txt
+status: 10
+--- stdout
+| p(one) | *     |
+|--------|-------|
+| Any    | True  |
+--- stderr
+
+$ rsbdd -v examples/group.txt
+status: 10
+--- stdout
+p(one)*;
+--- stderr
+
+$ rsbdd -m -t -f true examples/group.txt
+status: 10
+--- stdout
+| p(one) | *     |
+|--------|-------|
+| Any    | True  |
+--- stderr

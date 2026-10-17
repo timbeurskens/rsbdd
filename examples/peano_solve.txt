@@ -1,0 +1,48 @@
+"
+Solving equations over peano numerals: term rewriting combined with satisfiability solving.
+
+Find natural numbers x and y such that
+
+1) x + y = 4
+2) x * y = 3
+
+Addition and multiplication are defined by term rules, so the constraints are written as plain equations between
+terms. The equations are decided by rewriting both sides to normal form.
+The unknowns val(v, n) state that variable v has value n. They have no rules, so every combination is a boolean
+variable for the solver, which finds all values satisfying the equations.
+Quantifiers range over the normal forms of all terms in the formula, so each quantified value is first checked to
+be a natural number. The numerals in the formula go up to 4, which bounds the search; constraint 1 ensures no
+solution is missed.
+The solutions are x = 1, y = 3 and x = 3, y = 1.
+
+Run with:
+    rsbdd examples/peano_solve.txt -t -ft
+
+Theorem proving by refutation: x is odd in every solution. Append the negation of this theorem,
+
+    ; exists x # is_nat(x) & val(X, x) & -(x = suc(_0) | x = suc(suc(suc(_0))))
+
+and the formula becomes unsatisfiable, which proves the theorem.
+"
+
+"addition and multiplication"
+sum y # plus(_0, y) -> y;
+sum x, y # plus(suc(x), y) -> suc(plus(x, y));
+sum y # times(_0, y) -> _0;
+sum x, y # times(suc(x), y) -> plus(y, times(x, y));
+
+"0 is a natural number, and so is the successor of every natural number"
+is_nat(_0) -> true;
+sum n # is_nat(suc(n)) -> is_nat(n);
+
+"the variables of the problem"
+var(X) -> true;
+var(Y) -> true;
+
+"every variable has exactly one value"
+forall v # var(v) => exists n # is_nat(n) & val(v, n) & forall m # (is_nat(m) & val(v, m)) => m = n;
+
+"the constraints"
+forall x, y # (is_nat(x) & is_nat(y) & val(X, x) & val(Y, y)) =>
+    plus(x, y) = suc(suc(suc(suc(_0)))) &
+    times(x, y) = suc(suc(suc(_0)))

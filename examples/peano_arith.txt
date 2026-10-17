@@ -1,0 +1,28 @@
+"
+Theorem proving over peano numerals by term rewriting.
+
+Addition and multiplication are defined by term rules. The rules are convergent, so two ground terms are equal if
+and only if their normal forms are identical. Every equation below is proven by rewriting both sides to normal form.
+The formula is valid, resulting in a single 'true' node in the BDD.
+
+Run with:
+    rsbdd examples/peano_arith.txt
+"
+
+sum y # plus(_0, y) -> y;
+sum x, y # plus(suc(x), y) -> suc(plus(x, y));
+sum y # times(_0, y) -> _0;
+sum x, y # times(suc(x), y) -> plus(y, times(x, y));
+
+"1 + 1 = 2"
+plus(suc(_0), suc(_0)) = suc(suc(_0));
+
+"2 * 2 = 2 + 2"
+times(suc(suc(_0)), suc(suc(_0))) = plus(suc(suc(_0)), suc(suc(_0)));
+
+"2 * 3 != 5"
+-(times(suc(suc(_0)), suc(suc(suc(_0)))) = suc(suc(suc(suc(suc(_0))))));
+
+"addition commutes and 0 is a right identity, for all numerals in the formula"
+forall x, y # plus(x, y) = plus(y, x);
+forall x # plus(x, _0) = x

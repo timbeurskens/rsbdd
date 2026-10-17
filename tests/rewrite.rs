@@ -91,3 +91,40 @@ fn test_term_equality_without_rules() -> io::Result<()> {
     assert!(is_false("A = B")?);
     Ok(())
 }
+
+#[test]
+fn test_term_rules() -> io::Result<()> {
+    let plus = "sum y # plus(_0, y) -> y; sum x, y # plus(suc(x), y) -> suc(plus(x, y));";
+    assert!(is_true(&format!(
+        "{plus} plus(suc(_0), suc(_0)) = suc(suc(_0))"
+    ))?);
+    assert!(is_false(&format!(
+        "{plus} plus(suc(_0), suc(_0)) = suc(_0)"
+    ))?);
+    assert!(is_false(&format!("{plus} p(plus(_0, A)) & -p(A)"))?);
+    Ok(())
+}
+
+#[test]
+fn test_peano_arithmetic() -> io::Result<()> {
+    assert!(is_true(&fs::read_to_string("examples/peano_arith.txt")?)?);
+    Ok(())
+}
+
+#[test]
+fn test_group_theory() -> io::Result<()> {
+    let theory = fs::read_to_string("examples/group.txt")?;
+    assert!(is_true(&theory)?);
+    assert!(is_false(&format!("{theory}; mul(a, b) = mul(b, a)"))?);
+    Ok(())
+}
+
+#[test]
+fn test_peano_solve() -> io::Result<()> {
+    let problem = fs::read_to_string("examples/peano_solve.txt")?;
+    assert!(!is_false(&problem)?);
+    assert!(is_false(&format!(
+        "{problem}; exists x # is_nat(x) & val(X, x) & -(x = suc(_0) | x = suc(suc(suc(_0))))"
+    ))?);
+    Ok(())
+}

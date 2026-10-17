@@ -309,6 +309,40 @@ has_color(H1, Red)
 
 See [examples/peano.txt](examples/peano.txt), [examples/peano_puzzle.txt](examples/peano_puzzle.txt) and [examples/einstein.txt](examples/einstein.txt).
 
+### Theorem proving by term rewriting
+
+A symbol used inside a term or as an operand of `=` is a function symbol. Its rules are term rules: the right-hand
+side is a term instead of a formula.
+
+```
+sum y # plus(_0, y) -> y;
+sum x, y # plus(suc(x), y) -> suc(plus(x, y));
+
+plus(suc(_0), suc(_0)) = suc(suc(_0))
+```
+
+- Terms are rewritten to normal form (innermost first, using the first matching rule) before they are compared,
+  matched against rules or turned into boolean variables. `t1 = t2` therefore holds modulo the term rules, and
+  `p(plus(_0, A))` and `p(A)` are the same proposition.
+- If the term rules form a convergent (terminating and confluent) rewrite system, two terms are equal in the
+  equational theory of the rules if and only if their normal forms are identical (Knuth & Bendix, 1970; Baader &
+  Nipkow, *Term Rewriting and All That*, 1998). A theorem is proven if the formula evaluates to `true`.
+- Convergence is not checked, and completion of the rules is not performed: a non-terminating system does not
+  terminate, and the result of a non-confluent system depends on the order of the rules.
+- Quantifiers range over the normal forms of the ground terms in the formula, so a quantified theorem is only proven
+  for those terms. Proofs by induction are not supported.
+
+See [examples/peano_arith.txt](examples/peano_arith.txt) and [examples/group.txt](examples/group.txt), which proves
+theorems of group theory using the completed rewrite system of Knuth and Bendix.
+
+Term rules combine with unknowns solved by the solver. [examples/peano_solve.txt](examples/peano_solve.txt) finds
+natural numbers `x` and `y` with `x + y = 4` and `x * y = 3`, and proves by refutation that `x` is odd in every
+solution: adding the negation of the theorem makes the formula unsatisfiable.
+
+```bash
+rsbdd examples/peano_solve.txt -t -ft
+```
+
 The puzzle in [examples/peano_puzzle.txt](examples/peano_puzzle.txt) asks for natural numbers `a`, `b` and `c` such
 that `a + b = c`, `b + c = 5` and `a < b`. The BDD below, obtained with `rsbdd examples/peano_puzzle.txt -d
 peano_puzzle.dot`, has a single path to `true`: the unique solution `a = 1`, `b = 2` and `c = 3`.

@@ -1,0 +1,40 @@
+"
+Theorem proving in group theory by term rewriting.
+
+The group axioms (with unit one, product mul and inverse inv)
+
+    mul(one, x) = x,   mul(inv(x), x) = one,   mul(mul(x, y), z) = mul(x, mul(y, z))
+
+are turned into the convergent rewrite system below by Knuth-Bendix completion (Knuth & Bendix, 1970).
+Two terms are equal in every group if and only if their normal forms are identical, so the theorems below
+are proven by rewriting both sides of each equation to normal form.
+
+The last theorem combines rewriting with the solver: the unknown p(..) is identified modulo the group axioms.
+The formula is valid, resulting in a single 'true' node in the BDD.
+
+Run with:
+    rsbdd examples/group.txt
+"
+
+sum x # mul(one, x) -> x;
+sum x # mul(x, one) -> x;
+sum x # mul(inv(x), x) -> one;
+sum x # mul(x, inv(x)) -> one;
+sum x, y, z # mul(mul(x, y), z) -> mul(x, mul(y, z));
+sum x, y # mul(inv(x), mul(x, y)) -> y;
+sum x, y # mul(x, mul(inv(x), y)) -> y;
+inv(one) -> one;
+sum x # inv(inv(x)) -> x;
+sum x, y # inv(mul(x, y)) -> mul(inv(y), inv(x));
+
+"the inverse of a product is the product of the inverses in reverse order"
+inv(mul(a, b)) = mul(inv(b), inv(a));
+
+"cancellation"
+mul(mul(a, inv(b)), b) = a;
+
+"the inverse of a conjugate is the conjugate of the inverse"
+inv(mul(mul(g, a), inv(g))) = mul(g, mul(inv(a), inv(g)));
+
+"properties of an unknown predicate p hold modulo the group axioms"
+p(mul(a, inv(a))) => p(inv(inv(one)))

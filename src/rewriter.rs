@@ -1,6 +1,7 @@
 use std::io;
 use std::rc::Rc;
 
+use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::NamedSymbol;
@@ -21,6 +22,7 @@ struct Rule {
 struct Universe {
     terms: Vec<DomainConstant>,
     seen: FxHashSet<DomainConstant>,
+    functions: FxHashSet<NamedSymbol>,
 }
 
 /// Grounds rewrite rules into a plain formula.
@@ -28,8 +30,13 @@ struct Universe {
 /// An application of a predicate with rules is replaced by the conjunction of the right-hand sides of all
 /// matching rules, or `false` if no rule matches. An application of a predicate without rules becomes a
 /// boolean variable. Quantifiers over variables used as terms range over all ground terms in the formula.
+///
+/// A rule for a function symbol (a symbol used inside a term or as an operand of `=`) is a term rule: its right-hand
+/// side is a term. Terms are rewritten to normal form before they are compared, matched or turned into variables,
+/// so `=` holds modulo the term rules. This decides equality if the term rules form a convergent rewrite system.
 pub struct Rewriter<'a> {
     rules: &'a [Rule],
+    term_rules: &'a [Rule],
     universe: &'a [DomainConstant],
     atoms: FxHashMap<DomainConstant, NamedSymbol>,
     base_id: usize,
@@ -56,9 +63,27 @@ impl Rewriter<'_> {
         }
         collect_terms(&formula, &[], &mut universe);
 
+        let (term_rules, rules): (Vec<_>, Vec<_>) = rules.into_iter().partition(|rule| {
+            matches!(&rule.lhs, DomainConstant::Application(f, _) if universe.functions.contains(f))
+        });
+        for rule in &term_rules {
+            add_element(
+                &term(&rule.rhs, &Substitution::default())?,
+                &rule.vars,
+                &mut universe,
+            );
+        }
+        let terms: Vec<_> = universe
+            .terms
+            .iter()
+            .map(|t| normalize(t, &term_rules))
+            .collect::<io::Result<_>>()?;
+        let terms: Vec<_> = terms.into_iter().unique().collect();
+
         let mut rewriter = Rewriter {
             rules: &rules,
-            universe: &universe.terms,
+            term_rules: &term_rules,
+            universe: &terms,
             atoms: FxHashMap::default(),
             base_id: parsed.vars.iter().map(|v| v.id + 1).max().unwrap_or(0),
             expanding: FxHashSet::default(),
@@ -76,7 +101,9 @@ impl Rewriter<'_> {
         Ok(match formula {
             SymbolicBDD::RuleApplication(t) => return self.apply(subst(t, theta)),
             SymbolicBDD::BinaryOp(BinaryOperator::Equals, l, r) => {
-                if term(l, theta)? == term(r, theta)? {
+                if normalize(&term(l, theta)?, self.term_rules)?
+                    == normalize(&term(r, theta)?, self.term_rules)?
+                {
                     SymbolicBDD::True
                 } else {
                     SymbolicBDD::False
@@ -167,6 +194,7 @@ impl Rewriter<'_> {
     }
 
     fn apply(&mut self, ground: DomainConstant) -> io::Result<SymbolicBDD> {
+        let ground = normalize(&ground, self.term_rules)?;
         if !self
             .rules
             .iter()
@@ -337,6 +365,26 @@ fn contains(t: &DomainConstant, v: &NamedSymbol) -> bool {
     }
 }
 
+/// Rewrite a term to normal form, innermost first
+fn normalize(t: &DomainConstant, rules: &[Rule]) -> io::Result<DomainConstant> {
+    let t = match t {
+        DomainConstant::Application(f, args) => DomainConstant::Application(
+            f.clone(),
+            args.iter()
+                .map(|a| normalize(a, rules))
+                .collect::<io::Result<_>>()?,
+        ),
+        terminal => terminal.clone(),
+    };
+    for rule in rules {
+        let mut sigma = Substitution::default();
+        if match_pattern(&rule.lhs, &t, &rule.vars, &mut sigma) {
+            return normalize(&term(&rule.rhs, &sigma)?, rules);
+        }
+    }
+    Ok(t)
+}
+
 fn same_functor(a: &DomainConstant, b: &DomainConstant) -> bool {
     matches!((a, b), (DomainConstant::Application(f, xs), DomainConstant::Application(g, ys)) if f == g && xs.len() == ys.len())
 }
@@ -374,6 +422,9 @@ fn add_args(t: &DomainConstant, bound: &[NamedSymbol], universe: &mut Universe) 
 
 /// Add a term and its subterms to the universe, skipping terms containing bound variables
 fn add_element(t: &DomainConstant, bound: &[NamedSymbol], universe: &mut Universe) {
+    if let DomainConstant::Application(f, _) = t {
+        universe.functions.insert(f.clone());
+    }
     if !bound.iter().any(|v| contains(t, v)) && universe.seen.insert(t.clone()) {
         universe.terms.push(t.clone());
     }
