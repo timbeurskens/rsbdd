@@ -7,7 +7,7 @@ use std::rc::Rc;
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHasher};
 
-use crate::store::{RawNode, Store, FALSE, TRUE};
+use crate::store::{FALSE, RawNode, Store, TRUE};
 use crate::{BDDSymbol, NamedSymbol, TruthTableEntry};
 
 #[macro_export]
