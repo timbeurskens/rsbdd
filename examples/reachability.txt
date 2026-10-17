@@ -1,0 +1,45 @@
+"
+Reachability: which states of a transition system can be reached from the initial state?
+
+A state is encoded by two bits (x1, x0), giving four states:
+
+    0 = (-x1, -x0)    1 = (-x1, x0)    2 = (x1, -x0)    3 = (x1, x0)
+
+Transitions (p = current state, x = next state):
+
+    0 -> 1,  1 -> 2,  2 -> 1,  3 -> 0
+
+Starting in state 0, the reachable states are {0, 1, 2}. State 3 is never reached,
+even though it has an outgoing transition.
+
+Why this needs a fixpoint:
+'reachable' is the transitive closure of the transition relation: the smallest set R with
+    R(x) <=> init(x) | exists p # R(p) & T(p, x)
+R is defined in terms of itself, and plain propositional logic cannot express that.
+Without a fixpoint you have to unroll the relation into init | step_1 | step_2 | ... | step_k,
+which needs a fresh copy of the state variables for every step and a bound k known in advance.
+Pick k too small (here k < 2) and you silently get an incomplete answer.
+The least fixpoint needs no bound. It starts from R = false and applies the step until R
+stops changing:
+
+    R0 = false
+    R1 = {0}
+    R2 = {0, 1}
+    R3 = {0, 1, 2}
+    R4 = {0, 1, 2}   (stable, done)
+
+Run with:
+    rsbdd examples/reachability.txt -t
+"
+
+let init := -x1 & -x0;
+
+"T(p, x): the transition relation"
+let T :=
+    -p1 & -p0 & -x1 &  x0 |  "0 -> 1"
+    -p1 &  p0 &  x1 & -x0 |  "1 -> 2"
+     p1 & -p0 & -x1 &  x0 |  "2 -> 1"
+     p1 &  p0 & -x1 & -x0;   "3 -> 0"
+
+"x is reachable if it is the initial state, or some reachable state p has a transition to x"
+lfp R # init | exists p1, p0 # R[x1 := p1, x0 := p0] & T
