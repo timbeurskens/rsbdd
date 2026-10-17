@@ -1,2 +1,0 @@
-"binary operators have no precedence and associate to the right: a & (b | c)"
-a & b | c

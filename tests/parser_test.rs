@@ -79,6 +79,60 @@ fn env() -> BDDEnv<usize> {
     BDDEnv::new()
 }
 
+fn assert_equivalent(lhs: &str, rhs: &str) -> io::Result<()> {
+    let formula = format!("let lhs := {}; let rhs := {}; lhs <=> rhs", lhs, rhs);
+    assert_eq!(
+        parse_and_evaluate(&formula)?,
+        env().mk_const(true),
+        "{} is not equivalent to {}",
+        lhs,
+        rhs
+    );
+    Ok(())
+}
+
+#[test]
+fn test_operator_precedence() -> io::Result<()> {
+    assert_equivalent("a & b | c", "(a & b) | c")?;
+    assert_equivalent("a | b & c", "a | (b & c)")?;
+    assert_equivalent("a ^ b & c", "a ^ (b & c)")?;
+    assert_equivalent("a | b ^ c", "a | (b ^ c)")?;
+    assert_equivalent("a & b => c", "(a & b) => c")?;
+    assert_equivalent("a => b => c", "a => (b => c)")?;
+    assert_equivalent("a => b <=> c", "(a => b) <=> c")?;
+    assert_equivalent("-a & b", "(-a) & b")?;
+    assert_equivalent("a & exists b # b | c", "a & (exists b # (b | c))")?;
+    Ok(())
+}
+
+#[test]
+fn test_definitions_and_constraint_lists() -> io::Result<()> {
+    assert_eq!(
+        parse_and_evaluate("let x := a & b; (x | c) <=> ((a & b) | c)")?,
+        env().mk_const(true)
+    );
+    assert_eq!(
+        parse_and_evaluate("a; b | c;")?,
+        parse_and_evaluate("a & (b | c)")?
+    );
+    assert_eq!(parse_and_evaluate("a; -a;")?, env().mk_const(false));
+    assert_eq!(
+        parse_and_evaluate("let step := a | X; lfp X # step")?,
+        parse_and_evaluate("a")?
+    );
+    Ok(())
+}
+
+#[test]
+fn test_substitution() -> io::Result<()> {
+    assert_equivalent("(a & b)[a := c]", "c & b")?;
+    assert_equivalent("(a & b)[a := true]", "b")?;
+    assert_equivalent("(a & -b)[a := c, b := d]", "c & -d")?;
+    assert_equivalent("-a[a := b]", "-b")?;
+    assert!(parse_and_evaluate("(a & b)[a := b, b := a]").is_err());
+    Ok(())
+}
+
 #[test]
 fn test_parsed_solutions() -> io::Result<()> {
     // constants are evaluated to true and

@@ -98,6 +98,28 @@ hello <=> world
 on ^ off
 ```
 
+### Operator precedence
+
+Binary operators follow the usual precedence, from strongest to weakest binding:
+
+| Precedence | Operators                 | Associativity |
+|------------|---------------------------|---------------|
+| 1          | `!` (negation)            | -             |
+| 2          | `&`, `nand`               | left          |
+| 3          | `^`                       | left          |
+| 4          | `\|`, `nor`               | left          |
+| 5          | `=>`, `<=`                | `=>`: right   |
+| 6          | `<=>`                     | left          |
+
+The body of a quantifier, fixed point or if-then-else extends as far to the right as possible.
+
+```
+a & b | c           <=> (a & b) | c
+a & b => c          <=> (a & b) => c
+a => b => c         <=> a => (b => c)
+a & exists b # b | c <=> a & (exists b # (b | c))
+```
+
 ### Composition
 
 Larger formulae can be composed using left and right parentheses: `(`, `)`:
@@ -198,6 +220,46 @@ mu X # ...          <=> lfp X # ...
 gfp/lfp X # a       <=> a
 gfp/lfp X # true    <=> true
 gfp/lfp X # false   <=> false
+```
+
+### Definitions and constraint lists
+
+A formula can be split into a list of constraints separated by `;`. The list holds when every constraint holds. A trailing
+`;` is allowed.
+
+```
+[a, b, c] = 1;
+a => -b;
+```
+
+Sub-formulae can be named using `let name := formula;` at the start of a file. A definition is used by its name (or
+`{name}`) in all following definitions and constraints, and is replaced by its formula when evaluated. A definition may
+refer to the variable of an enclosing fixed point.
+
+```
+let init := -x & -y;
+let step := X | (x & -y);
+lfp X # init | step
+```
+
+### Substitution
+
+The postfix `formula[x := y, ...]` replaces variables in a formula by other variables or constants. This is
+particularly useful in fixed points, for example to compute the predecessor of a set of states. A replaced variable may
+not be used as a replacement in the same substitution, so `[x := y, y := x]` is rejected.
+
+```
+(a & b)[a := c]     <=> c & b
+(a & b)[a := true]  <=> b
+```
+
+The example below computes all states reachable from state `00` in a transition system `T` over current-state
+variables `p1, p0` and next-state variables `x1, x0` (see [examples/reachability.txt](examples/reachability.txt)).
+
+```
+let init := -x1 & -x0;
+let T := ...;
+lfp R # init | exists p1, p0 # R[x1 := p1, x0 := p0] & T
 ```
 
 ### Parse-tree display

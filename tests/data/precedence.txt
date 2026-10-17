@@ -1,0 +1,2 @@
+"& binds stronger than |: (a & b) | c"
+a & b | c

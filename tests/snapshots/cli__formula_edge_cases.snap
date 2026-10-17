@@ -273,7 +273,8 @@ status: 0
 --- stdout
 | a     | b     | c     | *     |
 |-------|-------|-------|-------|
-| False | Any   | Any   | False |
+| False | Any   | False | True  |
+| False | Any   | True  | False |
 | True  | False | False | True  |
 | True  | False | True  | False |
 | True  | True  | Any   | True  |

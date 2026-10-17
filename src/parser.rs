@@ -10,13 +10,13 @@ use std::vec::Vec;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::NamedSymbol;
 use crate::bdd::{BDD, BDDEnv};
 
 lazy_static! {
-    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+|>=|=|>|<|\[|\]|,|\(|\))|(?P<countable>\d+)|\{(?P<reference>[\w']+)\}|(?P<identifier>[\w']+)|(?P<eof>$)|(?P<comment>"[^"]*")"#).expect("Error setting-up tokenizer regex");
+    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|-|<=>|<=|\||\^|#|\*|\+|>=|:=|=|>|<|\[|\]|,|;|\(|\))|(?P<countable>\d+)|\{(?P<reference>[\w']+)\}|(?P<identifier>[\w']+)|(?P<eof>$)|(?P<comment>"[^"]*")"#).expect("Error setting-up tokenizer regex");
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,6 +52,9 @@ pub enum SymbolicBDDToken {
     LFP,
     GFP,
     Hash,
+    Let,
+    Assign,
+    Semicolon,
     Eof,
 }
 
@@ -246,7 +249,7 @@ impl ParsedFormula {
         let mut vars: Vec<NamedSymbol> = Self::extract_vars(&tokens);
         vars.sort_by_key(|a| a.id);
 
-        let formula = SymbolicBDD::parse_formula(&mut tokens.iter().peekable())?;
+        let (definitions, formula) = SymbolicBDD::parse_formula(&mut tokens.iter().peekable())?;
 
         let n = vars.len();
         let mut result = Self {
@@ -257,6 +260,10 @@ impl ParsedFormula {
             env,
             definitions: Default::default(),
         };
+
+        for (name, definition) in definitions {
+            result.define(&name, ReferenceContents::Syntax(definition));
+        }
 
         let mut vi = 0;
         for v in &result.vars {
@@ -410,12 +417,28 @@ impl ParsedFormula {
 }
 
 impl SymbolicBDD {
-    fn parse_formula(tokens: &mut TokenReader) -> io::Result<Self> {
-        let result = Self::parse_sub_formula(tokens)?;
+    fn parse_formula(tokens: &mut TokenReader) -> io::Result<(Vec<(String, Self)>, Self)> {
+        let mut definitions = Vec::new();
+
+        while eat(SymbolicBDDToken::Let, tokens) {
+            let name = Self::parse_reference_name(tokens)?;
+            expect(SymbolicBDDToken::Assign, tokens)?;
+            definitions.push((name, Self::parse_sub_formula(tokens)?));
+            expect(SymbolicBDDToken::Semicolon, tokens)?;
+        }
+
+        let mut result = Self::parse_sub_formula(tokens)?;
+
+        while eat(SymbolicBDDToken::Semicolon, tokens)
+            && check(SymbolicBDDToken::Eof, tokens).is_err()
+        {
+            let next = Self::parse_sub_formula(tokens)?;
+            result = Self::BinaryOp(BinaryOperator::And, Box::new(result), Box::new(next));
+        }
 
         expect(SymbolicBDDToken::Eof, tokens)?;
 
-        Ok(result)
+        Ok((definitions, result))
     }
 
     fn parse_simple_sub_formula(tokens: &mut TokenReader) -> io::Result<Self> {
@@ -451,24 +474,96 @@ impl SymbolicBDD {
     }
 
     fn parse_sub_formula(tokens: &mut TokenReader) -> io::Result<Self> {
-        let left = Self::parse_simple_sub_formula(tokens)?;
+        Self::parse_binary(tokens, 0)
+    }
 
-        // either a binary operator or end of sub-formula
-        match tokens.peek() {
-            Some(SymbolicBDDToken::And)
-            | Some(SymbolicBDDToken::Or)
-            | Some(SymbolicBDDToken::Xor)
-            | Some(SymbolicBDDToken::Nor)
-            | Some(SymbolicBDDToken::Nand)
-            | Some(SymbolicBDDToken::Implies)
-            | Some(SymbolicBDDToken::ImpliesInv)
-            | Some(SymbolicBDDToken::Iff) => {
-                let op = Self::parse_binary_operator(tokens)?;
-                let right = Self::parse_sub_formula(tokens)?;
-                Ok(Self::BinaryOp(op, Box::new(left), Box::new(right)))
+    // precedence climbing: binary operators with a precedence lower than min_prec end the sub-formula
+    fn parse_binary(tokens: &mut TokenReader, min_prec: u8) -> io::Result<Self> {
+        let mut left = Self::parse_operand(tokens)?;
+
+        while let Some((op, prec, right_assoc)) = tokens.peek().and_then(|t| binary_operator(t)) {
+            if prec < min_prec {
+                break;
             }
-            _ => Ok(left),
+            tokens.next();
+
+            let right = Self::parse_binary(tokens, if right_assoc { prec } else { prec + 1 })?;
+            left = Self::BinaryOp(op, Box::new(left), Box::new(right));
         }
+
+        Ok(left)
+    }
+
+    fn parse_operand(tokens: &mut TokenReader) -> io::Result<Self> {
+        let mut operand = Self::parse_simple_sub_formula(tokens)?;
+
+        while eat(SymbolicBDDToken::OpenSquare, tokens) {
+            operand = Self::parse_substitution(tokens, operand)?;
+        }
+
+        Ok(operand)
+    }
+
+    // f[x := y, ...] is rewritten to: exists x, ... # f & (x <=> y) & ...
+    fn parse_substitution(tokens: &mut TokenReader, formula: Self) -> io::Result<Self> {
+        let mut targets = Vec::new();
+        let mut replacements = Vec::new();
+
+        loop {
+            targets.push(Self::parse_variable_name(tokens)?);
+            expect(SymbolicBDDToken::Assign, tokens)?;
+            replacements.push(match tokens.next() {
+                Some(SymbolicBDDToken::Var(v)) => Self::Var(v.clone()),
+                Some(SymbolicBDDToken::True) => Self::True,
+                Some(SymbolicBDDToken::False) => Self::False,
+                other => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!(
+                            "Expected variable or constant in substitution, got {:?}",
+                            other
+                        ),
+                    ));
+                }
+            });
+
+            if !eat(SymbolicBDDToken::Comma, tokens) {
+                break;
+            }
+        }
+
+        expect(SymbolicBDDToken::CloseSquare, tokens)?;
+
+        if let Some(v) = replacements.iter().find_map(|r| match r {
+            Self::Var(v) if targets.contains(v) => Some(v),
+            _ => None,
+        }) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Substitution target {} cannot also be used as a replacement",
+                    v
+                ),
+            ));
+        }
+
+        let body = targets
+            .iter()
+            .zip(replacements)
+            .fold(formula, |acc, (target, replacement)| {
+                let binding = Self::BinaryOp(
+                    BinaryOperator::Iff,
+                    Box::new(Self::Var(target.clone())),
+                    Box::new(replacement),
+                );
+                Self::BinaryOp(BinaryOperator::And, Box::new(acc), Box::new(binding))
+            });
+
+        Ok(Self::Quantifier(
+            QuantifierType::Exists,
+            targets,
+            Box::new(body),
+        ))
     }
 
     fn parse_ite(tokens: &mut TokenReader) -> io::Result<Self> {
@@ -638,47 +733,6 @@ impl SymbolicBDD {
         ))
     }
 
-    fn parse_binary_operator(tokens: &mut TokenReader) -> io::Result<BinaryOperator> {
-        match tokens.peek() {
-            Some(SymbolicBDDToken::And) => {
-                expect(SymbolicBDDToken::And, tokens)?;
-                Ok(BinaryOperator::And)
-            }
-            Some(SymbolicBDDToken::Or) => {
-                expect(SymbolicBDDToken::Or, tokens)?;
-                Ok(BinaryOperator::Or)
-            }
-            Some(SymbolicBDDToken::Xor) => {
-                expect(SymbolicBDDToken::Xor, tokens)?;
-                Ok(BinaryOperator::Xor)
-            }
-            Some(SymbolicBDDToken::Nor) => {
-                expect(SymbolicBDDToken::Nor, tokens)?;
-                Ok(BinaryOperator::Nor)
-            }
-            Some(SymbolicBDDToken::Nand) => {
-                expect(SymbolicBDDToken::Nand, tokens)?;
-                Ok(BinaryOperator::Nand)
-            }
-            Some(SymbolicBDDToken::Implies) => {
-                expect(SymbolicBDDToken::Implies, tokens)?;
-                Ok(BinaryOperator::Implies)
-            }
-            Some(SymbolicBDDToken::ImpliesInv) => {
-                expect(SymbolicBDDToken::ImpliesInv, tokens)?;
-                Ok(BinaryOperator::ImpliesInv)
-            }
-            Some(SymbolicBDDToken::Iff) => {
-                expect(SymbolicBDDToken::Iff, tokens)?;
-                Ok(BinaryOperator::Iff)
-            }
-            other => Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Expected binary operator, got {:?}", other),
-            )),
-        }
-    }
-
     fn parse_negation(tokens: &mut TokenReader) -> io::Result<Self> {
         expect(SymbolicBDDToken::Not, tokens)?;
 
@@ -708,6 +762,7 @@ impl SymbolicBDD {
         let mut result = Vec::new();
 
         let mut variable_indexes: FxHashMap<String, usize> = FxHashMap::default();
+        let mut definitions: FxHashSet<String> = FxHashSet::default();
         let mut var_id_counter: usize = 0;
 
         if let Some(variables) = variable_ordering {
@@ -741,6 +796,8 @@ impl SymbolicBDD {
                     "[" => result.push(SymbolicBDDToken::OpenSquare),
                     "]" => result.push(SymbolicBDDToken::CloseSquare),
                     "," => result.push(SymbolicBDDToken::Comma),
+                    ":=" => result.push(SymbolicBDDToken::Assign),
+                    ";" => result.push(SymbolicBDDToken::Semicolon),
                     _ => {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidData,
@@ -769,6 +826,15 @@ impl SymbolicBDD {
                     "else" => result.push(SymbolicBDDToken::Else),
                     "gfp" | "nu" => result.push(SymbolicBDDToken::GFP),
                     "lfp" | "mu" => result.push(SymbolicBDDToken::LFP),
+                    "let" => result.push(SymbolicBDDToken::Let),
+                    name if result.last() == Some(&SymbolicBDDToken::Let)
+                        || definitions.contains(name) =>
+                    {
+                        if result.last() == Some(&SymbolicBDDToken::Let) {
+                            definitions.insert(name.to_string());
+                        }
+                        result.push(SymbolicBDDToken::Reference(name.to_string()));
+                    }
                     var => {
                         let var_str = var.to_string();
                         let var_id: usize;
@@ -809,6 +875,21 @@ impl SymbolicBDD {
     }
 }
 
+// precedence and right-associativity of a binary operator token
+const fn binary_operator(token: &SymbolicBDDToken) -> Option<(BinaryOperator, u8, bool)> {
+    match token {
+        SymbolicBDDToken::Iff => Some((BinaryOperator::Iff, 1, false)),
+        SymbolicBDDToken::Implies => Some((BinaryOperator::Implies, 2, true)),
+        SymbolicBDDToken::ImpliesInv => Some((BinaryOperator::ImpliesInv, 2, false)),
+        SymbolicBDDToken::Or => Some((BinaryOperator::Or, 3, false)),
+        SymbolicBDDToken::Nor => Some((BinaryOperator::Nor, 3, false)),
+        SymbolicBDDToken::Xor => Some((BinaryOperator::Xor, 4, false)),
+        SymbolicBDDToken::And => Some((BinaryOperator::And, 5, false)),
+        SymbolicBDDToken::Nand => Some((BinaryOperator::Nand, 5, false)),
+        _ => None,
+    }
+}
+
 fn expect(token: SymbolicBDDToken, tokens: &mut TokenReader) -> io::Result<()> {
     match &tokens.next() {
         &Some(t) if *t == token => Ok(()),
@@ -817,6 +898,10 @@ fn expect(token: SymbolicBDDToken, tokens: &mut TokenReader) -> io::Result<()> {
             format!("Expected {:?}, got {:?}", token, t),
         )),
     }
+}
+
+fn eat(token: SymbolicBDDToken, tokens: &mut TokenReader) -> bool {
+    tokens.next_if(|t| **t == token).is_some()
 }
 
 fn check(token: SymbolicBDDToken, tokens: &mut TokenReader) -> io::Result<()> {
