@@ -10,6 +10,8 @@ pub mod parser_io;
 pub mod plot;
 pub mod set;
 
+mod store;
+
 mod truth_table;
 
 mod symbols;

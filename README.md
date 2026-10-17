@@ -227,10 +227,8 @@ domains other than boolean variables. Embedding rewrite rules in the BDD could p
 The famous n-queens problem can be expressed efficiently in the RsBDD language.
 The example below shows a 4-queens variant, which can be solved in roughly 15 milliseconds. The library contains a
 generator for arbitrary n-queens problems.
-At this point, the largest verified problem size is n=8, which reports all solutions in less than 20 minutes on modern
-hardware.
-The explosive nature of the problem makes n=9 an infeasable problem. Further optimizations (such as multi-processor
-parallellism, or vertex ordering) could decrease the run-time in the future.
+At this point, the largest verified problem size is n=10, which reports all solutions in less 1 minute on modern hardware.
+Further optimizations (such as multi-processor parallellism, or vertex ordering) could decrease the run-time in the future.
 
 ```
 "every row must contain exactly one queen"

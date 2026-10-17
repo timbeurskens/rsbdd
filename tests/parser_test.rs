@@ -1,7 +1,6 @@
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
-use std::rc::Rc;
 
 use pretty_assertions::assert_eq;
 
@@ -71,9 +70,9 @@ fn test_parser() -> io::Result<()> {
     Ok(())
 }
 
-fn parse_and_evaluate(test_str: &str) -> io::Result<Rc<BDD<usize>>> {
+fn parse_and_evaluate(test_str: &str) -> io::Result<BDD<usize>> {
     let result = ParsedFormula::new(&mut BufReader::new(test_str.as_bytes()), None)?;
-    Ok(Rc::new(BDD::<usize>::from(result.eval().as_ref().clone())))
+    Ok(BDD::<usize>::from(result.eval()))
 }
 
 fn env() -> BDDEnv<usize> {

@@ -50,6 +50,7 @@ anyhow.workspace = true
 argfile.workspace = true
 clap.workspace = true
 dot.workspace = true
+hashbrown = { version = "0.17.1", default-features = false }
 itertools.workspace = true
 lazy_static.workspace = true
 regex.workspace = true

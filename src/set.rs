@@ -6,7 +6,7 @@ use crate::bdd::*;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BDDSet {
     env: Rc<BDDEnv<usize>>,
-    pub bdd: RefCell<Rc<BDD<usize>>>,
+    pub bdd: RefCell<BDD<usize>>,
     bits: usize,
 }
 
@@ -34,7 +34,7 @@ impl BDDSet {
         }
     }
 
-    pub fn from_bdd(bdd: &Rc<BDD<usize>>, bits: usize, env: &Rc<BDDEnv<usize>>) -> Self {
+    pub fn from_bdd(bdd: &BDD<usize>, bits: usize, env: &Rc<BDDEnv<usize>>) -> Self {
         Self {
             env: env.clone(),
             bdd: RefCell::new(bdd.clone()),
@@ -92,7 +92,7 @@ impl BDDSet {
     }
 
     pub fn complement(&self, other: &Self) -> &Self {
-        let new: Rc<BDD<usize>> = self.bdd.borrow().clone();
+        let new: BDD<usize> = self.bdd.borrow().clone();
 
         self.bdd
             .replace(self.env.and(new, other.bdd.borrow().clone()));
