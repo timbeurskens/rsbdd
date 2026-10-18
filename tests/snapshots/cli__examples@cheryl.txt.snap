@@ -1,0 +1,26 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: examples/cheryl.txt
+---
+$ rsbdd -t -f true examples/cheryl.txt
+status: 10
+--- stdout
+| birthday(May, D15) | birthday(May, D16) | birthday(May, D19) | birthday(June, D17) | birthday(June, D18) | birthday(July, D16) | birthday(July, D14) | birthday(August, D15) | birthday(August, D17) | birthday(August, D14) | *     |
+|--------------------|--------------------|--------------------|---------------------|---------------------|---------------------|---------------------|-----------------------|-----------------------|-----------------------|-------|
+| False              | False              | False              | False               | False               | True                | False               | False                 | False                 | False                 | True  |
+--- stderr
+
+$ rsbdd -v examples/cheryl.txt
+status: 10
+--- stdout
+birthday(July, D16);
+--- stderr
+
+$ rsbdd -m -t -f true examples/cheryl.txt
+status: 10
+--- stdout
+| birthday(May, D15) | birthday(May, D16) | birthday(May, D19) | birthday(June, D17) | birthday(June, D18) | birthday(July, D16) | birthday(July, D14) | birthday(August, D15) | birthday(August, D17) | birthday(August, D14) | *     |
+|--------------------|--------------------|--------------------|---------------------|---------------------|---------------------|---------------------|-----------------------|-----------------------|-----------------------|-------|
+| False              | False              | False              | False               | False               | True                | False               | False                 | False                 | False                 | True  |
+--- stderr

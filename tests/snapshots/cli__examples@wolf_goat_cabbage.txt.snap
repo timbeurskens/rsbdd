@@ -1,0 +1,36 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: examples/wolf_goat_cabbage.txt
+---
+$ rsbdd -t -f true examples/wolf_goat_cabbage.txt
+status: 10
+--- stdout
+| f     | w     | g     | c     | *     |
+|-------|-------|-------|-------|-------|
+| False | False | False | Any   | True  |
+| False | False | True  | False | True  |
+| False | True  | False | Any   | True  |
+| True  | False | True  | Any   | True  |
+| True  | True  | False | True  | True  |
+| True  | True  | True  | Any   | True  |
+--- stderr
+
+$ rsbdd -v examples/wolf_goat_cabbage.txt
+status: 10
+--- stdout
+c*;
+g;
+w, c*;
+f, g, c*;
+f, w, c;
+f, w, g, c*;
+--- stderr
+
+$ rsbdd -m -t -f true examples/wolf_goat_cabbage.txt
+status: 10
+--- stdout
+| f     | w     | g     | c     | *     |
+|-------|-------|-------|-------|-------|
+| True  | True  | True  | Any   | True  |
+--- stderr
