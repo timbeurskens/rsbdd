@@ -1,0 +1,27 @@
+---
+source: tests/cli.rs
+assertion_line: 31
+expression: output
+input_file: examples/einstein_small.txt
+---
+$ rsbdd -t -f true examples/einstein_small.txt
+status: 10
+--- stdout
+| has_nationality(H1, Brit) | has_nationality(H1, Swede) | has_nationality(H1, Dane) | has_nationality(H2, Brit) | has_nationality(H2, Swede) | has_nationality(H2, Dane) | has_nationality(H3, Brit) | has_nationality(H3, Swede) | has_nationality(H3, Dane) | has_color(H1, Red) | has_color(H1, Green) | has_color(H1, Blue) | has_color(H2, Red) | has_color(H2, Green) | has_color(H2, Blue) | has_color(H3, Red) | has_color(H3, Green) | has_color(H3, Blue) | keeps(H1, Dog) | keeps(H1, Cat) | keeps(H1, Fish) | keeps(H2, Dog) | keeps(H2, Cat) | keeps(H2, Fish) | keeps(H3, Dog) | keeps(H3, Cat) | keeps(H3, Fish) | *     |
+|---------------------------|----------------------------|---------------------------|---------------------------|----------------------------|---------------------------|---------------------------|----------------------------|---------------------------|--------------------|----------------------|---------------------|--------------------|----------------------|---------------------|--------------------|----------------------|---------------------|----------------|----------------|-----------------|----------------|----------------|-----------------|----------------|----------------|-----------------|-------|
+| False                     | False                      | True                      | False                     | True                       | False                     | True                      | False                      | False                     | False              | True                 | False               | False              | False                | True                | True               | False                | False               | False          | True           | False           | True           | False          | False           | False          | False          | True            | True  |
+--- stderr
+
+$ rsbdd -v examples/einstein_small.txt
+status: 10
+--- stdout
+has_nationality(H1, Dane), has_nationality(H2, Swede), has_nationality(H3, Brit), has_color(H1, Green), has_color(H2, Blue), has_color(H3, Red), keeps(H1, Cat), keeps(H2, Dog), keeps(H3, Fish);
+--- stderr
+
+$ rsbdd -m -t -f true examples/einstein_small.txt
+status: 10
+--- stdout
+| has_nationality(H1, Brit) | has_nationality(H1, Swede) | has_nationality(H1, Dane) | has_nationality(H2, Brit) | has_nationality(H2, Swede) | has_nationality(H2, Dane) | has_nationality(H3, Brit) | has_nationality(H3, Swede) | has_nationality(H3, Dane) | has_color(H1, Red) | has_color(H1, Green) | has_color(H1, Blue) | has_color(H2, Red) | has_color(H2, Green) | has_color(H2, Blue) | has_color(H3, Red) | has_color(H3, Green) | has_color(H3, Blue) | keeps(H1, Dog) | keeps(H1, Cat) | keeps(H1, Fish) | keeps(H2, Dog) | keeps(H2, Cat) | keeps(H2, Fish) | keeps(H3, Dog) | keeps(H3, Cat) | keeps(H3, Fish) | *     |
+|---------------------------|----------------------------|---------------------------|---------------------------|----------------------------|---------------------------|---------------------------|----------------------------|---------------------------|--------------------|----------------------|---------------------|--------------------|----------------------|---------------------|--------------------|----------------------|---------------------|----------------|----------------|-----------------|----------------|----------------|-----------------|----------------|----------------|-----------------|-------|
+| False                     | False                      | True                      | False                     | True                       | False                     | True                      | False                      | False                     | False              | True                 | False               | False              | False                | True                | True               | False                | False               | False          | True           | False           | True           | False          | False           | False          | False          | True            | True  |
+--- stderr
