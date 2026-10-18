@@ -1,0 +1,79 @@
+"
+Tower of Hanoi
+
+The situation
+
+    There are three pegs A, B and C, and three disks D1 < D2 < D3 of different sizes.
+    All disks start on peg A, the largest at the bottom.
+    A move takes the top disk of one peg and puts it on another peg.
+    A disk may never be placed on top of a smaller disk.
+
+The question is: which moves bring all disks to peg C?
+
+From: https://en.wikipedia.org/wiki/Tower_of_Hanoi
+
+---
+
+The fixpoint in wolf_goat_cabbage.txt shows that the goal can be reached, but not which moves get there.
+This example lets the solver produce the moves themselves.
+
+The only unknowns are move(t, d, p): at step t, disk d is moved to peg p.
+The position on(d, p, t) of every disk after step t is not an unknown, but is derived from the moves by a rewrite rule:
+all disks start on A, and afterwards a disk is on p if it was moved there, or was already on p and did not move.
+Because the moves are the only boolean variables, a single model is exactly the list of moves.
+
+Three disks need 2^3 - 1 = 7 moves. The solution is unique:
+    move(T1, D1, C), move(T2, D2, B), move(T3, D1, B), move(T4, D3, C), move(T5, D1, A), move(T6, D2, C), move(T7, D1, C);
+
+Removing prev(T6, T7) and requiring the goal at T6 makes the formula unsatisfiable (exit status 20),
+so 7 moves is the minimum.
+
+Run with:
+    rsbdd examples/tower_of_hanoi.txt -m -v
+    rsbdd examples/tower_of_hanoi.txt -t -ft -c true
+"
+
+"Disks from small to large, and pegs"
+disk(D1) -> true;
+disk(D2) -> true;
+disk(D3) -> true;
+
+smaller(D1, D2) -> true;
+smaller(D1, D3) -> true;
+smaller(D2, D3) -> true;
+
+peg(A) -> true;
+peg(B) -> true;
+peg(C) -> true;
+
+"Steps: T0 is the start, every following step is one move"
+prev(T0, T1) -> true;
+prev(T1, T2) -> true;
+prev(T2, T3) -> true;
+prev(T3, T4) -> true;
+prev(T4, T5) -> true;
+prev(T5, T6) -> true;
+prev(T6, T7) -> true;
+
+"
+on(d, p, t): all disks start on A; afterwards a disk is on p if it was moved there, or was on p and did not move.
+The initial state is part of this rule: a separate rule for T0 would be conjoined with this one.
+"
+sum d, p, t # on(d, p, t) ->
+    t = T0 & p = A |
+    exists s # prev(s, t) & (move(t, d, p) | on(d, p, s) & -exists q # peg(q) & move(t, d, q));
+
+"Exactly one move per step"
+forall s, t # prev(s, t) => [
+    move(t, D1, A), move(t, D1, B), move(t, D1, C),
+    move(t, D2, A), move(t, D2, B), move(t, D2, C),
+    move(t, D3, A), move(t, D3, B), move(t, D3, C)
+] = 1;
+
+"A disk moves to another peg, and no smaller disk is on its source peg (it is the top disk) or on the target peg"
+forall s, t, d, p # prev(s, t) & disk(d) & peg(p) & move(t, d, p) =>
+    -on(d, p, s) &
+    forall e, q # smaller(e, d) & peg(q) & (on(d, q, s) | q = p) => -on(e, q, s);
+
+"Goal: all disks are on C after the last move"
+forall d # disk(d) => on(d, C, T7)
