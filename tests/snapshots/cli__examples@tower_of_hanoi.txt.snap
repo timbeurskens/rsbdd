@@ -1,6 +1,5 @@
 ---
 source: tests/cli.rs
-assertion_line: 31
 expression: output
 input_file: examples/tower_of_hanoi.txt
 ---
