@@ -1,0 +1,41 @@
+"
+Knights and Knaves
+
+The situation
+
+    On a fictional island, all inhabitants are either knights, who always tell the truth, or knaves, who always lie.
+    A visitor meets three inhabitants: A, B and C.
+
+    The visitor asks A whether he is a knight or a knave, but cannot hear the answer.
+    B then says: 'A said that he is a knave.'
+    C then says: 'Don't believe B, he is lying!'
+
+The question is: what are A, B and C?
+
+From: Raymond Smullyan, What Is the Name of This Book? (1978)
+      https://en.wikipedia.org/wiki/Knights_and_Knaves
+
+---
+
+knight(p) is true if p is a knight and false if p is a knave. A person is a knight exactly when their statement is true.
+The unheard answer of A is the unknown claims_knave(A): A either said 'I am a knave' or 'I am a knight'.
+
+Nobody can say 'I am a knave': a knight would be lying, and a knave would be telling the truth.
+So B is a knave, which makes C a knight. A's answer was 'I am a knight', which both knights and knaves can say,
+so A's type cannot be determined.
+
+Run with:
+    rsbdd examples/knights_knaves.txt -t -ft
+"
+
+person(A) -> true;
+person(B) -> true;
+person(C) -> true;
+
+"What each person said"
+statement(A) -> if claims_knave(A) then -knight(A) else knight(A);
+statement(B) -> claims_knave(A);
+statement(C) -> -knight(B);
+
+"Knights tell the truth, knaves lie"
+forall p # person(p) => (knight(p) <=> statement(p))

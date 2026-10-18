@@ -36,8 +36,8 @@ solution: adding the negation of the theorem makes the formula unsatisfiable.
 rsbdd examples/peano_solve.txt -t -ft
 ```
 
-The BDD, obtained with `rsbdd examples/peano_solve.txt -d peano_solve.dot`, has two paths to `true`: `x = 1, y = 3`
-on the left and `x = 3, y = 1` on the right. Every other assignment of values leads to `false`.
+The BDD, obtained with `rsbdd examples/peano_solve.txt -c true -d peano_solve.dot`, has two paths to `true`:
+`x = 1, y = 3` and `x = 3, y = 1`. The `-c true` flag omits every value that occurs in no solution.
 
 ![peano solve bdd](images/peano_solve_bdd.svg)
 

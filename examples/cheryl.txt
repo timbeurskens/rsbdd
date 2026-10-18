@@ -1,0 +1,59 @@
+"
+Cheryl's Birthday
+
+The situation
+
+    Albert and Bernard just became friends with Cheryl, and they want to know when her birthday is.
+    Cheryl gives them a list of 10 possible dates:
+
+        May 15,    May 16,    May 19
+        June 17,   June 18
+        July 14,   July 16
+        August 14, August 15, August 17
+
+    Cheryl then tells Albert only the month, and Bernard only the day of her birthday.
+
+    1) Albert: I don't know when Cheryl's birthday is, but I know that Bernard does not know too.
+    2) Bernard: At first I didn't know when Cheryl's birthday is, but I know now.
+    3) Albert: Then I also know when Cheryl's birthday is.
+
+The question is: when is Cheryl's birthday?
+
+From: Singapore and Asian Schools Math Olympiad (SASMO) 2015
+      https://en.wikipedia.org/wiki/Cheryl%27s_Birthday
+
+---
+
+Every statement narrows down the set of candidate dates, defined by rewrite rules:
+- s1: Albert's month has no date with a day that is unique, so Bernard cannot know (rules out May and June).
+- s2: of the dates left after s1, Bernard's day occurs in only one month (rules out the 14th).
+- s3: of the dates left after s2, Albert's month has only one date (rules out August).
+
+The unknowns birthday(m, d) are true exactly for the dates that remain after all three statements.
+
+Run with:
+    rsbdd examples/cheryl.txt -t -ft
+"
+
+date(May, D15) -> true;
+date(May, D16) -> true;
+date(May, D19) -> true;
+date(June, D17) -> true;
+date(June, D18) -> true;
+date(July, D14) -> true;
+date(July, D16) -> true;
+date(August, D14) -> true;
+date(August, D15) -> true;
+date(August, D17) -> true;
+
+"1) Every day in Albert's month also occurs in another month, so Bernard does not know"
+sum m # bernard_unsure(m) -> forall d # date(m, d) => exists m2 # -(m2 = m) & date(m2, d);
+sum m, d # s1(m, d) -> date(m, d) & bernard_unsure(m);
+
+"2) Bernard now knows: his day occurs in only one month of the remaining dates"
+sum m, d # s2(m, d) -> s1(m, d) & forall m2 # s1(m2, d) => m2 = m;
+
+"3) Albert now knows: his month has only one of the remaining dates"
+sum m, d # s3(m, d) -> s2(m, d) & forall d2 # s2(m, d2) => d2 = d;
+
+forall m, d # date(m, d) => (birthday(m, d) <=> s3(m, d))

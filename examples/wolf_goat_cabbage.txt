@@ -1,0 +1,48 @@
+"
+Wolf, goat and cabbage
+
+The situation
+
+    A farmer wants to cross a river with a wolf, a goat and a cabbage.
+    The boat only has room for the farmer and one of the three.
+    Left alone, the wolf eats the goat, and the goat eats the cabbage.
+
+The question is: can the farmer bring everything to the other bank?
+
+From: https://en.wikipedia.org/wiki/Wolf,_goat_and_cabbage_problem
+
+---
+
+Every actor has one bit for its bank: false is the left bank, true is the right bank.
+The current state is (pf, pw, pg, pc), the next state is (f, w, g, c), for the farmer, wolf, goat and cabbage.
+
+A crossing moves the farmer, and at most one item that was on the farmer's bank.
+A state is safe if the goat is not left alone with the wolf or with the cabbage.
+
+The least fixpoint computes all states that can be reached from the start (everything on the left bank)
+using only safe crossings, without knowing the number of crossings in advance.
+The result has 10 reachable states, including f & w & g & c: everything on the right bank, so the puzzle is solvable.
+
+The fixpoint shows that the goal can be reached, but not which moves get there. One of the two 7-move solutions:
+    goat over, return, wolf over, goat back, cabbage over, return, goat over.
+
+Run with:
+    rsbdd examples/wolf_goat_cabbage.txt -t -ft
+"
+
+let init := -f & -w & -g & -c;
+
+"The goat is never alone with the wolf or the cabbage"
+let safe := -((w <=> g) & (f ^ g)) & -((g <=> c) & (f ^ g));
+
+"T(p, x): the farmer crosses, taking at most one item from his own bank"
+let T :=
+    (f ^ pf) &
+    ((w ^ pw) => (pw <=> pf)) &
+    ((g ^ pg) => (pg <=> pf)) &
+    ((c ^ pc) => (pc <=> pf)) &
+    [w ^ pw, g ^ pg, c ^ pc] <= 1 &
+    safe;
+
+"x is reachable if it is the initial state, or some reachable state p has a crossing to x"
+lfp R # init | exists pf, pw, pg, pc # R[f := pf, w := pw, g := pg, c := pc] & T

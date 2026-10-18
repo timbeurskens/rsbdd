@@ -37,8 +37,9 @@ expanded over the houses `H1` and `H2`, and every remaining proposition is a boo
 See [examples/peano.txt](../examples/peano.txt), [examples/peano_puzzle.txt](../examples/peano_puzzle.txt) and [examples/einstein.txt](../examples/einstein.txt).
 
 The puzzle in [examples/peano_puzzle.txt](../examples/peano_puzzle.txt) asks for natural numbers `a`, `b` and `c` such
-that `a + b = c`, `b + c = 5` and `a < b`. The BDD below, obtained with `rsbdd examples/peano_puzzle.txt -d
-peano_puzzle.dot`, has a single path to `true`: the unique solution `a = 1`, `b = 2` and `c = 3`.
+that `a + b = c`, `b + c = 5` and `a < b`. The BDD below, obtained with `rsbdd examples/peano_puzzle.txt -c true -d
+peano_puzzle.dot`, has a single path to `true`: the unique solution `a = 1`, `b = 2` and `c = 3`. The `-c true` flag
+omits every choice whose `T` edge only leads to `false`, such as `val(A, _0)`, so only the chosen values remain.
 
 ![peano puzzle bdd](images/peano_puzzle.svg)
 
@@ -72,7 +73,8 @@ The trapdoor only leads from the attic to the hall, so the attic and the cellar 
 
 ![rooms house](images/rooms_house.svg)
 
-The BDD obtained with `rsbdd examples/rooms.txt -d rooms.dot` has a single path to `true`:
+The BDD obtained with `rsbdd examples/rooms.txt -c true -d rooms.dot` has a single path to `true`. The unreachable
+attic and cellar are omitted:
 
 ![rooms bdd](images/rooms_bdd.svg)
 
