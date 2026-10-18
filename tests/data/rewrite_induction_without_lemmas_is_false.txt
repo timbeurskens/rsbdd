@@ -1,0 +1,5 @@
+"induction: commutativity is not proven without the lemmas it depends on"
+sum y # plus(_0, y) -> y;
+sum x, y # plus(suc(x), y) -> suc(plus(x, y));
+
+induct x, y # plus(x, y) = plus(y, x)

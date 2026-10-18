@@ -34,9 +34,15 @@ struct Universe {
 /// A rule for a function symbol (a symbol used inside a term or as an operand of `=`) is a term rule: its right-hand
 /// side is a term. Terms are rewritten to normal form before they are compared, matched or turned into variables,
 /// so `=` holds modulo the term rules. This decides equality if the term rules form a convergent rewrite system.
+///
+/// `induct x, .. # l = r` proves an equation by induction on `x`, using the patterns of the rules defining a function
+/// applied to `x` as cases and the induction hypotheses as rewrite rules. It is `true` if every case is proven and
+/// `false` otherwise. A proven equation becomes a rewrite rule for the remainder of the formula.
 pub struct Rewriter<'a> {
     rules: &'a [Rule],
-    term_rules: &'a [Rule],
+    term_rules: Vec<Rule>,
+    definitions: usize,
+    skolems: usize,
     universe: &'a [DomainConstant],
     atoms: FxHashMap<DomainConstant, NamedSymbol>,
     base_id: usize,
@@ -82,7 +88,9 @@ impl Rewriter<'_> {
 
         let mut rewriter = Rewriter {
             rules: &rules,
-            term_rules: &term_rules,
+            definitions: term_rules.len(),
+            term_rules,
+            skolems: 0,
             universe: &terms,
             atoms: FxHashMap::default(),
             base_id: parsed.vars.iter().map(|v| v.id + 1).max().unwrap_or(0),
@@ -101,8 +109,8 @@ impl Rewriter<'_> {
         Ok(match formula {
             SymbolicBDD::RuleApplication(t) => return self.apply(subst(t, theta)),
             SymbolicBDD::BinaryOp(BinaryOperator::Equals, l, r) => {
-                if normalize(&term(l, theta)?, self.term_rules)?
-                    == normalize(&term(r, theta)?, self.term_rules)?
+                if normalize(&term(l, theta)?, &self.term_rules)?
+                    == normalize(&term(r, theta)?, &self.term_rules)?
                 {
                     SymbolicBDD::True
                 } else {
@@ -113,6 +121,17 @@ impl Rewriter<'_> {
                 return Err(invalid(
                     "rewrite rules and summations must be top-level conjuncts",
                 ));
+            }
+            SymbolicBDD::Quantifier(QuantifierType::Induction, vars, body) => {
+                let SymbolicBDD::BinaryOp(BinaryOperator::Equals, l, r) = body.as_ref() else {
+                    return Err(invalid("the body of an induction must be an equation"));
+                };
+                let (l, r) = (term(l, theta)?, term(r, theta)?);
+                if !self.induct(vars, &l, &r)? {
+                    return Ok(SymbolicBDD::False);
+                }
+                self.term_rules.extend(orient(&l, &r, vars));
+                SymbolicBDD::True
             }
             SymbolicBDD::Quantifier(q, vars, body) => {
                 let (domain, boolean): (Vec<_>, Vec<_>) =
@@ -188,13 +207,13 @@ impl Rewriter<'_> {
         }
 
         Ok(match q {
-            QuantifierType::Forall => join(BinaryOperator::And, instances),
             QuantifierType::Exists => join(BinaryOperator::Or, instances),
+            _ => join(BinaryOperator::And, instances),
         })
     }
 
     fn apply(&mut self, ground: DomainConstant) -> io::Result<SymbolicBDD> {
-        let ground = normalize(&ground, self.term_rules)?;
+        let ground = normalize(&ground, &self.term_rules)?;
         if !self
             .rules
             .iter()
@@ -222,6 +241,68 @@ impl Rewriter<'_> {
         } else {
             join(BinaryOperator::And, bodies)
         })
+    }
+
+    /// Prove `l = r` for all values of the first variable, with a case for every pattern of the rules defining a function
+    /// applied to it, and an induction hypothesis for every variable of the pattern
+    fn induct(
+        &mut self,
+        vars: &[NamedSymbol],
+        l: &DomainConstant,
+        r: &DomainConstant,
+    ) -> io::Result<bool> {
+        let (x, rest) = vars
+            .split_first()
+            .ok_or_else(|| invalid("an induction requires a variable"))?;
+        let definitions = &self.term_rules[..self.definitions];
+        let Some((f, i)) = position(l, x, definitions).or_else(|| position(r, x, definitions))
+        else {
+            return Ok(false);
+        };
+        let cases: Vec<_> = definitions
+            .iter()
+            .filter_map(|rule| match &rule.lhs {
+                DomainConstant::Application(_, args) if same_functor(&rule.lhs, &f) => {
+                    Some((args[i].clone(), rule.vars.clone()))
+                }
+                _ => None,
+            })
+            .collect();
+
+        let at = |t: &DomainConstant, value: &DomainConstant| {
+            subst(t, &Substitution::from_iter([(x.clone(), value.clone())]))
+        };
+        for (pattern, pattern_vars) in cases {
+            let skolems: Substitution = pattern_vars
+                .iter()
+                .filter(|v| contains(&pattern, v))
+                .map(|v| (v.clone(), DomainConstant::Terminal(self.skolem(v))))
+                .collect();
+            let case = subst(&pattern, &skolems);
+            let hypotheses: Vec<_> = skolems
+                .values()
+                .filter(|s| **s != case)
+                .filter_map(|s| orient(&at(l, s), &at(r, s), rest))
+                .collect();
+
+            let n = self.term_rules.len();
+            self.term_rules.extend(hypotheses);
+            let proven = normalize(&at(l, &case), &self.term_rules)
+                .and_then(|l| Ok(l == normalize(&at(r, &case), &self.term_rules)?));
+            self.term_rules.truncate(n);
+            if !proven? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    fn skolem(&mut self, v: &NamedSymbol) -> NamedSymbol {
+        self.skolems += 1;
+        NamedSymbol {
+            name: Rc::new(format!("{v}'")),
+            id: usize::MAX - self.skolems,
+        }
     }
 
     fn atom(&mut self, ground: DomainConstant) -> NamedSymbol {
@@ -383,6 +464,41 @@ fn normalize(t: &DomainConstant, rules: &[Rule]) -> io::Result<DomainConstant> {
         }
     }
     Ok(t)
+}
+
+/// Find an application of a defined function with `x` as an argument, returning the application and the position of `x`
+fn position(
+    t: &DomainConstant,
+    x: &NamedSymbol,
+    rules: &[Rule],
+) -> Option<(DomainConstant, usize)> {
+    let DomainConstant::Application(_, args) = t else {
+        return None;
+    };
+    args.iter()
+        .position(|a| matches!(a, DomainConstant::Terminal(v) if v == x))
+        .filter(|_| rules.iter().any(|rule| same_functor(&rule.lhs, t)))
+        .map(|i| (t.clone(), i))
+        .or_else(|| args.iter().find_map(|a| position(a, x, rules)))
+}
+
+/// Orient an equation into a rewrite rule whose right-hand side is not an instance of its left-hand side
+fn orient(l: &DomainConstant, r: &DomainConstant, vars: &[NamedSymbol]) -> Option<Rule> {
+    [(l, r), (r, l)]
+        .into_iter()
+        .find(|(lhs, rhs)| {
+            matches!(lhs, DomainConstant::Application(..))
+                && vars.iter().all(|v| !contains(rhs, v) || contains(lhs, v))
+                && !match_pattern(lhs, rhs, vars, &mut Substitution::default())
+        })
+        .map(|(lhs, rhs)| Rule {
+            vars: vars.to_vec(),
+            lhs: lhs.clone(),
+            rhs: match rhs {
+                DomainConstant::Terminal(v) => SymbolicBDD::Var(v.clone()),
+                t => SymbolicBDD::RuleApplication(t.clone()),
+            },
+        })
 }
 
 fn same_functor(a: &DomainConstant, b: &DomainConstant) -> bool {

@@ -93,19 +93,6 @@ fn test_term_equality_without_rules() -> io::Result<()> {
 }
 
 #[test]
-fn test_term_rules() -> io::Result<()> {
-    let plus = "sum y # plus(_0, y) -> y; sum x, y # plus(suc(x), y) -> suc(plus(x, y));";
-    assert!(is_true(&format!(
-        "{plus} plus(suc(_0), suc(_0)) = suc(suc(_0))"
-    ))?);
-    assert!(is_false(&format!(
-        "{plus} plus(suc(_0), suc(_0)) = suc(_0)"
-    ))?);
-    assert!(is_false(&format!("{plus} p(plus(_0, A)) & -p(A)"))?);
-    Ok(())
-}
-
-#[test]
 fn test_peano_arithmetic() -> io::Result<()> {
     assert!(is_true(&fs::read_to_string("examples/peano_arith.txt")?)?);
     Ok(())
@@ -126,5 +113,13 @@ fn test_peano_solve() -> io::Result<()> {
     assert!(is_false(&format!(
         "{problem}; exists x # is_nat(x) & val(X, x) & -(x = suc(_0) | x = suc(suc(suc(_0))))"
     ))?);
+    Ok(())
+}
+
+#[test]
+fn test_induction() -> io::Result<()> {
+    let plus = "sum y # plus(_0, y) -> y; sum x, y # plus(suc(x), y) -> suc(plus(x, y));";
+    assert!(is_true(&fs::read_to_string("examples/induction.txt")?)?);
+    assert!(evaluate(&format!("{plus} induct x # plus(x, _0) => x")).is_err());
     Ok(())
 }

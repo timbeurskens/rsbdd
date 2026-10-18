@@ -1,0 +1,24 @@
+---
+source: tests/cli.rs
+assertion_line: 31
+expression: output
+input_file: tests/data/rewrite_induction_without_lemmas_is_false.txt
+---
+$ rsbdd -t -f true tests/data/rewrite_induction_without_lemmas_is_false.txt
+status: 20
+--- stdout
+| *     |
+|-------|
+--- stderr
+
+$ rsbdd -v tests/data/rewrite_induction_without_lemmas_is_false.txt
+status: 20
+--- stdout
+--- stderr
+
+$ rsbdd -m -t -f true tests/data/rewrite_induction_without_lemmas_is_false.txt
+status: 20
+--- stdout
+| *     |
+|-------|
+--- stderr

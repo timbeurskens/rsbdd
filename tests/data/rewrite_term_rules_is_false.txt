@@ -1,0 +1,5 @@
+"term rules: equality holds modulo rewriting, 1 + 1 != 1"
+sum y # plus(_0, y) -> y;
+sum x, y # plus(suc(x), y) -> suc(plus(x, y));
+
+plus(suc(_0), suc(_0)) = suc(_0)

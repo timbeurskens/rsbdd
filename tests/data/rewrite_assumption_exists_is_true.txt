@@ -1,0 +1,4 @@
+"assumption rewriting: if Alice and Bob are persons, some person is Alice"
+sum p # is_person(p) -> p = Alice | p = Bob;
+
+exists p # is_person(p) & p = Alice

@@ -1,0 +1,5 @@
+"equalities between distinct constants are false, so no term equals two distinct constants"
+const(Alice) -> true;
+const(Bob) -> true;
+
+forall d # ((d = _0) & (d = _1)) => (_0 = _1)

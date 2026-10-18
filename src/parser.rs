@@ -41,6 +41,7 @@ pub enum SymbolicBDDToken {
     Else,
     Exists,
     Forall,
+    Induct,
     Sum,
     Eq,
     Geq,
@@ -89,6 +90,7 @@ pub enum CountableOperator {
 pub enum QuantifierType {
     Exists,
     Forall,
+    Induction,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -147,6 +149,9 @@ impl Display for SymbolicBDD {
             }
             Self::Quantifier(QuantifierType::Forall, vars, e) => {
                 write!(f, "(forall {} # {})", vars.iter().join(", "), e)
+            }
+            Self::Quantifier(QuantifierType::Induction, vars, e) => {
+                write!(f, "(induct {} # {})", vars.iter().join(", "), e)
             }
             Self::CountableConst(op, es, n) => {
                 write!(f, "([{}] {} {})", es.iter().join(", "), op, n)
@@ -514,7 +519,9 @@ impl ParsedFormula {
                     ReferenceContents::BDD(bdd) => bdd,
                 },
             ),
-            SymbolicBDD::Summation(_, _) | SymbolicBDD::RuleApplication(_) => {
+            SymbolicBDD::Summation(_, _)
+            | SymbolicBDD::RuleApplication(_)
+            | SymbolicBDD::Quantifier(QuantifierType::Induction, _, _) => {
                 unreachable!("removed by the rewriter")
             }
         }
@@ -608,8 +615,15 @@ impl SymbolicBDD {
                 application => Ok(Self::RuleApplication(application)),
             },
             Some(SymbolicBDDToken::Not) => Self::parse_negation(tokens),
-            Some(SymbolicBDDToken::Exists) => Self::parse_existence_quantifier(tokens),
-            Some(SymbolicBDDToken::Forall) => Self::parse_universal_quantifier(tokens),
+            Some(SymbolicBDDToken::Exists) => {
+                Self::parse_quantifier(tokens, SymbolicBDDToken::Exists, QuantifierType::Exists)
+            }
+            Some(SymbolicBDDToken::Forall) => {
+                Self::parse_quantifier(tokens, SymbolicBDDToken::Forall, QuantifierType::Forall)
+            }
+            Some(SymbolicBDDToken::Induct) => {
+                Self::parse_quantifier(tokens, SymbolicBDDToken::Induct, QuantifierType::Induction)
+            }
             Some(SymbolicBDDToken::GFP) => Self::parse_fixed_point(tokens, true),
             Some(SymbolicBDDToken::LFP) => Self::parse_fixed_point(tokens, false),
             Some(SymbolicBDDToken::If) => Self::parse_ite(tokens),
@@ -873,32 +887,18 @@ impl SymbolicBDD {
         ))
     }
 
-    fn parse_existence_quantifier(tokens: &mut TokenReader) -> io::Result<Self> {
-        expect(SymbolicBDDToken::Exists, tokens)?;
+    fn parse_quantifier(
+        tokens: &mut TokenReader,
+        token: SymbolicBDDToken,
+        q: QuantifierType,
+    ) -> io::Result<Self> {
+        expect(token, tokens)?;
         let vars = Self::parse_variable_list(tokens)?;
 
         expect(SymbolicBDDToken::Hash, tokens)?;
         let formula = Self::parse_sub_formula(tokens)?;
 
-        Ok(Self::Quantifier(
-            QuantifierType::Exists,
-            vars,
-            Box::new(formula),
-        ))
-    }
-
-    fn parse_universal_quantifier(tokens: &mut TokenReader) -> io::Result<Self> {
-        expect(SymbolicBDDToken::Forall, tokens)?;
-        let vars = Self::parse_variable_list(tokens)?;
-
-        expect(SymbolicBDDToken::Hash, tokens)?;
-        let formula = Self::parse_sub_formula(tokens)?;
-
-        Ok(Self::Quantifier(
-            QuantifierType::Forall,
-            vars,
-            Box::new(formula),
-        ))
+        Ok(Self::Quantifier(q, vars, Box::new(formula)))
     }
 
     fn parse_summation(tokens: &mut TokenReader) -> io::Result<Self> {
@@ -1000,6 +1000,7 @@ impl SymbolicBDD {
                     "iff" | "eq" => result.push(SymbolicBDDToken::Iff),
                     "exists" | "any" => result.push(SymbolicBDDToken::Exists),
                     "forall" | "all" => result.push(SymbolicBDDToken::Forall),
+                    "induct" => result.push(SymbolicBDDToken::Induct),
                     "if" => result.push(SymbolicBDDToken::If),
                     "then" => result.push(SymbolicBDDToken::Then),
                     "else" => result.push(SymbolicBDDToken::Else),

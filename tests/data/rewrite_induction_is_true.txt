@@ -1,0 +1,7 @@
+"induction: proven equations become lemmas for the next proofs"
+sum y # plus(_0, y) -> y;
+sum x, y # plus(suc(x), y) -> suc(plus(x, y));
+
+induct x # plus(x, _0) = x;
+induct x, y # plus(x, suc(y)) = suc(plus(x, y));
+induct x, y # plus(x, y) = plus(y, x)

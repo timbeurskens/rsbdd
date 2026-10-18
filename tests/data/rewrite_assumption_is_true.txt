@@ -1,0 +1,4 @@
+"assumption rewriting: if Alice is the only person, every person is Alice"
+sum p # is_person(p) -> p = Alice;
+
+forall p # is_person(p) => p = Alice

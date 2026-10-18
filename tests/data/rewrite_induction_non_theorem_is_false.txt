@@ -1,0 +1,5 @@
+"induction: an equation that does not hold for every value is not proven"
+sum y # plus(_0, y) -> y;
+sum x, y # plus(suc(x), y) -> suc(plus(x, y));
+
+induct x # plus(x, y) = x
