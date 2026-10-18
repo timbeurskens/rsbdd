@@ -1,0 +1,26 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: examples/knights_knaves.txt
+---
+$ rsbdd -t -f true examples/knights_knaves.txt
+status: 10
+--- stdout
+| knight(A) | claims_knave(A) | knight(B) | knight(C) | *     |
+|-----------|-----------------|-----------|-----------|-------|
+| Any       | False           | False     | True      | True  |
+--- stderr
+
+$ rsbdd -v examples/knights_knaves.txt
+status: 10
+--- stdout
+knight(A)*, knight(C);
+--- stderr
+
+$ rsbdd -m -t -f true examples/knights_knaves.txt
+status: 10
+--- stdout
+| knight(A) | claims_knave(A) | knight(B) | knight(C) | *     |
+|-----------|-----------------|-----------|-----------|-------|
+| Any       | False           | False     | True      | True  |
+--- stderr

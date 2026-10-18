@@ -1,0 +1,66 @@
+"
+A simplified version of Einstein's riddle (see einstein.txt)
+
+The situation
+
+    There are 3 houses in three different colors: red, green and blue.
+    In each house lives a person with a different nationality: a Brit, a Swede and a Dane.
+    Each owner keeps a different pet: a dog, a cat or a fish.
+
+The question is: Who owns the fish?
+
+Hints
+
+1) the Brit lives in the red house
+2) the Swede keeps the dog
+3) the green house is on the left of the blue house
+4) the Dane lives in the first house
+5) the fish does not live in the green house
+
+The BDD has a single path to true: the Brit owns the fish.
+
+The domains and the neighbour relation are described by rewrite rules. The unknowns has_nationality(h, n),
+has_color(h, c) and keeps(h, p) have no rules, so every combination of a house and a value is a boolean variable for
+the solver.
+
+Run with:
+    rsbdd examples/einstein_small.txt -t -ft
+"
+
+"All houses, from left to right"
+house(H1) -> true;
+house(H2) -> true;
+house(H3) -> true;
+
+left(H1, H2) -> true;
+left(H2, H3) -> true;
+
+sum x, y # next(x, y) -> left(x, y) | left(y, x);
+
+nationality(Brit) -> true;
+nationality(Swede) -> true;
+nationality(Dane) -> true;
+
+color(Red) -> true;
+color(Green) -> true;
+color(Blue) -> true;
+
+pet(Dog) -> true;
+pet(Cat) -> true;
+pet(Fish) -> true;
+
+"Every house has exactly one value of every kind, and every value belongs to exactly one house"
+forall h # house(h) => [has_nationality(h, Brit), has_nationality(h, Swede), has_nationality(h, Dane)] = 1;
+forall h # house(h) => [has_color(h, Red), has_color(h, Green), has_color(h, Blue)] = 1;
+forall h # house(h) => [keeps(h, Dog), keeps(h, Cat), keeps(h, Fish)] = 1;
+
+forall n # nationality(n) => [has_nationality(H1, n), has_nationality(H2, n), has_nationality(H3, n)] = 1;
+forall c # color(c) => [has_color(H1, c), has_color(H2, c), has_color(H3, c)] = 1;
+forall p # pet(p) => [keeps(H1, p), keeps(H2, p), keeps(H3, p)] = 1;
+
+"Hints"
+forall h # house(h) => (has_nationality(h, Brit) <=> has_color(h, Red));
+forall h # house(h) => (has_nationality(h, Swede) <=> keeps(h, Dog));
+forall h # house(h) => (has_color(h, Blue) => exists g # left(g, h) & has_color(g, Green));
+has_nationality(H1, Dane);
+forall h # house(h) => (has_color(h, Green) => -keeps(h, Fish))

@@ -1,0 +1,5 @@
+"term rules: arguments of open atoms are rewritten to normal form, so p(0 + A) and p(A) share a variable"
+sum y # plus(_0, y) -> y;
+sum x, y # plus(suc(x), y) -> suc(plus(x, y));
+
+p(plus(_0, A)) & -p(A)

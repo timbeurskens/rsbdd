@@ -1,0 +1,38 @@
+"
+Proofs by induction over peano numerals.
+
+Term rules decide an equation by rewriting both sides to normal form. That is not enough for x + 0 = x: plus recurses
+on its first argument, so plus(x, _0) cannot be rewritten while x is unknown. 'induct x # l = r' proves the
+equation for every natural number x by structural induction instead. The cases are the patterns of the rules of plus
+at the position of x:
+
+    case _0:      plus(_0, _0)      = _0         by rewriting
+    case suc(x'): plus(suc(x'), _0) = suc(x')    by rewriting with the hypothesis plus(x', _0) -> x'
+
+Every proven equation becomes a rewrite rule (a lemma) for the theorems that follow it. Commutativity cannot be
+proven by induction from the definition of plus alone: its proof uses the first two theorems as lemmas.
+Every theorem is proven, resulting in a single 'true' node in the BDD.
+
+Run with:
+    rsbdd examples/induction.txt
+"
+
+sum y # plus(_0, y) -> y;
+sum x, y # plus(suc(x), y) -> suc(plus(x, y));
+sum y # times(_0, y) -> _0;
+sum x, y # times(suc(x), y) -> plus(y, times(x, y));
+
+"0 is a right identity of addition"
+induct x # plus(x, _0) = x;
+
+"the successor can be moved out of the second argument"
+induct x, y # plus(x, suc(y)) = suc(plus(x, y));
+
+"addition is commutative"
+induct x, y # plus(x, y) = plus(y, x);
+
+"addition is associative"
+induct x, y, z # plus(plus(x, y), z) = plus(x, plus(y, z));
+
+"0 is a right zero of multiplication"
+induct x # times(x, _0) = _0

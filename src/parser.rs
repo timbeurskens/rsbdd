@@ -41,6 +41,7 @@ pub enum SymbolicBDDToken {
     Else,
     Exists,
     Forall,
+    Induct,
     Sum,
     Eq,
     Geq,
@@ -89,6 +90,7 @@ pub enum CountableOperator {
 pub enum QuantifierType {
     Exists,
     Forall,
+    Induction,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -147,6 +149,9 @@ impl Display for SymbolicBDD {
             }
             Self::Quantifier(QuantifierType::Forall, vars, e) => {
                 write!(f, "(forall {} # {})", vars.iter().join(", "), e)
+            }
+            Self::Quantifier(QuantifierType::Induction, vars, e) => {
+                write!(f, "(induct {} # {})", vars.iter().join(", "), e)
             }
             Self::CountableConst(op, es, n) => {
                 write!(f, "([{}] {} {})", es.iter().join(", "), op, n)
@@ -357,7 +362,7 @@ impl ParsedFormula {
             result.define(&name, ReferenceContents::Syntax(definition));
         }
 
-        if uses_rewriting(&tokens) {
+        if result.uses_rewriting(&result.bdd) {
             let (bdd, atoms) = Rewriter::rewrite(&result)?;
             result.bdd = bdd;
             result.vars.extend(atoms);
@@ -377,6 +382,19 @@ impl ParsedFormula {
         }
 
         Ok(result)
+    }
+
+    fn uses_rewriting(&self, formula: &SymbolicBDD) -> bool {
+        match formula {
+            SymbolicBDD::Summation(_, _)
+            | SymbolicBDD::RuleApplication(_)
+            | SymbolicBDD::BinaryOp(BinaryOperator::Rewrite | BinaryOperator::Equals, _, _) => true,
+            SymbolicBDD::Reference(name) => matches!(
+                self.get_definition(name),
+                Some(ReferenceContents::Syntax(definition)) if self.uses_rewriting(&definition)
+            ),
+            other => other.children().into_iter().any(|c| self.uses_rewriting(c)),
+        }
     }
 
     pub fn eval(&self) -> BDD<NamedSymbol> {
@@ -501,7 +519,9 @@ impl ParsedFormula {
                     ReferenceContents::BDD(bdd) => bdd,
                 },
             ),
-            SymbolicBDD::Summation(_, _) | SymbolicBDD::RuleApplication(_) => {
+            SymbolicBDD::Summation(_, _)
+            | SymbolicBDD::RuleApplication(_)
+            | SymbolicBDD::Quantifier(QuantifierType::Induction, _, _) => {
                 unreachable!("removed by the rewriter")
             }
         }
@@ -522,6 +542,35 @@ impl ParsedFormula {
 }
 
 impl SymbolicBDD {
+    /// The direct sub-formulas of this formula
+    pub fn children(&self) -> Vec<&Self> {
+        match self {
+            Self::Not(f)
+            | Self::Quantifier(_, _, f)
+            | Self::FixedPoint(_, _, f)
+            | Self::Summation(_, f) => vec![f],
+            Self::BinaryOp(_, l, r) => vec![l, r],
+            Self::Ite(c, t, e) => vec![c, t, e],
+            Self::CountableConst(_, fs, _) => fs.iter().collect(),
+            Self::CountableVariable(_, l, r) => l.iter().chain(r).collect(),
+            _ => vec![],
+        }
+    }
+
+    /// Build `l op r`, folding the constants `true` and `false` for `&`, `|` and `=>`
+    pub fn binop(op: BinaryOperator, l: Self, r: Self) -> Self {
+        use BinaryOperator::{And, Implies, Or};
+        use SymbolicBDD::{False, True};
+
+        match (op, l, r) {
+            (And, False, _) | (And, _, False) => False,
+            (Or, True, _) | (Or, _, True) | (Implies, False, _) | (Implies, _, True) => True,
+            (And | Implies, True, r) | (Or, False, r) => r,
+            (And, l, True) | (Or, l, False) => l,
+            (op, l, r) => Self::BinaryOp(op, Box::new(l), Box::new(r)),
+        }
+    }
+
     fn parse_formula(tokens: &mut TokenReader) -> io::Result<(Vec<(String, Self)>, Self)> {
         let mut definitions = Vec::new();
 
@@ -566,8 +615,15 @@ impl SymbolicBDD {
                 application => Ok(Self::RuleApplication(application)),
             },
             Some(SymbolicBDDToken::Not) => Self::parse_negation(tokens),
-            Some(SymbolicBDDToken::Exists) => Self::parse_existence_quantifier(tokens),
-            Some(SymbolicBDDToken::Forall) => Self::parse_universal_quantifier(tokens),
+            Some(SymbolicBDDToken::Exists) => {
+                Self::parse_quantifier(tokens, SymbolicBDDToken::Exists, QuantifierType::Exists)
+            }
+            Some(SymbolicBDDToken::Forall) => {
+                Self::parse_quantifier(tokens, SymbolicBDDToken::Forall, QuantifierType::Forall)
+            }
+            Some(SymbolicBDDToken::Induct) => {
+                Self::parse_quantifier(tokens, SymbolicBDDToken::Induct, QuantifierType::Induction)
+            }
             Some(SymbolicBDDToken::GFP) => Self::parse_fixed_point(tokens, true),
             Some(SymbolicBDDToken::LFP) => Self::parse_fixed_point(tokens, false),
             Some(SymbolicBDDToken::If) => Self::parse_ite(tokens),
@@ -831,32 +887,18 @@ impl SymbolicBDD {
         ))
     }
 
-    fn parse_existence_quantifier(tokens: &mut TokenReader) -> io::Result<Self> {
-        expect(SymbolicBDDToken::Exists, tokens)?;
+    fn parse_quantifier(
+        tokens: &mut TokenReader,
+        token: SymbolicBDDToken,
+        q: QuantifierType,
+    ) -> io::Result<Self> {
+        expect(token, tokens)?;
         let vars = Self::parse_variable_list(tokens)?;
 
         expect(SymbolicBDDToken::Hash, tokens)?;
         let formula = Self::parse_sub_formula(tokens)?;
 
-        Ok(Self::Quantifier(
-            QuantifierType::Exists,
-            vars,
-            Box::new(formula),
-        ))
-    }
-
-    fn parse_universal_quantifier(tokens: &mut TokenReader) -> io::Result<Self> {
-        expect(SymbolicBDDToken::Forall, tokens)?;
-        let vars = Self::parse_variable_list(tokens)?;
-
-        expect(SymbolicBDDToken::Hash, tokens)?;
-        let formula = Self::parse_sub_formula(tokens)?;
-
-        Ok(Self::Quantifier(
-            QuantifierType::Forall,
-            vars,
-            Box::new(formula),
-        ))
+        Ok(Self::Quantifier(q, vars, Box::new(formula)))
     }
 
     fn parse_summation(tokens: &mut TokenReader) -> io::Result<Self> {
@@ -958,6 +1000,7 @@ impl SymbolicBDD {
                     "iff" | "eq" => result.push(SymbolicBDDToken::Iff),
                     "exists" | "any" => result.push(SymbolicBDDToken::Exists),
                     "forall" | "all" => result.push(SymbolicBDDToken::Forall),
+                    "induct" => result.push(SymbolicBDDToken::Induct),
                     "if" => result.push(SymbolicBDDToken::If),
                     "then" => result.push(SymbolicBDDToken::Then),
                     "else" => result.push(SymbolicBDDToken::Else),
@@ -1011,21 +1054,6 @@ impl SymbolicBDD {
 
         Ok(result)
     }
-}
-
-fn uses_rewriting(tokens: &[SymbolicBDDToken]) -> bool {
-    tokens
-        .iter()
-        .any(|t| matches!(t, SymbolicBDDToken::Rewrite | SymbolicBDDToken::Sum))
-        || tokens.windows(2).any(|w| {
-            matches!(
-                w,
-                [
-                    SymbolicBDDToken::Ident(_),
-                    SymbolicBDDToken::OpenParen | SymbolicBDDToken::Eq
-                ]
-            )
-        })
 }
 
 // precedence and right-associativity of a binary operator token
