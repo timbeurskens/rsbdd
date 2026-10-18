@@ -10,7 +10,11 @@ use crate::parser::{
 };
 
 type Substitution = FxHashMap<NamedSymbol, DomainConstant>;
+type Equation = (Vec<NamedSymbol>, DomainConstant, DomainConstant);
 
+const COMPLETION_STEPS: usize = 1000;
+
+#[derive(Clone)]
 struct Rule {
     vars: Vec<NamedSymbol>,
     lhs: DomainConstant,
@@ -33,7 +37,8 @@ struct Universe {
 ///
 /// A rule for a function symbol (a symbol used inside a term or as an operand of `=`) is a term rule: its right-hand
 /// side is a term. Terms are rewritten to normal form before they are compared, matched or turned into variables,
-/// so `=` holds modulo the term rules. This decides equality if the term rules form a convergent rewrite system.
+/// so `=` holds modulo the term rules. The term rules are completed into a convergent rewrite system by Knuth-Bendix
+/// completion if possible, in which case this decides equality in the equational theory of the rules.
 ///
 /// `induct x, .. # l = r` proves an equation by induction on `x`, using the patterns of the rules defining a function
 /// applied to `x` as cases and the induction hypotheses as rewrite rules. It is `true` if every case is proven and
@@ -72,6 +77,7 @@ impl Rewriter<'_> {
         let (term_rules, rules): (Vec<_>, Vec<_>) = rules.into_iter().partition(|rule| {
             matches!(&rule.lhs, DomainConstant::Application(f, _) if universe.functions.contains(f))
         });
+        let term_rules = complete(&term_rules).unwrap_or(term_rules);
         for rule in &term_rules {
             add_element(
                 &term(&rule.rhs, &Substitution::default())?,
@@ -491,14 +497,22 @@ fn orient(l: &DomainConstant, r: &DomainConstant, vars: &[NamedSymbol]) -> Optio
                 && vars.iter().all(|v| !contains(rhs, v) || contains(lhs, v))
                 && !match_pattern(lhs, rhs, vars, &mut Substitution::default())
         })
-        .map(|(lhs, rhs)| Rule {
-            vars: vars.to_vec(),
-            lhs: lhs.clone(),
-            rhs: match rhs {
-                DomainConstant::Terminal(v) => SymbolicBDD::Var(v.clone()),
-                t => SymbolicBDD::RuleApplication(t.clone()),
-            },
-        })
+        .map(|(lhs, rhs)| term_rule(vars.to_vec(), lhs.clone(), rhs))
+}
+
+fn term_rule(vars: Vec<NamedSymbol>, lhs: DomainConstant, rhs: &DomainConstant) -> Rule {
+    Rule {
+        vars,
+        lhs,
+        rhs: operand(rhs),
+    }
+}
+
+fn operand(t: &DomainConstant) -> SymbolicBDD {
+    match t {
+        DomainConstant::Terminal(v) => SymbolicBDD::Var(v.clone()),
+        t => SymbolicBDD::RuleApplication(t.clone()),
+    }
 }
 
 fn same_functor(a: &DomainConstant, b: &DomainConstant) -> bool {
@@ -569,5 +583,253 @@ fn collect_terms(formula: &SymbolicBDD, bound: &[NamedSymbol], universe: &mut Un
                 collect_terms(c, bound, universe);
             }
         }
+    }
+}
+
+/// Complete term rules into a convergent rewrite system by Knuth-Bendix completion (Knuth & Bendix, 1970). The given
+/// rules keep their direction, derived equations are oriented by the lexicographic path order.
+fn complete(rules: &[Rule]) -> Option<Vec<Rule>> {
+    let precedence = precedence(rules);
+    let mut fresh = 0;
+    let mut pending = Vec::new();
+    for (i, rule) in rules.iter().enumerate() {
+        pending.extend(overlaps(rule, &rules[..i], &mut fresh));
+    }
+    let mut complete = rules.to_vec();
+
+    for _ in 0..COMPLETION_STEPS {
+        let Some(i) = pending
+            .iter()
+            .enumerate()
+            .min_by_key(|(_, (_, l, r))| size(l) + size(r))
+            .map(|(i, _)| i)
+        else {
+            return Some(complete);
+        };
+        let (vars, s, t) = pending.swap_remove(i);
+        let s = normalize(&s, &complete).ok()?;
+        let t = normalize(&t, &complete).ok()?;
+        if s == t {
+            continue;
+        }
+        let (lhs, rhs) = [(&s, &t), (&t, &s)]
+            .into_iter()
+            .find(|(l, r)| lpo(l, r, &vars, &precedence))?;
+        let vars = vars.into_iter().filter(|v| contains(lhs, v)).collect();
+        let rule = term_rule(vars, lhs.clone(), rhs);
+
+        let (collapsed, kept): (Vec<_>, Vec<_>) = complete.into_iter().partition(|old| {
+            normalize(&old.lhs, std::slice::from_ref(&rule)).is_ok_and(|t| t != old.lhs)
+        });
+        for old in collapsed {
+            let rhs = term(&old.rhs, &Substitution::default()).ok()?;
+            pending.push((old.vars, old.lhs, rhs));
+        }
+        complete = kept;
+        complete.push(rule);
+        for k in 0..complete.len() {
+            let rhs = term(&complete[k].rhs, &Substitution::default()).ok()?;
+            complete[k].rhs = operand(&normalize(&rhs, &complete).ok()?);
+        }
+        let (new, others) = complete.split_last()?;
+        pending.extend(overlaps(new, others, &mut fresh));
+    }
+
+    None
+}
+
+/// The critical pairs of a rule with itself and with each of the other rules, in both directions
+fn overlaps(new: &Rule, others: &[Rule], fresh: &mut usize) -> Vec<Equation> {
+    let mut pairs = critical_pairs(new, new, true, fresh);
+    for old in others {
+        pairs.extend(critical_pairs(new, old, false, fresh));
+        pairs.extend(critical_pairs(old, new, false, fresh));
+    }
+    pairs
+}
+
+/// The equations obtained by unifying the left-hand side of `inner` with a non-variable subterm of the left-hand side
+/// of `outer`
+fn critical_pairs(outer: &Rule, inner: &Rule, same: bool, fresh: &mut usize) -> Vec<Equation> {
+    let (outer_vars, l1, r1) = rename(outer, fresh);
+    let (inner_vars, l2, r2) = rename(inner, fresh);
+    let vars = [outer_vars, inner_vars].concat();
+    let mut subterms = Vec::new();
+    positions(&l1, &mut Vec::new(), &mut subterms);
+
+    let mut pairs = Vec::new();
+    for (path, subterm) in subterms {
+        if matches!(subterm, DomainConstant::Terminal(v) if vars.contains(v))
+            || (same && path.is_empty())
+        {
+            continue;
+        }
+        let mut sigma = Substitution::default();
+        if unify(subterm, &l2, &vars, &mut sigma) {
+            let rhs = resolve(&replace(&l1, &path, &r2), &sigma);
+            pairs.push((vars.clone(), resolve(&r1, &sigma), rhs));
+        }
+    }
+    pairs
+}
+
+fn rename(rule: &Rule, fresh: &mut usize) -> Equation {
+    let vars: Vec<_> = rule
+        .vars
+        .iter()
+        .map(|v| {
+            *fresh += 1;
+            NamedSymbol {
+                name: v.name.clone(),
+                id: usize::MAX / 2 + *fresh,
+            }
+        })
+        .collect();
+    let theta: Substitution = rule
+        .vars
+        .iter()
+        .cloned()
+        .zip(vars.iter().cloned().map(DomainConstant::Terminal))
+        .collect();
+    let rhs = term(&rule.rhs, &theta).expect("the right-hand side of a term rule is a term");
+    (vars, subst(&rule.lhs, &theta), rhs)
+}
+
+fn positions<'t>(
+    t: &'t DomainConstant,
+    path: &mut Vec<usize>,
+    out: &mut Vec<(Vec<usize>, &'t DomainConstant)>,
+) {
+    out.push((path.clone(), t));
+    if let DomainConstant::Application(_, args) = t {
+        for (i, a) in args.iter().enumerate() {
+            path.push(i);
+            positions(a, path, out);
+            path.pop();
+        }
+    }
+}
+
+fn replace(t: &DomainConstant, path: &[usize], s: &DomainConstant) -> DomainConstant {
+    match (t, path.split_first()) {
+        (DomainConstant::Application(f, args), Some((&i, rest))) => {
+            let mut args = args.clone();
+            args[i] = replace(&args[i], rest, s);
+            DomainConstant::Application(f.clone(), args)
+        }
+        _ => s.clone(),
+    }
+}
+
+fn unify(
+    a: &DomainConstant,
+    b: &DomainConstant,
+    vars: &[NamedSymbol],
+    sigma: &mut Substitution,
+) -> bool {
+    let (a, b) = (resolve(a, sigma), resolve(b, sigma));
+    match (&a, &b) {
+        _ if a == b => true,
+        (DomainConstant::Terminal(v), t) | (t, DomainConstant::Terminal(v))
+            if vars.contains(v) && !contains(t, v) =>
+        {
+            sigma.insert(v.clone(), t.clone());
+            true
+        }
+        (DomainConstant::Application(_, xs), DomainConstant::Application(_, ys)) => {
+            same_functor(&a, &b) && xs.iter().zip(ys).all(|(x, y)| unify(x, y, vars, sigma))
+        }
+        _ => false,
+    }
+}
+
+fn resolve(t: &DomainConstant, sigma: &Substitution) -> DomainConstant {
+    match t {
+        DomainConstant::Terminal(v) => sigma
+            .get(v)
+            .map_or_else(|| t.clone(), |u| resolve(u, sigma)),
+        DomainConstant::Application(f, args) => {
+            DomainConstant::Application(f.clone(), args.iter().map(|a| resolve(a, sigma)).collect())
+        }
+    }
+}
+
+fn size(t: &DomainConstant) -> usize {
+    match t {
+        DomainConstant::Terminal(_) => 1,
+        DomainConstant::Application(_, args) => 1 + args.iter().map(size).sum::<usize>(),
+    }
+}
+
+/// The precedence of the symbols of the rules, following the default of Prover9: constants are the smallest, followed
+/// by symbols of increasing arity, with unary symbols the largest. Symbols of the same arity are ordered by their first
+/// occurrence.
+fn precedence(rules: &[Rule]) -> FxHashMap<NamedSymbol, (usize, usize)> {
+    fn visit(
+        t: &DomainConstant,
+        vars: &[NamedSymbol],
+        ranks: &mut FxHashMap<NamedSymbol, (usize, usize)>,
+    ) {
+        let n = ranks.len();
+        if let Some((f, args)) = head(t, vars) {
+            let arity = if args.len() == 1 {
+                usize::MAX
+            } else {
+                args.len()
+            };
+            ranks.entry(f.clone()).or_insert((arity, n));
+            for a in args {
+                visit(a, vars, ranks);
+            }
+        }
+    }
+
+    let mut ranks = FxHashMap::default();
+    for rule in rules {
+        visit(&rule.lhs, &rule.vars, &mut ranks);
+        if let Ok(rhs) = term(&rule.rhs, &Substitution::default()) {
+            visit(&rhs, &rule.vars, &mut ranks);
+        }
+    }
+    ranks
+}
+
+/// The lexicographic path order: `s > t`
+fn lpo(
+    s: &DomainConstant,
+    t: &DomainConstant,
+    vars: &[NamedSymbol],
+    precedence: &FxHashMap<NamedSymbol, (usize, usize)>,
+) -> bool {
+    let Some((f, ss)) = head(s, vars) else {
+        return false;
+    };
+    let Some((g, ts)) = head(t, vars) else {
+        return matches!(t, DomainConstant::Terminal(v) if s != t && contains(s, v));
+    };
+    let rank = |f: &NamedSymbol| precedence.get(f).copied().unwrap_or_default();
+
+    ss.iter().any(|si| si == t || lpo(si, t, vars, precedence))
+        || ts.iter().all(|tj| lpo(s, tj, vars, precedence))
+            && match rank(f).cmp(&rank(g)) {
+                std::cmp::Ordering::Greater => true,
+                std::cmp::Ordering::Equal if f == g => ss
+                    .iter()
+                    .zip(ts)
+                    .find(|(si, ti)| si != ti)
+                    .is_some_and(|(si, ti)| lpo(si, ti, vars, precedence)),
+                _ => false,
+            }
+}
+
+/// The function symbol and arguments of a term, with a constant as a function without arguments
+fn head<'t>(
+    t: &'t DomainConstant,
+    vars: &[NamedSymbol],
+) -> Option<(&'t NamedSymbol, &'t [DomainConstant])> {
+    match t {
+        DomainConstant::Terminal(v) if vars.contains(v) => None,
+        DomainConstant::Terminal(c) => Some((c, &[])),
+        DomainConstant::Application(f, args) => Some((f, args)),
     }
 }
