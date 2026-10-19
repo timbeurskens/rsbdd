@@ -70,7 +70,15 @@ fn test_not_theorems() -> io::Result<()> {
 
 #[test]
 fn test_examples() -> io::Result<()> {
-    for example in ["fol/dreadbury.txt", "right_identity.txt", "group.txt"] {
+    for example in [
+        "fol/barber.txt",
+        "fol/boolean_group.txt",
+        "fol/dreadbury.txt",
+        "fol/drinker.txt",
+        "fol/steamroller.txt",
+        "right_identity.txt",
+        "group.txt",
+    ] {
         let formula = fs::read_to_string(format!("examples/{example}"))?;
         assert!(is_theorem(&formula)?, "{example}");
     }

@@ -332,7 +332,7 @@ impl Prover {
         let mut taken = FxHashSet::default();
         let mut passive: Vec<usize> = (0..self.clauses.len()).collect();
         let mut active: Vec<usize> = Vec::new();
-        let mut demodulators: Vec<Rule> = Vec::new();
+        let mut demodulators: Vec<(Rule, usize)> = Vec::new();
 
         for step in 0..PROVER_STEPS {
             for c in std::mem::take(&mut passive) {
@@ -364,7 +364,7 @@ impl Prover {
 
             active.retain(|&a| !self.subsumes(given, a));
             if let Some(rule) = self.demodulator(given) {
-                demodulators.push(rule);
+                demodulators.push((rule, given));
             }
             active.push(given);
 
@@ -407,12 +407,18 @@ impl Prover {
 
     /// Simplify a clause by demodulation, removing `s != s` and duplicate literals, and delete it if it is a tautology
     /// or subsumed by an active clause
-    fn simplify(&mut self, c: usize, active: &[usize], demodulators: &[Rule]) -> Option<usize> {
+    fn simplify(
+        &mut self,
+        c: usize,
+        active: &[usize],
+        demodulators: &[(Rule, usize)],
+    ) -> Option<usize> {
         let mut literals: Vec<Literal> = Vec::new();
+        let mut used = Vec::new();
         let mut changed = false;
         for literal in &self.clauses[c].literals {
-            let l = normalize(&literal.l, demodulators).ok()?;
-            let r = normalize(&literal.r, demodulators).ok()?;
+            let l = demodulate(&literal.l, demodulators, &mut used)?;
+            let r = demodulate(&literal.r, demodulators, &mut used)?;
             changed |= l != literal.l || r != literal.r;
             let simplified = Literal {
                 positive: literal.positive,
@@ -442,7 +448,7 @@ impl Prover {
             literals.push(simplified);
         }
         let c = if changed {
-            self.add(literals, "simplification", vec![c])
+            self.add(literals, "simplification", [vec![c], used].concat())
         } else {
             c
         };
@@ -742,6 +748,28 @@ impl Prover {
                 }
             })
             .join(" | ")
+    }
+}
+
+/// Rewrite a term to normal form with the demodulators, collecting the clauses of the demodulators that were used
+fn demodulate(
+    t: &DomainConstant,
+    demodulators: &[(Rule, usize)],
+    used: &mut Vec<usize>,
+) -> Option<DomainConstant> {
+    let mut t = t.clone();
+    'rewrite: loop {
+        for (rule, clause) in demodulators {
+            let s = normalize(&t, std::slice::from_ref(rule)).ok()?;
+            if s != t {
+                t = s;
+                if !used.contains(clause) {
+                    used.push(*clause);
+                }
+                continue 'rewrite;
+            }
+        }
+        return Some(t);
     }
 }
 

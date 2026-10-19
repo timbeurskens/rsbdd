@@ -1,0 +1,48 @@
+"
+Schubert's Steamroller
+
+The situation
+
+    Wolves, foxes, birds, caterpillars, and snails are animals, and there are some of each of them.
+    Also there are some grains, and grains are plants.
+    Every animal either likes to eat all plants or all animals much smaller than itself that like to eat some plants.
+    Caterpillars and snails are much smaller than birds, which are much smaller than foxes,
+    which in turn are much smaller than wolves.
+    Wolves do not like to eat foxes or grains, while birds like to eat caterpillars but not snails.
+    Caterpillars and snails like to eat some plants.
+
+The question is: is there an animal that likes to eat a grain-eating animal?
+
+From: Pelletier, Seventy-five problems for testing automatic theorem provers (1986), problem 47
+      Schubert's challenge to automated theorem provers (1978), TPTP problem PUZ031
+
+---
+
+The facts imply the conclusion, but no animal is named: the prover has to find the eater (the wolf, eating the fox
+that eats grain, or the fox, eating the bird that eats grain) from the Skolem constants of the 'there are some' facts.
+
+Run with:
+    rsbdd examples/fol/steamroller.txt --prove
+"
+
+(
+    (forall x # wolf(x) => animal(x)) & (exists x # wolf(x)) &
+    (forall x # fox(x) => animal(x)) & (exists x # fox(x)) &
+    (forall x # bird(x) => animal(x)) & (exists x # bird(x)) &
+    (forall x # caterpillar(x) => animal(x)) & (exists x # caterpillar(x)) &
+    (forall x # snail(x) => animal(x)) & (exists x # snail(x)) &
+    (forall x # grain(x) => plant(x)) & (exists x # grain(x)) &
+
+    (forall x # animal(x) =>
+        (forall y # plant(y) => eats(x, y)) |
+        (forall y # animal(y) & smaller(y, x) & (exists z # plant(z) & eats(y, z)) => eats(x, y))) &
+
+    (forall x, y # bird(y) & (caterpillar(x) | snail(x)) => smaller(x, y)) &
+    (forall x, y # fox(y) & bird(x) => smaller(x, y)) &
+    (forall x, y # wolf(y) & fox(x) => smaller(x, y)) &
+
+    (forall x, y # wolf(x) & (fox(y) | grain(y)) => -eats(x, y)) &
+    (forall x, y # bird(x) & caterpillar(y) => eats(x, y)) &
+    (forall x, y # bird(x) & snail(y) => -eats(x, y)) &
+    (forall x # caterpillar(x) | snail(x) => exists y # plant(y) & eats(x, y))
+) => exists x, y # animal(x) & animal(y) & eats(x, y) & forall z # grain(z) => eats(y, z)

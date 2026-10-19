@@ -135,9 +135,9 @@ Agatha?*: the facts imply that Agatha killed herself. The output is the proof, e
 0. lives(sk1) [negated goal]
 1. killed(sk1, agatha) [negated goal]
 ...
-136. (sk1 = agatha) [simplification 122]
+136. (sk1 = agatha) [simplification 122, 63]
 140. -killed(sk1, agatha) [superposition 136, 14]
-161. false [simplification 140]
+161. false [simplification 140, 1]
 theorem
 ```
 
@@ -152,10 +152,17 @@ theorem
   order of [completion](#completion) and a selected negative literal. Clauses are simplified by demodulation with
   oriented unit equations, and deleted if they are tautologies or subsumed. A predicate `p(..)` is the equation
   `p(..) = true`.
+- Every line of the proof is a clause with the rule that derived it and the clauses it was derived from;
+  simplification also lists the unit equations it rewrote with.
 - The result is `theorem` with the proof (exit status 10) if the empty clause is derived, `not a theorem` (20) if the
   clauses are saturated without it, and `unknown` (30) if no proof is found within 100000 given clauses. As
   first-order validity is undecidable, a formula that is not a theorem may also give `unknown`.
 - Counting, fixed points, atom quantifiers and `induct` are not part of first-order logic, and are rejected.
+
+More puzzles in [examples/fol](../examples/fol): the barber paradox ([barber.txt](../examples/fol/barber.txt)), the
+drinker paradox ([drinker.txt](../examples/fol/drinker.txt)), Schubert's Steamroller
+([steamroller.txt](../examples/fol/steamroller.txt)), and groups in which every element is its own inverse
+([boolean_group.txt](../examples/fol/boolean_group.txt)).
 
 The prover proves the first-order problems of Pelletier's *Seventy-five problems for testing automatic theorem
 provers* (1986) in [tests/prover.rs](../tests/prover.rs), including Andrews' challenge (problem 34) and the problems

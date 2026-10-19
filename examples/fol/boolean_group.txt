@@ -1,0 +1,27 @@
+"
+Groups in which every element is its own inverse are commutative.
+
+The situation
+
+    A set with a product mul is associative and has a left identity e.
+    Every element x is its own inverse: mul(x, x) = e.
+
+The question is: is the product commutative, mul(x, y) = mul(y, x) for all x and y?
+
+From: Pelletier, Seventy-five problems for testing automatic theorem provers (1986), problem 65
+
+---
+
+Yes. Writing x * y for mul(x, y), e is also a right identity: x * e = x * (x * x) = (x * x) * x = e * x = x. Then
+    y * x = ((x * y) * (x * y)) * (y * x) = (x * y) * (x * (y * y) * x) = (x * y) * (x * x) = x * y.
+Unlike examples/group.txt, the axioms are not rewrite rules, so they may be used in both directions.
+
+Run with:
+    rsbdd examples/fol/boolean_group.txt --prove
+"
+
+(
+    (forall x, y, z # mul(x, mul(y, z)) = mul(mul(x, y), z)) &
+    (forall x # mul(e, x) = x) &
+    (forall x # mul(x, x) = e)
+) => forall x, y # mul(x, y) = mul(y, x)
