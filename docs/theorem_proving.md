@@ -141,9 +141,12 @@ Agatha?*: the facts imply that Agatha killed herself. The output is the proof, e
 theorem
 ```
 
-- The rewrite rules are axioms: a term rule `l -> r` is the equation `l = r`, and a rule `p(..) -> f` is the
-  equivalence `p(..) <=> f`, for all values of its variables. The rest of the formula is the goal. Unlike rewriting,
-  an application without a matching rule is not false, and distinct names may denote the same element.
+- The rewrite rules are axioms, read as in finite mode: a term rule `l -> r` is the equation `l = r` for all values
+  of its variables, and the rules of a predicate are its definition (Clark completion): an application holds if and
+  only if some rule matches, and the right-hand side of every matching rule holds. The rest of the formula is the
+  goal.
+- Distinct names are distinct elements (unique names), unless an equation of the formula relates them. See
+  [Finite mode and first-order proofs](finite_and_first_order.md#unique-names).
 - Names that are not bound by a quantifier are constants, so a goal holds for every value of them. Boolean variables
   are propositions, and a quantifier over a boolean variable ranges over `true` and `false`.
 - The negated goal and the axioms are Skolemized and converted to clauses (with definitions for large subformulas;
@@ -157,7 +160,9 @@ theorem
 - The result is `theorem` with the proof (exit status 10) if the empty clause is derived, `not a theorem` (20) if the
   clauses are saturated without it, and `unknown` (30) if no proof is found within 100000 given clauses. As
   first-order validity is undecidable, a formula that is not a theorem may also give `unknown`.
-- Counting, fixed points, atom quantifiers and `induct` are not part of first-order logic, and are rejected.
+- Counting, fixed points, atom quantifiers and atom substitution are evaluated as in finite mode, and an equation
+  proven by `induct` becomes an axiom. The differences between `--prove` and finite mode are described in
+  [Finite mode and first-order proofs](finite_and_first_order.md).
 
 More puzzles in [examples/fol](../examples/fol): the barber paradox ([barber.txt](../examples/fol/barber.txt)), the
 drinker paradox ([drinker.txt](../examples/fol/drinker.txt)), Schubert's Steamroller

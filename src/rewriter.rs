@@ -28,6 +28,7 @@ pub(crate) struct Universe {
     terms: Vec<DomainConstant>,
     seen: FxHashSet<DomainConstant>,
     pub(crate) functions: FxHashSet<NamedSymbol>,
+    pub(crate) symbols: FxHashSet<(NamedSymbol, usize)>,
 }
 
 /// The rewrite rules and remaining formula of a parsed formula, with the ground terms and function symbols in them
@@ -71,8 +72,8 @@ pub(crate) fn split_rules(
 /// applied to `x` as cases and the induction hypotheses as rewrite rules. A case that does not rewrite to an identity
 /// is generalised into a lemma and proven by induction first. It is `true` if every case is proven and `false`
 /// otherwise. A proven equation becomes a rewrite rule for the remainder of the formula.
-pub struct Rewriter<'a> {
-    rules: &'a [Rule],
+pub struct Rewriter {
+    rules: Rc<[Rule]>,
     term_rules: Vec<Rule>,
     definitions: usize,
     skolems: usize,
@@ -86,9 +87,19 @@ pub struct Rewriter<'a> {
     expanding: FxHashSet<DomainConstant>,
 }
 
-impl Rewriter<'_> {
+impl Rewriter {
     /// Rewrite the parsed formula, returning the ground formula and the variables introduced for open atoms
     pub fn rewrite(parsed: &ParsedFormula) -> io::Result<(SymbolicBDD, Vec<NamedSymbol>)> {
+        let (mut rewriter, formula) = Self::new(parsed)?;
+        let result = rewriter.expand(&formula, &Substitution::default())?;
+
+        let mut new_vars: Vec<_> = rewriter.atoms.into_values().collect();
+        new_vars.sort_by_key(|v| v.id);
+        Ok((result, new_vars))
+    }
+
+    /// A rewriter for the rules of a parsed formula, with the remaining formula
+    pub(crate) fn new(parsed: &ParsedFormula) -> io::Result<(Self, SymbolicBDD)> {
         let (rules, formula, mut universe) = split_rules(parsed)?;
 
         let (term_rules, rules): (Vec<_>, Vec<_>) = rules.into_iter().partition(|rule| {
@@ -109,8 +120,8 @@ impl Rewriter<'_> {
             .collect::<io::Result<_>>()?;
         let terms: Vec<_> = terms.into_iter().unique().collect();
 
-        let mut rewriter = Rewriter {
-            rules: &rules,
+        let rewriter = Self {
+            rules: rules.into(),
             definitions: term_rules.len(),
             term_rules,
             skolems: 0,
@@ -122,14 +133,25 @@ impl Rewriter<'_> {
             base_id: parsed.vars.iter().map(|v| v.id + 1).max().unwrap_or(0),
             expanding: FxHashSet::default(),
         };
-        let result = rewriter.expand(&formula, &Substitution::default())?;
-
-        let mut new_vars: Vec<_> = rewriter.atoms.into_values().collect();
-        new_vars.sort_by_key(|v| v.id);
-        Ok((result, new_vars))
+        Ok((rewriter, formula))
     }
 
-    fn expand(&mut self, formula: &SymbolicBDD, theta: &Substitution) -> io::Result<SymbolicBDD> {
+    /// The atom of a variable introduced by the rewriter
+    pub(crate) fn atom_of(&self, v: &NamedSymbol) -> Option<&DomainConstant> {
+        v.id.checked_sub(self.base_id)
+            .and_then(|i| self.grounds.get(i))
+    }
+
+    /// Whether a predicate rule is defined for the functor of a term
+    pub(crate) fn defines(&self, t: &DomainConstant) -> bool {
+        self.rules.iter().any(|rule| same_functor(&rule.lhs, t))
+    }
+
+    pub(crate) fn expand(
+        &mut self,
+        formula: &SymbolicBDD,
+        theta: &Substitution,
+    ) -> io::Result<SymbolicBDD> {
         let mut expand = |f: &SymbolicBDD| self.expand(f, theta);
 
         Ok(match formula {
@@ -277,7 +299,7 @@ impl Rewriter<'_> {
         }
 
         let mut bodies = Vec::new();
-        for rule in self.rules {
+        for rule in Rc::clone(&self.rules).iter() {
             let mut sigma = Substitution::default();
             if match_pattern(&rule.lhs, &ground, &rule.vars, &mut sigma) {
                 bodies.push(self.expand(&rule.rhs, &sigma)?);
@@ -686,8 +708,15 @@ fn add_args(t: &DomainConstant, bound: &[NamedSymbol], universe: &mut Universe) 
 
 /// Add a term and its subterms to the universe, skipping terms containing bound variables
 fn add_element(t: &DomainConstant, bound: &[NamedSymbol], universe: &mut Universe) {
-    if let DomainConstant::Application(f, _) = t {
-        universe.functions.insert(f.clone());
+    match t {
+        DomainConstant::Application(f, args) => {
+            universe.functions.insert(f.clone());
+            universe.symbols.insert((f.clone(), args.len()));
+        }
+        DomainConstant::Terminal(c) if !bound.contains(c) => {
+            universe.symbols.insert((c.clone(), 0));
+        }
+        DomainConstant::Terminal(_) => {}
     }
     if !bound.iter().any(|v| contains(t, v)) && universe.seen.insert(t.clone()) {
         universe.terms.push(t.clone());
@@ -722,7 +751,7 @@ fn collect_terms(formula: &SymbolicBDD, bound: &[NamedSymbol], universe: &mut Un
 
 /// Complete term rules into a convergent rewrite system by Knuth-Bendix completion (Knuth & Bendix, 1970). The given
 /// rules keep their direction, derived equations are oriented by the lexicographic path order.
-fn complete(rules: &[Rule]) -> Option<Vec<Rule>> {
+pub(crate) fn complete(rules: &[Rule]) -> Option<Vec<Rule>> {
     let precedence = precedence(rules);
     let mut fresh = 0;
     let mut pending = Vec::new();

@@ -1,0 +1,53 @@
+"
+Who killed Aunt Agatha?
+
+The situation
+
+    Someone who lives in Dreadbury Mansion killed Aunt Agatha.
+    Agatha, the butler, and Charles live in Dreadbury Mansion, and are the only people who live therein.
+    A killer always hates his victim, and is never richer than his victim.
+    Charles hates no one that Aunt Agatha hates.
+    Agatha hates everyone except the butler.
+    The butler hates everyone not richer than Aunt Agatha.
+    The butler hates everyone Aunt Agatha hates.
+    No one hates everyone.
+    Agatha is not the butler.
+
+The question is: who killed Aunt Agatha?
+
+From: Pelletier, Seventy-five problems for testing automatic theorem provers (1986), problem 55
+      TPTP problem PUZ001
+
+---
+
+examples/fol/dreadbury.txt proves that Agatha killed herself. Here the solver finds the killer instead: the clues
+only describe the situation, and nobody is named as the killer.
+
+Everyone is one of the people in the mansion. The unknowns lives(x), killed(x, y), hates(x, y) and richer(x, y)
+are the relations between them, which the solver chooses. A person p is a possible killer if some choice of these
+relations satisfies all clues, with killed(p, Agatha). The atom quantifier exists killed(_, _), .. ranges over every
+choice of the relations, so killer(p) only depends on p.
+
+The truth table has a single row, in which only killer(Agatha) is true: Agatha killed herself.
+
+Run with:
+    rsbdd examples/dreadbury.txt -t -ft
+"
+
+let clues :=
+    (exists x # person(x) & lives(x) & killed(x, Agatha)) &
+    lives(Agatha) & lives(Butler) & lives(Charles) &
+    (forall x, y # person(x) & person(y) => (killed(x, y) => hates(x, y)) & (killed(x, y) => -richer(x, y))) &
+    (forall x # person(x) => (hates(Agatha, x) => -hates(Charles, x))) &
+    (forall x # person(x) => (-(x = Butler) => hates(Agatha, x))) &
+    (forall x # person(x) => (-richer(x, Agatha) => hates(Butler, x))) &
+    (forall x # person(x) => (hates(Agatha, x) => hates(Butler, x))) &
+    (forall x # person(x) => exists y # person(y) & -hates(x, y)) &
+    -(Agatha = Butler);
+
+person(Agatha) -> true;
+person(Butler) -> true;
+person(Charles) -> true;
+
+forall p # person(p) =>
+    (killer(p) <=> exists lives(_), killed(_, _), hates(_, _), richer(_, _) # clues & killed(p, Agatha))

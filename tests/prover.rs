@@ -85,8 +85,32 @@ fn test_examples() -> io::Result<()> {
     Ok(())
 }
 
+/// Formulas valid in finite mode that are theorems of `--prove`, and one that is not valid in finite mode
+#[test]
+fn test_compatibility() -> io::Result<()> {
+    let plus = "sum y # plus(_0, y) -> y; sum x, y # plus(suc(x), y) -> suc(plus(x, y));";
+    for formula in [
+        "p(A) -> true; -p(B)",
+        "is_nat(_0) -> true; sum n # is_nat(suc(n)) -> is_nat(n); is_nat(suc(_0)) & -is_nat(A)",
+        "sum x # p(x) -> q(x); p(A) -> r; p(A) <=> (q(A) & r)",
+        "[a, b] = 1 => (a ^ b)",
+        "[a] <= [a, b]",
+        "forall x # ([p(x), q(x)] = 1 => (p(x) ^ q(x)))",
+        "(p(A) & -p(B))[p(_) := q(_)] <=> (q(A) & -q(B))",
+        "exists p(_) # p(A)",
+        "(lfp X # a | X) <=> a",
+        "e(A, B) -> true; sum x, y # r(x, y) -> e(x, y) | exists z # e(x, z) & r(z, y); r(A, B)",
+        &format!("{plus} induct x # plus(x, _0) = x; forall x # plus(x, _0) = x"),
+    ] {
+        assert!(is_theorem(formula)?, "{formula}");
+    }
+    assert!(is_not_theorem(
+        "sum x # p(x) -> q(x); p(A) -> r; q(A) <=> r"
+    )?);
+    Ok(())
+}
+
 #[test]
 fn test_unsupported() {
-    assert!(prove("[a, b] = 1").is_err());
-    assert!(prove("lfp X # a | X").is_err());
+    assert!(prove("p(A) -> true; forall x # [p(x)] = 1").is_err());
 }

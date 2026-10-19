@@ -7,10 +7,11 @@ use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::NamedSymbol;
+use crate::bdd::{BDD, Node};
 use crate::parser::{BinaryOperator, DomainConstant, ParsedFormula, QuantifierType, SymbolicBDD};
 use crate::rewriter::{
-    Rule, Substitution, invalid, lpo, match_pattern, normalize, occurs_as_term, positions, rank,
-    replace, resolve, size, split_rules, subst, term, unify,
+    Rewriter, Rule, Substitution, complete, invalid, join, lpo, match_pattern, normalize,
+    occurs_as_term, positions, rank, replace, resolve, size, split_rules, subst, term, unify,
 };
 
 const PROVER_STEPS: usize = 100000;
@@ -49,10 +50,16 @@ struct Scope {
 
 /// A first-order theorem prover by superposition (Bachmair & Ganzinger, 1994) with a given-clause loop.
 ///
-/// The rules of the formula are axioms: a term rule `l -> r` is the equation `l = r`, a rule `p(..) -> f` is the
-/// equivalence `p(..) <=> f`, both for all values of its variables. The remaining formula is the goal: its negation is
-/// Skolemized and converted to clauses together with the axioms, and the formula is proven if the clauses derive the
-/// empty clause. A predicate `p(..)` is the equation `p(..) = true`, so all inferences are on equations. The
+/// The rules of the formula are axioms, read as in finite mode: a term rule `l -> r` is the equation `l = r` for all
+/// values of its variables, and the rules of a predicate are its Clark completion: an application holds if and only if
+/// some rule matches it, and the right-hand side of every matching rule holds. If the term rules can be completed,
+/// the function symbols that are not defined by a term rule are constructors: distinct constructors are unequal and
+/// constructors are injective. Symbols in an equation of the formula are not constructors, as the formula may equate
+/// them. Counting, fixed points and atom quantifiers are evaluated as in finite mode by the
+/// rewriter and the BDD, whose nodes become definitions, and `induct` proves an equation that becomes an axiom.
+///
+/// The remaining formula is the goal: its negation is Skolemized and converted to clauses together with the axioms,
+/// and the formula is proven if the clauses derive the empty clause. A predicate `p(..)` is the equation `p(..) = true`, so all inferences are on equations. The
 /// inferences are restricted by the lexicographic path order of the completion, and clauses are simplified by
 /// demodulation with oriented unit equations, and by tautology deletion and subsumption.
 pub struct Prover {
@@ -62,6 +69,8 @@ pub struct Prover {
     top: DomainConstant,
     fresh: usize,
     definitions: Vec<Vec<Literal>>,
+    rewriter: Rewriter,
+    finite: ParsedFormula,
 }
 
 impl Prover {
@@ -77,19 +86,52 @@ impl Prover {
             }),
             fresh: 0,
             definitions: Vec::new(),
+            rewriter: Rewriter::new(parsed)?.0,
+            finite: parsed.clone(),
         };
 
-        for rule in &rules {
-            let lhs = SymbolicBDD::from_term(&rule.lhs);
-            let axiom = match &rule.lhs {
-                DomainConstant::Application(f, _) if universe.functions.contains(f) => {
-                    SymbolicBDD::binop(BinaryOperator::Equals, lhs, rule.rhs.clone())
-                }
-                _ => SymbolicBDD::binop(BinaryOperator::Iff, lhs, rule.rhs.clone()),
-            };
-            let axiom =
-                SymbolicBDD::Quantifier(QuantifierType::Forall, rule.vars.clone(), Box::new(axiom));
+        let (term_rules, predicate_rules): (Vec<_>, Vec<_>) = rules.into_iter().partition(|rule| {
+            matches!(&rule.lhs, DomainConstant::Application(f, _) if universe.functions.contains(f))
+        });
+        for rule in &term_rules {
+            let equation = SymbolicBDD::binop(
+                BinaryOperator::Equals,
+                SymbolicBDD::from_term(&rule.lhs),
+                rule.rhs.clone(),
+            );
+            let axiom = SymbolicBDD::Quantifier(
+                QuantifierType::Forall,
+                rule.vars.clone(),
+                Box::new(equation),
+            );
             prover.input(&axiom, true, "axiom")?;
+        }
+        let functors = predicate_rules
+            .iter()
+            .map(|rule| functor(&rule.lhs))
+            .unique();
+        for (p, n) in functors {
+            let rules: Vec<_> = predicate_rules
+                .iter()
+                .filter(|rule| functor(&rule.lhs) == (p.clone(), n))
+                .collect();
+            let definition = prover.completion(&p, n, &rules);
+            prover.input(&definition, true, "definition")?;
+        }
+        if let Some(completed) = complete(&term_rules) {
+            let mut open: FxHashSet<_> =
+                completed.iter().map(|rule| functor(&rule.lhs).0).collect();
+            equated(&goal, &mut open);
+            let constructors: Vec<_> = universe
+                .symbols
+                .iter()
+                .filter(|(c, _)| !open.contains(c))
+                .cloned()
+                .sorted_by_key(|(c, n)| (c.id, *n))
+                .collect();
+            for axiom in prover.unique_names(&constructors) {
+                prover.input(&axiom, true, "unique names")?;
+            }
         }
         prover.input(&goal, false, "negated goal")?;
 
@@ -104,6 +146,113 @@ impl Prover {
         prover.precedence = ranks;
 
         Ok(prover.saturate())
+    }
+
+    /// The Clark completion of the rules of a predicate `p` with `n` arguments:
+    /// `forall xs # p(xs) <=> (exists vars # xs = args) | .. & (forall vars # xs = args => rhs) & ..`
+    fn completion(&mut self, p: &NamedSymbol, n: usize, rules: &[&Rule]) -> SymbolicBDD {
+        let xs: Vec<_> = (0..n).map(|_| self.symbol("x".to_string())).collect();
+        let matches = |rule: &Rule| {
+            let DomainConstant::Application(_, args) = &rule.lhs else {
+                return SymbolicBDD::True;
+            };
+            let equations = xs.iter().zip(args).map(|(x, arg)| {
+                SymbolicBDD::binop(
+                    BinaryOperator::Equals,
+                    SymbolicBDD::Var(x.clone()),
+                    SymbolicBDD::from_term(arg),
+                )
+            });
+            join(BinaryOperator::And, equations.collect())
+        };
+        let quantify =
+            |q, rule: &Rule, body| SymbolicBDD::Quantifier(q, rule.vars.clone(), Box::new(body));
+        let some = rules
+            .iter()
+            .map(|rule| quantify(QuantifierType::Exists, rule, matches(rule)))
+            .collect();
+        let every = rules
+            .iter()
+            .map(|rule| {
+                let implication =
+                    SymbolicBDD::binop(BinaryOperator::Implies, matches(rule), rule.rhs.clone());
+                quantify(QuantifierType::Forall, rule, implication)
+            })
+            .collect();
+        let atom = SymbolicBDD::from_term(&application(
+            p,
+            xs.iter().cloned().map(DomainConstant::Terminal).collect(),
+        ));
+        let body = SymbolicBDD::binop(
+            BinaryOperator::And,
+            join(BinaryOperator::Or, some),
+            join(BinaryOperator::And, every),
+        );
+        SymbolicBDD::Quantifier(
+            QuantifierType::Forall,
+            xs,
+            Box::new(SymbolicBDD::binop(BinaryOperator::Iff, atom, body)),
+        )
+    }
+
+    /// The axioms of unique names for constructors: distinct constructors are unequal, and constructors are injective
+    fn unique_names(&mut self, constructors: &[(NamedSymbol, usize)]) -> Vec<SymbolicBDD> {
+        let mut vars = |n: usize| -> Vec<NamedSymbol> {
+            (0..n).map(|_| self.symbol("x".to_string())).collect()
+        };
+        let mut axioms = Vec::new();
+        for (i, (c, m)) in constructors.iter().enumerate() {
+            let (xs, ys) = (vars(*m), vars(*m));
+            let c_xs = application(
+                c,
+                xs.iter().cloned().map(DomainConstant::Terminal).collect(),
+            );
+            if *m > 0 {
+                let c_ys = application(
+                    c,
+                    ys.iter().cloned().map(DomainConstant::Terminal).collect(),
+                );
+                let arguments = xs.iter().zip(&ys).map(|(x, y)| {
+                    SymbolicBDD::binop(
+                        BinaryOperator::Equals,
+                        SymbolicBDD::Var(x.clone()),
+                        SymbolicBDD::Var(y.clone()),
+                    )
+                });
+                let injective = SymbolicBDD::binop(
+                    BinaryOperator::Implies,
+                    SymbolicBDD::binop(
+                        BinaryOperator::Equals,
+                        SymbolicBDD::from_term(&c_xs),
+                        SymbolicBDD::from_term(&c_ys),
+                    ),
+                    join(BinaryOperator::And, arguments.collect()),
+                );
+                axioms.push(SymbolicBDD::Quantifier(
+                    QuantifierType::Forall,
+                    [xs.clone(), ys].concat(),
+                    Box::new(injective),
+                ));
+            }
+            for (d, n) in &constructors[i + 1..] {
+                let zs = vars(*n);
+                let d_zs = application(
+                    d,
+                    zs.iter().cloned().map(DomainConstant::Terminal).collect(),
+                );
+                let distinct = SymbolicBDD::Not(Box::new(SymbolicBDD::binop(
+                    BinaryOperator::Equals,
+                    SymbolicBDD::from_term(&c_xs),
+                    SymbolicBDD::from_term(&d_zs),
+                )));
+                axioms.push(SymbolicBDD::Quantifier(
+                    QuantifierType::Forall,
+                    [xs.clone(), zs].concat(),
+                    Box::new(distinct),
+                ));
+            }
+        }
+        axioms
     }
 
     /// Add the clauses of a formula, or of its negation
@@ -213,12 +362,111 @@ impl Prover {
                 scope.terms.insert(v.clone(), value);
                 self.nnf(&rest, positive, &scope)?
             }
+            SymbolicBDD::CountableConst(..)
+            | SymbolicBDD::CountableVariable(..)
+            | SymbolicBDD::AtomQuantifier(..)
+            | SymbolicBDD::FixedPoint(..) => self.finite(f, positive, scope)?,
+            SymbolicBDD::Quantifier(QuantifierType::Induction, vars, body) => {
+                let proven = self.rewriter.expand(f, &scope.terms)?;
+                if proven == SymbolicBDD::True {
+                    let lemma =
+                        SymbolicBDD::Quantifier(QuantifierType::Forall, vars.clone(), body.clone());
+                    let clauses = self.nnf(&lemma, true, scope)?;
+                    self.definitions.extend(clauses);
+                }
+                self.nnf(&proven, positive, scope)?
+            }
             other => {
                 return Err(invalid(format!(
                     "{other} is not supported in a first-order proof"
                 )));
             }
         })
+    }
+
+    /// The clauses of a formula evaluated as in finite mode: the rewriter grounds it and the BDD decides it. Every node
+    /// of the BDD is named by a new atom with its definition `node <=> if v then hi else lo`.
+    fn finite(
+        &mut self,
+        f: &SymbolicBDD,
+        positive: bool,
+        scope: &Scope,
+    ) -> io::Result<Vec<Vec<Literal>>> {
+        if self.applies_rule_to_variable(f, scope) {
+            return Err(invalid(format!(
+                "{f} applies a rule to a variable, which is not supported in a first-order proof"
+            )));
+        }
+        let mut finite = self.finite.clone();
+        let mut ground = self.rewriter.expand(f, &scope.terms)?;
+        for (v, value) in &scope.booleans {
+            let value = if *value {
+                SymbolicBDD::True
+            } else {
+                SymbolicBDD::False
+            };
+            ground = finite.replace_var(&ground, v, &value);
+        }
+        finite.bdd = ground;
+        let root = self.definition(&finite.eval(), scope, &mut FxHashMap::default())?;
+        self.nnf(&root, positive, scope)
+    }
+
+    /// The atom naming a BDD node, adding its definition
+    #[allow(clippy::mutable_key_type)]
+    fn definition(
+        &mut self,
+        bdd: &BDD<NamedSymbol>,
+        scope: &Scope,
+        names: &mut FxHashMap<BDD<NamedSymbol>, SymbolicBDD>,
+    ) -> io::Result<SymbolicBDD> {
+        let Node::Choice(hi, v, lo) = bdd.node() else {
+            return Ok(if bdd.is_true() {
+                SymbolicBDD::True
+            } else {
+                SymbolicBDD::False
+            });
+        };
+        if let Some(name) = names.get(bdd) {
+            return Ok(name.clone());
+        }
+        let hi = self.definition(&hi, scope, names)?;
+        let lo = self.definition(&lo, scope, names)?;
+        let var = self
+            .rewriter
+            .atom_of(&v)
+            .map_or_else(|| SymbolicBDD::Var(v.clone()), SymbolicBDD::from_term);
+        let symbol = self.symbol(format!("def{}", self.fresh + 1));
+        let name = SymbolicBDD::from_term(&application(&symbol, scope.universals.clone()));
+        let ite = SymbolicBDD::Ite(Box::new(var), Box::new(hi), Box::new(lo));
+        let clauses = self.nnf(
+            &SymbolicBDD::binop(BinaryOperator::Iff, name.clone(), ite),
+            true,
+            scope,
+        )?;
+        self.definitions.extend(clauses);
+        names.insert(bdd.clone(), name.clone());
+        Ok(name)
+    }
+
+    /// Whether a formula applies a predicate defined by rules to a term with a variable or Skolem function of the proof
+    /// (a symbol made by [Self::symbol]), which the rewriter would match syntactically
+    fn applies_rule_to_variable(&self, f: &SymbolicBDD, scope: &Scope) -> bool {
+        match f {
+            SymbolicBDD::RuleApplication(t) => {
+                let t = subst(t, &scope.terms);
+                let mut subterms = Vec::new();
+                positions(&t, &mut vec![], &mut subterms);
+                self.rewriter.defines(&t)
+                    && subterms
+                        .iter()
+                        .any(|(_, t)| functor(t).0.id > usize::MAX / 2)
+            }
+            other => other
+                .children()
+                .into_iter()
+                .any(|c| self.applies_rule_to_variable(c, scope)),
+        }
     }
 
     /// The clauses of a conjunction or disjunction of clauses. Before distributing a disjunction over large
@@ -770,6 +1018,37 @@ fn demodulate(
             }
         }
         return Some(t);
+    }
+}
+
+fn application(f: &NamedSymbol, args: Vec<DomainConstant>) -> DomainConstant {
+    if args.is_empty() {
+        DomainConstant::Terminal(f.clone())
+    } else {
+        DomainConstant::Application(f.clone(), args)
+    }
+}
+
+/// Collect the symbols of the terms of the equations in a formula
+fn equated(f: &SymbolicBDD, symbols: &mut FxHashSet<NamedSymbol>) {
+    if let SymbolicBDD::BinaryOp(BinaryOperator::Equals, l, r) = f {
+        for operand in [l, r] {
+            if let Ok(t) = term(operand, &Substitution::default()) {
+                let mut subterms = Vec::new();
+                positions(&t, &mut vec![], &mut subterms);
+                symbols.extend(subterms.into_iter().map(|(_, t)| functor(t).0));
+            }
+        }
+    }
+    for c in f.children() {
+        equated(c, symbols);
+    }
+}
+
+fn functor(t: &DomainConstant) -> (NamedSymbol, usize) {
+    match t {
+        DomainConstant::Terminal(c) => (c.clone(), 0),
+        DomainConstant::Application(f, args) => (f.clone(), args.len()),
     }
 }
 
