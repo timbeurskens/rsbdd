@@ -1,0 +1,29 @@
+"
+Group theory: prove the right identity and right inverse from the left identity and left inverse.
+
+This is the Prover9 problem in examples/in_progress/right-identity.prover9.txt, with the product x * y written as
+mul(x, y) and the inverse x' as inv(x). The three axioms are not a convergent rewrite system: mul(x, e) cannot be
+rewritten with them. Knuth-Bendix completion (Knuth & Bendix, 1970) adds the missing rules, deriving the lemmas of
+the proof by Prover9, such as
+
+    mul(inv(x), mul(x, y)) -> y,   inv(inv(x)) -> x,   mul(x, e) -> x,   mul(x, inv(x)) -> e
+
+The goals are proven by rewriting both sides to normal form. As in Prover9, the x of a goal is an arbitrary
+constant (the Skolem constants c1 and c2 of Prover9), so a goal holds for every element of every group.
+Both goals are proven, resulting in a single 'true' node in the BDD.
+
+Run with:
+    rsbdd examples/right_identity.txt
+"
+
+"a left identity exists for the group"
+sum x # mul(e, x) -> x;
+"a left inverse exists for the group"
+sum x # mul(inv(x), x) -> e;
+"associative law for the group"
+sum x, y, z # mul(mul(x, y), z) -> mul(x, mul(y, z));
+
+"the right identity is equal to the left identity"
+mul(x, e) = x;
+"the right inverse is equal to the left inverse"
+mul(x, inv(x)) = e

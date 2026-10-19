@@ -235,17 +235,27 @@ not be used as a replacement in the same substitution, so `[x := y, y := x]` is 
 (a & b)[a := true]  <=> b
 ```
 
-The example below computes all states reachable from state `00` in a transition system `T` over current-state
-variables `p1, p0` and next-state variables `x1, x0` (see [examples/reachability.txt](../examples/reachability.txt)).
+The target of a substitution can also be an atom (see [Rewrite rules](rewriting.md)). Every `_` in the target ranges
+over all ground terms, and is replaced by the same term at the corresponding `_` in the replacement:
 
 ```
-let init := -x1 & -x0;
-let T := ...;
-lfp R # init | exists p1, p0 # R[x1 := p1, x0 := p0] & T
+(p(A) & -p(B))[p(_) := q(_)]   <=> q(A) & -q(B)
+f[p(_) := q(_)]                <=> exists p(_) # f & forall _ # (p(_) <=> q(_))
+```
+
+The example below computes all states reachable from state `S0` in a transition system `T`. The unknowns
+`state(w, s)` state that the system is in state `s` at `w`, where `Prev` is the current state and `Cur` the next
+state of a transition (see [examples/reachability.txt](../examples/reachability.txt)).
+
+```
+let init := is_in(Cur, S0);
+let T := exists p, x # transition(p, x) & is_in(Prev, p) & is_in(Cur, x);
+...
+lfp R # init | exists state(Prev, _) # R[state(Cur, _) := state(Prev, _)] & T
 ```
 
 The resulting BDD, obtained with `rsbdd examples/reachability.txt -d reachability.dot`, is the set of reachable states:
-every state except `11` (`x1 & x0`) is reachable.
+every state except `S3` is reachable.
 
 ![reachability bdd](images/reachability_bdd.svg)
 

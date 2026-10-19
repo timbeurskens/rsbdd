@@ -7,7 +7,7 @@ _Solving satisfiability problems in Rust_
 RsBDD is a SAT solver based on binary decision diagrams (BDDs). Problems are written in a small logic language with
 quantifiers, counting constraints, fixed points, definitions and substitution. The solver reports every satisfying
 assignment, a single model, or the BDD itself. Rewrite rules over terms such as `suc(_0)` or `next(H1, H2)` describe
-problems over domains other than booleans, and turn the solver into a theorem prover by term rewriting and induction.
+problems over domains other than booleans, and turn the solver into a theorem prover by term rewriting, completion and induction.
 The package also contains generators for n-queens, sudoku, graph coloring and max-clique problems.
 
 ```bash
@@ -30,6 +30,7 @@ rsbdd -e "a & -b" -t
    - [Combining rewrite rules and fixed points](docs/rewriting.md#combining-rewrite-rules-and-fixed-points)
 4. [Theorem proving](docs/theorem_proving.md)
    - [Theorem proving by term rewriting](docs/theorem_proving.md#theorem-proving-by-term-rewriting)
+   - [Completion](docs/theorem_proving.md#completion)
    - [Proofs by induction](docs/theorem_proving.md#proofs-by-induction)
 5. [Examples](docs/examples.md): transitivity, the 4 queens problem, model checking Peterson's protocol, a simplified Einstein riddle
 6. [CLI usage](docs/cli.md): `rsbdd`, `max_clique_gen`, `random_graph_gen`, `n_queens_gen`, `sudoku_gen`
