@@ -1,4 +1,4 @@
-"induction: commutativity is not proven without the lemmas it depends on"
+"induction: commutativity is proven with the lemmas discovered from the stuck cases"
 sum y # plus(_0, y) -> y;
 sum x, y # plus(suc(x), y) -> suc(plus(x, y));
 

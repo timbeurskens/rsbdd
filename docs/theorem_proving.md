@@ -22,8 +22,9 @@ plus(suc(_0), suc(_0)) = suc(suc(_0))
   Nipkow, *Term Rewriting and All That*, 1998). A theorem is proven if the formula evaluates to `true`.
 - The rules are [completed](#completion) if possible. Otherwise convergence is not checked: a non-terminating system
   does not terminate, and the result of a non-confluent system depends on the order of the rules.
-- Quantifiers range over the normal forms of the ground terms in the formula, so a quantified theorem is only proven
-  for those terms. Use `induct` for a proof for all values.
+- Quantifiers range over the normal forms of the ground terms in the formula and an arbitrary constant. The theorem
+  `forall x # plus(x, _0) = x` is therefore not proven by rewriting, as `plus(x', _0)` cannot be rewritten. Use
+  `induct` for a proof for all values.
 
 See [examples/peano_arith.txt](../examples/peano_arith.txt) and [examples/group.txt](../examples/group.txt), which proves
 theorems of group theory from the group axioms by [completion](#completion).
@@ -89,19 +90,25 @@ induct x, y # plus(x, y) = plus(y, x)
 - The cases are the patterns of the rules of the function applied to `x` (a cover set): `_0` and `suc(x')` for
   `plus`. A case is proven if both sides rewrite to the same normal form. The induction hypothesis for every variable
   of the pattern, such as `plus(x', _0) = x'`, is used as an extra rewrite rule in that case.
+- If the sides of a case have different normal forms, the case is generalised into a lemma: the variables and
+  Skolem constants such as `x'` become variables. The lemma is proven by induction on one of its variables, using
+  the definitions and proven lemmas but not the induction hypotheses, and becomes a rewrite rule. Lemmas are
+  speculated up to two levels deep. Commutativity of `plus` is proven without stating any lemma: its cases need
+  `plus(y, _0) = y` and `plus(y, suc(x)) = suc(plus(y, x))`, which are discovered.
 - A proven equation `l = r` becomes the rewrite rule `l -> r` (or `r -> l` if `l` is a variable) for the remainder of
   the formula, so it can be used as a lemma. An equation such as commutativity, which would rewrite forever, is not
-  added. In the example above, commutativity is proven using the first two theorems.
+  added. In the example above, the first two theorems are also discovered as lemmas if they are not stated.
 - `induct` is `true` if the equation is proven, and `false` if it is not. As the method is incomplete, `false` means
   "not proven" rather than "disproven", so `induct` should not be negated.
-- `forall` is not affected: it remains an exact check over the ground terms in the formula.
 
 This follows the Boyer–Moore approach (Boyer & Moore, *A Computational Logic*, 1979): the induction scheme follows the
 recursion of the definitions (cover set induction; Zhang, Kapur & Krishnamoorthy, 1988), the hypothesis is used by
 rewriting (rewriting induction; Reddy, 1990), and proven theorems become rewrite rules.
 
 Limitations:
-- Needed lemmas are not discovered and goals are not generalised: they must be stated as earlier theorems.
+- Only lemmas that generalise a stuck case are discovered. A lemma that cannot be oriented, such as a permutative
+  lemma `plus(x, plus(y, z)) = plus(y, plus(x, z))`, cannot be used as a rewrite rule, so commutativity of `times`
+  is not proven.
 - The body of `induct` must be a single equation.
 - The patterns of the rules are assumed to cover all values (sufficient completeness): the theorem is proven for the
   terms covered by the rules, i.e. `_0` and `suc(..)`.

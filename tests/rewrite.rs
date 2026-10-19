@@ -159,3 +159,25 @@ fn test_atom_substitution() -> io::Result<()> {
     )?);
     Ok(())
 }
+
+#[test]
+fn test_open_world_quantifiers() -> io::Result<()> {
+    assert!(!is_true("(forall x # p(x)) <=> p(A)")?);
+    assert!(is_true("(forall x # p(x)) => p(A)")?);
+    assert!(is_true("(forall x # p(x)) => (forall x # p(x))")?);
+    assert!(is_true("forall x # exists y # y = x")?);
+    Ok(())
+}
+
+#[test]
+fn test_recursive_rules() -> io::Result<()> {
+    let graph = "edge(A, B) -> true; edge(B, A) -> true; edge(B, C) -> true; \
+        sum x, y # reach(x, y) -> edge(x, y) | exists z # edge(x, z) & reach(z, y);";
+    assert!(is_true(&format!(
+        "{graph} reach(A, C) & reach(A, A) & -reach(C, A)"
+    ))?);
+    assert!(is_true(
+        "sum x # p(x) -> q(x) | a; sum x # q(x) -> p(x); p(A) <=> a"
+    )?);
+    Ok(())
+}

@@ -13,6 +13,7 @@ type Substitution = FxHashMap<NamedSymbol, DomainConstant>;
 type Equation = (Vec<NamedSymbol>, DomainConstant, DomainConstant);
 
 const COMPLETION_STEPS: usize = 1000;
+const LEMMA_DEPTH: usize = 2;
 
 #[derive(Clone)]
 struct Rule {
@@ -33,7 +34,8 @@ struct Universe {
 ///
 /// An application of a predicate with rules is replaced by the conjunction of the right-hand sides of all
 /// matching rules, or `false` if no rule matches. An application of a predicate without rules becomes a
-/// boolean variable. Quantifiers over variables used as terms range over all ground terms in the formula.
+/// boolean variable, and an application that depends on itself is the least fixpoint of its rules. Quantifiers over
+/// variables used as terms range over all ground terms in the formula and an arbitrary constant for every variable.
 /// A quantifier over an atom pattern such as `p(A, _)` ranges over the boolean variables of the atoms in its body
 /// that match the pattern, where `_` matches any term.
 ///
@@ -43,14 +45,17 @@ struct Universe {
 /// completion if possible, in which case this decides equality in the equational theory of the rules.
 ///
 /// `induct x, .. # l = r` proves an equation by induction on `x`, using the patterns of the rules defining a function
-/// applied to `x` as cases and the induction hypotheses as rewrite rules. It is `true` if every case is proven and
-/// `false` otherwise. A proven equation becomes a rewrite rule for the remainder of the formula.
+/// applied to `x` as cases and the induction hypotheses as rewrite rules. A case that does not rewrite to an identity
+/// is generalised into a lemma and proven by induction first. It is `true` if every case is proven and `false`
+/// otherwise. A proven equation becomes a rewrite rule for the remainder of the formula.
 pub struct Rewriter<'a> {
     rules: &'a [Rule],
     term_rules: Vec<Rule>,
     definitions: usize,
     skolems: usize,
-    universe: &'a [DomainConstant],
+    universe: Vec<DomainConstant>,
+    arbitrary: FxHashMap<NamedSymbol, DomainConstant>,
+    recursive: FxHashMap<DomainConstant, NamedSymbol>,
     atoms: FxHashMap<DomainConstant, NamedSymbol>,
     // the atom of every variable introduced by the rewriter, indexed by id - base_id
     grounds: Vec<DomainConstant>,
@@ -101,7 +106,9 @@ impl Rewriter<'_> {
             definitions: term_rules.len(),
             term_rules,
             skolems: 0,
-            universe: &terms,
+            universe: terms,
+            arbitrary: FxHashMap::default(),
+            recursive: FxHashMap::default(),
             atoms: FxHashMap::default(),
             grounds: Vec::new(),
             base_id: parsed.vars.iter().map(|v| v.id + 1).max().unwrap_or(0),
@@ -138,7 +145,7 @@ impl Rewriter<'_> {
                     return Err(invalid("the body of an induction must be an equation"));
                 };
                 let (l, r) = (term(l, theta)?, term(r, theta)?);
-                if !self.induct(vars, &l, &r)? {
+                if !self.induct(vars, &l, &r, LEMMA_DEPTH)? {
                     return Ok(SymbolicBDD::False);
                 }
                 self.term_rules.extend(orient(&l, &r, vars));
@@ -213,15 +220,28 @@ impl Rewriter<'_> {
             return self.expand(body, theta);
         };
 
+        let open = v.name.as_str() != "_";
+        if open {
+            if !self.arbitrary.contains_key(v) {
+                let constant = DomainConstant::Terminal(self.skolem(v));
+                self.arbitrary.insert(v.clone(), constant);
+            }
+            self.universe.push(self.arbitrary[v].clone());
+        }
+
         let mut instances = Vec::with_capacity(self.universe.len());
-        for value in self.universe {
-            let previous = theta.insert(v.clone(), value.clone());
+        for i in 0..self.universe.len() {
+            let value = self.universe[i].clone();
+            let previous = theta.insert(v.clone(), value);
             let instance = self.expand_domain(q, rest, body, theta);
             match previous {
                 Some(previous) => theta.insert(v.clone(), previous),
                 None => theta.remove(v),
             };
             instances.push(instance?);
+        }
+        if open {
+            self.universe.pop();
         }
 
         Ok(match q {
@@ -241,7 +261,11 @@ impl Rewriter<'_> {
         }
 
         if !self.expanding.insert(ground.clone()) {
-            return Ok(SymbolicBDD::False);
+            if !self.recursive.contains_key(&ground) {
+                let x = self.skolem(&ground);
+                self.recursive.insert(ground.clone(), x);
+            }
+            return Ok(SymbolicBDD::Var(self.recursive[&ground].clone()));
         }
 
         let mut bodies = Vec::new();
@@ -254,10 +278,14 @@ impl Rewriter<'_> {
 
         self.expanding.remove(&ground);
 
-        Ok(if bodies.is_empty() {
+        let body = if bodies.is_empty() {
             SymbolicBDD::False
         } else {
             join(BinaryOperator::And, bodies)
+        };
+        Ok(match self.recursive.remove(&ground) {
+            Some(x) => SymbolicBDD::FixedPoint(x, false, Box::new(body)),
+            None => body,
         })
     }
 
@@ -268,6 +296,7 @@ impl Rewriter<'_> {
         vars: &[NamedSymbol],
         l: &DomainConstant,
         r: &DomainConstant,
+        depth: usize,
     ) -> io::Result<bool> {
         let (x, rest) = vars
             .split_first()
@@ -303,19 +332,68 @@ impl Rewriter<'_> {
                 .filter_map(|s| orient(&at(l, s), &at(r, s), rest))
                 .collect();
 
-            let n = self.term_rules.len();
-            self.term_rules.extend(hypotheses);
-            let proven = normalize(&at(l, &case), &self.term_rules)
-                .and_then(|l| Ok(l == normalize(&at(r, &case), &self.term_rules)?));
-            self.term_rules.truncate(n);
-            if !proven? {
+            let (cl, cr) = self.normalize_with(&hypotheses, &at(l, &case), &at(r, &case))?;
+            if cl == cr {
+                continue;
+            }
+            let generalised: Vec<_> = skolems
+                .values()
+                .filter_map(|s| match s {
+                    DomainConstant::Terminal(v) => Some(v),
+                    _ => None,
+                })
+                .chain(rest)
+                .filter(|v| contains(&cl, v) || contains(&cr, v))
+                .cloned()
+                .collect();
+            if depth == 0 || !self.speculate(&generalised, &cl, &cr, depth - 1)? {
+                return Ok(false);
+            }
+            let (cl, cr) = self.normalize_with(&hypotheses, &cl, &cr)?;
+            if cl != cr {
                 return Ok(false);
             }
         }
         Ok(true)
     }
 
-    fn skolem(&mut self, v: &NamedSymbol) -> NamedSymbol {
+    fn normalize_with(
+        &mut self,
+        hypotheses: &[Rule],
+        l: &DomainConstant,
+        r: &DomainConstant,
+    ) -> io::Result<(DomainConstant, DomainConstant)> {
+        let n = self.term_rules.len();
+        self.term_rules.extend_from_slice(hypotheses);
+        let normal =
+            normalize(l, &self.term_rules).and_then(|l| Ok((l, normalize(r, &self.term_rules)?)));
+        self.term_rules.truncate(n);
+        normal
+    }
+
+    /// Prove `l = r` as a lemma by induction on any of the variables, and add it as a rewrite rule
+    fn speculate(
+        &mut self,
+        vars: &[NamedSymbol],
+        l: &DomainConstant,
+        r: &DomainConstant,
+        depth: usize,
+    ) -> io::Result<bool> {
+        let Some(lemma) = orient(l, r, vars) else {
+            return Ok(false);
+        };
+        for i in 0..vars.len() {
+            let mut order = vars.to_vec();
+            order.rotate_left(i);
+            if self.induct(&order, l, r, depth)? {
+                self.term_rules.push(lemma);
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    fn skolem(&mut self, v: &impl std::fmt::Display) -> NamedSymbol {
         self.skolems += 1;
         NamedSymbol {
             name: Rc::new(format!("{v}'")),

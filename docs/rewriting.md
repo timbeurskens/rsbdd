@@ -23,10 +23,25 @@ has_color(H1, Red)
   in the left-hand side of the rule.
 - `t1 = t2` holds if both terms are identical.
 - A proposition `p(..)` for which rules exist is rewritten to the conjunction of the right-hand sides of all matching
-  rules. If no rule matches, or the rewriting is cyclic, the proposition is false.
+  rules. If no rule matches, the proposition is false.
+- A proposition that depends on itself, such as `reach(x, y)` below, is the least fixpoint of its rules: the
+  smallest interpretation that satisfies them, as in Datalog. Recursion must be positive (not through a negation),
+  like the transformer of a [fixed point](syntax.md#fixed-points); otherwise the computation does not terminate.
+
+  ```
+  edge(A, B) -> true;
+  edge(B, A) -> true;
+  edge(B, C) -> true;
+  sum x, y # reach(x, y) -> edge(x, y) | exists z # edge(x, z) & reach(z, y);
+
+  reach(A, C) & reach(A, A) & -reach(C, A)
+  ```
 - A proposition without any rules is an unknown: every distinct proposition, such as `has_color(H1, Red)`, becomes a
   boolean variable for the solver.
-- `forall` and `exists` over a variable used as a term range over all ground terms occurring in the formula.
+- `forall` and `exists` over a variable `x` used as a term range over all ground terms occurring in the formula, and
+  over an arbitrary constant `x'` that stands for every other element. `forall x # p(x)` therefore also requires the
+  unknown `p(x')`, so it does not follow from `p(A)` alone. A guard such as `forall h # house(h) => ...` excludes the
+  arbitrary constant, as no rule matches `house(h')`. Every `_` in a substitution only ranges over the ground terms.
 - `forall` and `exists` over an atom, such as `exists color(H1, _) # ...`, quantify the boolean variables of the
   unknowns in their body that match the atom, where `_` matches any term. This quantifies over the interpretation of
   a function: `exists color(H1, _)` asks for some color of house `H1`. The atom may contain pattern variables of the
