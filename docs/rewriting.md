@@ -27,6 +27,10 @@ has_color(H1, Red)
 - A proposition without any rules is an unknown: every distinct proposition, such as `has_color(H1, Red)`, becomes a
   boolean variable for the solver.
 - `forall` and `exists` over a variable used as a term range over all ground terms occurring in the formula.
+- `forall` and `exists` over an atom, such as `exists color(H1, _) # ...`, quantify the boolean variables of the
+  unknowns in their body that match the atom, where `_` matches any term. This quantifies over the interpretation of
+  a function: `exists color(H1, _)` asks for some color of house `H1`. The atom may contain pattern variables of the
+  enclosing rule, as in `sum w # f(w) -> forall color(other(w), _) # ...`.
 - Rewrite rules must be top-level conjuncts of the formula.
 
 The parse tree (`-p`) shows the formula after rewriting. For the example above, the rules are gone, the `forall` is

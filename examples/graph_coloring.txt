@@ -1,27 +1,34 @@
-"for a graph with 4 vertices and 3 colors, in which every vertex has a single color"
-[a1, a2, a3] = 1 &
-[b1, b2, b3] = 1 &
-[c1, c2, c3] = 1 &
-[d1, d2, d3] = 1 &
-
 "
-the following vertices are connected (undirected planar graph)
-a <-> b
-b <-> c
-b <-> d
-c <-> d
+Color a graph with 4 vertices and 3 colors, such that connected vertices have different colors.
 
-the connected vertices must not have the same color
+The following vertices are connected (undirected planar graph):
+    A <-> B
+    B <-> C
+    B <-> D
+    C <-> D
+
+The color of a vertex is a function: the unknowns color(v, c) state that vertex v has color c.
+
+Run with:
+    rsbdd examples/graph_coloring.txt -t -ft
 "
 
-"a <-> b"
--(a1 & b1) & -(a2 & b2) & -(a3 & b3) &
+vertex(A) -> true;
+vertex(B) -> true;
+vertex(C) -> true;
+vertex(D) -> true;
 
-"b <-> c"
--(b1 & c1) & -(b2 & c2) & -(b3 & c3) &
+is_color(Red) -> true;
+is_color(Green) -> true;
+is_color(Blue) -> true;
 
-"b <-> d"
--(b1 & d1) & -(b2 & d2) & -(b3 & d3) &
+edge(A, B) -> true;
+edge(B, C) -> true;
+edge(B, D) -> true;
+edge(C, D) -> true;
 
-"c <-> d"
--(c1 & d1) & -(c2 & d2) & -(c3 & d3)
+"Every vertex has exactly one color"
+forall v # vertex(v) => exists c # is_color(c) & color(v, c) & forall c2 # is_color(c2) & color(v, c2) => c2 = c;
+
+"Connected vertices have different colors"
+forall v, w, c # edge(v, w) & is_color(c) => -(color(v, c) & color(w, c))

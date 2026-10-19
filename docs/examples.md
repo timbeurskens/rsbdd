@@ -256,33 +256,52 @@ and August 14, 15, 17. She tells Albert only the month and Bernard only the day.
 2) Bernard: At first I didn't know when Cheryl's birthday is, but I know now.
 3) Albert: Then I also know when Cheryl's birthday is.
 
-[examples/cheryl.txt](../examples/cheryl.txt) turns every statement into a rewrite rule that narrows down the set of
-candidate dates. The right-hand sides use quantifiers and term equality (`m2 = m`):
+In [examples/cheryl.txt](../examples/cheryl.txt), the month and day of a date `w` are functions, interpreted by the
+solver: like `val(v, n)` in [examples/peano_solve.txt](../examples/peano_solve.txt), the unknowns `month(w, m)` and
+`day(w, d)` state that the month of `w` is `m` and the day of `w` is `d`. Cheryl's birthday is the date `Cheryl`.
+
+Someone knows the birthday `w` if every candidate date they cannot tell apart from `w` is `w` itself. The other
+candidate is the date `other(w)`, and "every candidate" is a quantifier over the interpretation of its month and day:
+`forall month(other(w), _), day(other(w), _)`. Every statement keeps the candidate dates for which it is true.
 
 ```
 date(May, D15) -> true;
 ...
 date(August, D17) -> true;
 
-sum m # bernard_unsure(m) -> forall d # date(m, d) => exists m2 # -(m2 = m) & date(m2, d);
-sum m, d # s1(m, d) -> date(m, d) & bernard_unsure(m);
-sum m, d # s2(m, d) -> s1(m, d) & forall m2 # s1(m2, d) => m2 = m;
-sum m, d # s3(m, d) -> s2(m, d) & forall d2 # s2(m, d2) => d2 = d;
+sum w # candidate(List, w) ->
+    exists m, d # date(m, d) & month(w, m) & day(w, d) &
+        forall m2, d2 # date(m2, d2) => (month(w, m2) => m2 = m) & (day(w, d2) => d2 = d);
 
-forall m, d # date(m, d) => (birthday(m, d) <=> s3(m, d))
+sum w, v # same_month(w, v) -> exists m, d # date(m, d) & month(w, m) & month(v, m);
+sum w, v # same_day(w, v) -> exists m, d # date(m, d) & day(w, d) & day(v, d);
+sum w, v # indistinguishable(Albert, w, v) -> same_month(w, v);
+sum w, v # indistinguishable(Bernard, w, v) -> same_day(w, v);
+
+sum p, s, w # knows(p, s, w) ->
+    forall month(other(w), _), day(other(w), _) #
+        candidate(s, other(w)) & indistinguishable(p, w, other(w)) => same_month(w, other(w)) & same_day(w, other(w));
+
+sum w # candidate(S1, w) ->
+    candidate(List, w) & -knows(Albert, List, w) &
+    forall month(other(w), _), day(other(w), _) #
+        candidate(List, other(w)) & indistinguishable(Albert, w, other(w)) => -knows(Bernard, List, other(w));
+sum w # candidate(S2, w) -> candidate(S1, w) & -knows(Bernard, List, w) & knows(Bernard, S1, w);
+sum w # candidate(S3, w) -> candidate(S2, w) & knows(Albert, S2, w);
+
+candidate(S3, Cheryl)
 ```
 
-- `s1`: May and June contain a day that occurs only once (the 19th and the 18th), so Albert's month is July or August.
-- `s2`: the 14th occurs in both remaining months, so Bernard's day is not the 14th.
-- `s3`: August still has two dates left, so Albert's month is July.
+The rewriter only grounds the rules; the knowledge of Albert and Bernard is computed by quantification over the BDD.
 
 ```bash
 rsbdd examples/cheryl.txt -t -ft
 ```
 
-The truth table has a single row, in which only `birthday(July, D16)` is true: Cheryl's birthday is July 16.
+The truth table has a single row, in which only `month(Cheryl, July)` and `day(Cheryl, D16)` are true: Cheryl's
+birthday is July 16.
 
-The BDD, obtained with `rsbdd examples/cheryl.txt -c true -d cheryl.dot`, omits the nine dates that cannot be the
-birthday, leaving a single choice:
+The BDD, obtained with `rsbdd examples/cheryl.txt -c true -d cheryl.dot`, omits the months and days that cannot be
+the birthday, leaving a single choice:
 
 ![cheryl bdd](images/cheryl_bdd.svg)

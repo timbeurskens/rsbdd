@@ -123,3 +123,26 @@ fn test_induction() -> io::Result<()> {
     assert!(evaluate(&format!("{plus} induct x # plus(x, _0) => x")).is_err());
     Ok(())
 }
+
+#[test]
+fn test_atom_quantification() -> io::Result<()> {
+    assert!(is_true("exists p(_) # p(A) & -p(B)")?);
+    assert!(is_false("forall p(_) # p(A) | p(B)")?);
+    assert!(is_true("forall p(A) # p(A) | -p(A)")?);
+    assert!(is_true("(forall p(A) # p(A) | p(B)) <=> p(B)")?);
+    assert!(is_true(
+        "sum w # f(w) -> exists v(g(w), _) # v(g(w), A) & -v(w, A); f(W) <=> -v(W, A)"
+    )?);
+    assert!(evaluate("induct p(_) # A = A").is_err());
+    Ok(())
+}
+
+#[test]
+fn test_cheryl() -> io::Result<()> {
+    let puzzle = fs::read_to_string("examples/cheryl.txt")?;
+    assert!(!is_false(&puzzle)?);
+    assert!(is_false(&format!(
+        "{puzzle}; -(month(Cheryl, July) & day(Cheryl, D16))"
+    ))?);
+    Ok(())
+}

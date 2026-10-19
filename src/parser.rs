@@ -108,6 +108,16 @@ impl Display for DomainConstant {
     }
 }
 
+impl Display for QuantifierType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Exists => "exists",
+            Self::Forall => "forall",
+            Self::Induction => "induct",
+        })
+    }
+}
+
 impl Display for BinaryOperator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
@@ -144,14 +154,9 @@ impl Display for SymbolicBDD {
             Self::True => write!(f, "true"),
             Self::Var(v) => write!(f, "{}", v),
             Self::Not(e) => write!(f, "-({})", e),
-            Self::Quantifier(QuantifierType::Exists, vars, e) => {
-                write!(f, "(exists {} # {})", vars.iter().join(", "), e)
-            }
-            Self::Quantifier(QuantifierType::Forall, vars, e) => {
-                write!(f, "(forall {} # {})", vars.iter().join(", "), e)
-            }
-            Self::Quantifier(QuantifierType::Induction, vars, e) => {
-                write!(f, "(induct {} # {})", vars.iter().join(", "), e)
+            Self::Quantifier(q, vars, e) => write!(f, "({} {} # {})", q, vars.iter().join(", "), e),
+            Self::AtomQuantifier(q, atoms, e) => {
+                write!(f, "({} {} # {})", q, atoms.iter().join(", "), e)
             }
             Self::CountableConst(op, es, n) => {
                 write!(f, "([{}] {} {})", es.iter().join(", "), op, n)
@@ -184,6 +189,8 @@ pub enum SymbolicBDD {
     Var(NamedSymbol),
     Not(Box<Self>),
     Quantifier(QuantifierType, Vec<NamedSymbol>, Box<Self>),
+    // quantification over the open atoms matching the given patterns, in which `_` matches any term
+    AtomQuantifier(QuantifierType, Vec<DomainConstant>, Box<Self>),
     CountableConst(CountableOperator, Vec<Self>, usize),
     CountableVariable(CountableOperator, Vec<Self>, Vec<Self>),
     // the fixed-point operator with a single transformer variable, initial value (as bool), and the transformer function as a symbolic bdd description
@@ -308,7 +315,9 @@ impl ParsedFormula {
             | SymbolicBDD::False
             | SymbolicBDD::Subtree(_)
             | SymbolicBDD::Var(_) => formula.clone(),
-            SymbolicBDD::Summation(_, _) | SymbolicBDD::RuleApplication(_) => {
+            SymbolicBDD::Summation(_, _)
+            | SymbolicBDD::RuleApplication(_)
+            | SymbolicBDD::AtomQuantifier(_, _, _) => {
                 unreachable!("removed by the rewriter")
             }
         }
@@ -388,6 +397,7 @@ impl ParsedFormula {
         match formula {
             SymbolicBDD::Summation(_, _)
             | SymbolicBDD::RuleApplication(_)
+            | SymbolicBDD::AtomQuantifier(_, _, _)
             | SymbolicBDD::BinaryOp(BinaryOperator::Rewrite | BinaryOperator::Equals, _, _) => true,
             SymbolicBDD::Reference(name) => matches!(
                 self.get_definition(name),
@@ -425,7 +435,9 @@ impl ParsedFormula {
             SymbolicBDD::FixedPoint(v, _, f) => v != var && self.var_is_free(f, var),
             SymbolicBDD::Subtree(_t) => unimplemented!(),
             SymbolicBDD::True | SymbolicBDD::False => false,
-            SymbolicBDD::Summation(_, _) | SymbolicBDD::RuleApplication(_) => {
+            SymbolicBDD::Summation(_, _)
+            | SymbolicBDD::RuleApplication(_)
+            | SymbolicBDD::AtomQuantifier(_, _, _) => {
                 unreachable!("removed by the rewriter")
             }
             SymbolicBDD::Reference(name) => {
@@ -521,6 +533,7 @@ impl ParsedFormula {
             ),
             SymbolicBDD::Summation(_, _)
             | SymbolicBDD::RuleApplication(_)
+            | SymbolicBDD::AtomQuantifier(_, _, _)
             | SymbolicBDD::Quantifier(QuantifierType::Induction, _, _) => {
                 unreachable!("removed by the rewriter")
             }
@@ -547,6 +560,7 @@ impl SymbolicBDD {
         match self {
             Self::Not(f)
             | Self::Quantifier(_, _, f)
+            | Self::AtomQuantifier(_, _, f)
             | Self::FixedPoint(_, _, f)
             | Self::Summation(_, f) => vec![f],
             Self::BinaryOp(_, l, r) => vec![l, r],
@@ -842,26 +856,17 @@ impl SymbolicBDD {
         }
     }
 
-    fn parse_variable_list(tokens: &mut TokenReader) -> io::Result<Vec<NamedSymbol>> {
-        let mut vars = Vec::new();
-
-        loop {
-            if check(SymbolicBDDToken::Hash, tokens).is_err() {
-                vars.push(Self::parse_ident(tokens)?);
-
-                // if no comma is found after the variable, the list should end with a closing hash
-                if check(SymbolicBDDToken::Comma, tokens).is_err() {
-                    break;
-                } else {
-                    // otherwise expect a comma
-                    expect(SymbolicBDDToken::Comma, tokens)?;
-                }
-            } else {
+    // parse the binders of a quantifier or summation up to the closing hash: variables or atom patterns
+    fn parse_binder_list(tokens: &mut TokenReader) -> io::Result<Vec<DomainConstant>> {
+        let mut binders = Vec::new();
+        while check(SymbolicBDDToken::Hash, tokens).is_err() {
+            binders.push(Self::parse_domain_constant(tokens)?);
+            if !eat(SymbolicBDDToken::Comma, tokens) {
                 break;
             }
         }
-
-        Ok(vars)
+        expect(SymbolicBDDToken::Hash, tokens)?;
+        Ok(binders)
     }
 
     fn parse_fixed_point(tokens: &mut TokenReader, initial: bool) -> io::Result<Self> {
@@ -893,19 +898,48 @@ impl SymbolicBDD {
         q: QuantifierType,
     ) -> io::Result<Self> {
         expect(token, tokens)?;
-        let vars = Self::parse_variable_list(tokens)?;
 
-        expect(SymbolicBDDToken::Hash, tokens)?;
-        let formula = Self::parse_sub_formula(tokens)?;
+        // a binder is either a variable or an atom pattern such as p(A, _)
+        let mut vars = Vec::new();
+        let mut atoms = Vec::new();
+        for binder in Self::parse_binder_list(tokens)? {
+            match binder {
+                DomainConstant::Terminal(v) => vars.push(v),
+                atom => atoms.push(atom),
+            }
+        }
+
+        let mut formula = Self::parse_sub_formula(tokens)?;
+
+        if !atoms.is_empty() {
+            if q == QuantifierType::Induction {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "an induction cannot range over atoms",
+                ));
+            }
+            formula = Self::AtomQuantifier(q, atoms, Box::new(formula));
+            if vars.is_empty() {
+                return Ok(formula);
+            }
+        }
 
         Ok(Self::Quantifier(q, vars, Box::new(formula)))
     }
 
     fn parse_summation(tokens: &mut TokenReader) -> io::Result<Self> {
         expect(SymbolicBDDToken::Sum, tokens)?;
-        let vars = Self::parse_variable_list(tokens)?;
+        let vars = Self::parse_binder_list(tokens)?
+            .into_iter()
+            .map(|binder| match binder {
+                DomainConstant::Terminal(v) => Ok(v),
+                atom => Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Expected variable in summation, got {atom}"),
+                )),
+            })
+            .collect::<io::Result<_>>()?;
 
-        expect(SymbolicBDDToken::Hash, tokens)?;
         let formula = Self::parse_sub_formula(tokens)?;
 
         Ok(Self::Summation(vars, Box::new(formula)))

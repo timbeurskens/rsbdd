@@ -34,6 +34,8 @@ struct Universe {
 /// An application of a predicate with rules is replaced by the conjunction of the right-hand sides of all
 /// matching rules, or `false` if no rule matches. An application of a predicate without rules becomes a
 /// boolean variable. Quantifiers over variables used as terms range over all ground terms in the formula.
+/// A quantifier over an atom pattern such as `p(A, _)` ranges over the boolean variables of the atoms in its body
+/// that match the pattern, where `_` matches any term.
 ///
 /// A rule for a function symbol (a symbol used inside a term or as an operand of `=`) is a term rule: its right-hand
 /// side is a term. Terms are rewritten to normal form before they are compared, matched or turned into variables,
@@ -50,6 +52,8 @@ pub struct Rewriter<'a> {
     skolems: usize,
     universe: &'a [DomainConstant],
     atoms: FxHashMap<DomainConstant, NamedSymbol>,
+    // the atom of every variable introduced by the rewriter, indexed by id - base_id
+    grounds: Vec<DomainConstant>,
     base_id: usize,
     expanding: FxHashSet<DomainConstant>,
 }
@@ -99,6 +103,7 @@ impl Rewriter<'_> {
             skolems: 0,
             universe: &terms,
             atoms: FxHashMap::default(),
+            grounds: Vec::new(),
             base_id: parsed.vars.iter().map(|v| v.id + 1).max().unwrap_or(0),
             expanding: FxHashSet::default(),
         };
@@ -143,12 +148,19 @@ impl Rewriter<'_> {
                 let (domain, boolean): (Vec<_>, Vec<_>) =
                     vars.iter().cloned().partition(|v| occurs_as_term(body, v));
                 let expanded = self.expand_domain(*q, &domain, body, &mut theta.clone())?;
-
-                if boolean.is_empty() {
-                    expanded
-                } else {
-                    SymbolicBDD::Quantifier(*q, boolean, Box::new(expanded))
-                }
+                quantify(*q, boolean, expanded)
+            }
+            SymbolicBDD::AtomQuantifier(q, patterns, body) => {
+                let body = self.expand(body, theta)?;
+                let patterns: Vec<_> = patterns
+                    .iter()
+                    .map(|p| normalize(&subst(p, theta), &self.term_rules))
+                    .collect::<io::Result<_>>()?;
+                let mut vars = Vec::new();
+                self.matching_atoms(&body, &patterns, &mut vars);
+                vars.sort_by_key(|v| v.id);
+                vars.dedup();
+                quantify(*q, vars, body)
             }
             SymbolicBDD::Not(f) => match expand(f)? {
                 SymbolicBDD::True => SymbolicBDD::False,
@@ -312,14 +324,44 @@ impl Rewriter<'_> {
     }
 
     fn atom(&mut self, ground: DomainConstant) -> NamedSymbol {
-        let id = self.base_id + self.atoms.len();
-        self.atoms
-            .entry(ground)
-            .or_insert_with_key(|ground| NamedSymbol {
-                name: Rc::new(ground.to_string()),
-                id,
-            })
-            .clone()
+        if let Some(v) = self.atoms.get(&ground) {
+            return v.clone();
+        }
+        let v = NamedSymbol {
+            name: Rc::new(ground.to_string()),
+            id: self.base_id + self.grounds.len(),
+        };
+        self.grounds.push(ground.clone());
+        self.atoms.insert(ground, v.clone());
+        v
+    }
+
+    /// Collect the variables in a formula of the atoms matching one of the patterns
+    fn matching_atoms(
+        &self,
+        formula: &SymbolicBDD,
+        patterns: &[DomainConstant],
+        vars: &mut Vec<NamedSymbol>,
+    ) {
+        match formula {
+            SymbolicBDD::Var(v) => {
+                let atom =
+                    v.id.checked_sub(self.base_id)
+                        .and_then(|i| self.grounds.get(i));
+                if atom.is_some_and(|atom| {
+                    patterns
+                        .iter()
+                        .any(|p| match_pattern(p, atom, &[], &mut Substitution::default()))
+                }) {
+                    vars.push(v.clone());
+                }
+            }
+            other => {
+                for c in other.children() {
+                    self.matching_atoms(c, patterns, vars);
+                }
+            }
+        }
     }
 }
 
@@ -335,6 +377,9 @@ fn inline(parsed: &ParsedFormula, formula: &SymbolicBDD) -> SymbolicBDD {
         },
         SymbolicBDD::Not(f) => SymbolicBDD::Not(boxed(f)),
         SymbolicBDD::Quantifier(q, vars, f) => SymbolicBDD::Quantifier(*q, vars.clone(), boxed(f)),
+        SymbolicBDD::AtomQuantifier(q, atoms, f) => {
+            SymbolicBDD::AtomQuantifier(*q, atoms.clone(), boxed(f))
+        }
         SymbolicBDD::Summation(vars, f) => SymbolicBDD::Summation(vars.clone(), boxed(f)),
         SymbolicBDD::FixedPoint(v, i, f) => SymbolicBDD::FixedPoint(v.clone(), *i, boxed(f)),
         SymbolicBDD::BinaryOp(op, l, r) => SymbolicBDD::BinaryOp(*op, boxed(l), boxed(r)),
@@ -411,6 +456,15 @@ fn occurs_as_term(formula: &SymbolicBDD, v: &NamedSymbol) -> bool {
             true
         }
         other => other.children().into_iter().any(|c| occurs_as_term(c, v)),
+    }
+}
+
+/// `q vars # body`, or `body` if there are no variables
+fn quantify(q: QuantifierType, vars: Vec<NamedSymbol>, body: SymbolicBDD) -> SymbolicBDD {
+    if vars.is_empty() {
+        body
+    } else {
+        SymbolicBDD::Quantifier(q, vars, Box::new(body))
     }
 }
 
@@ -526,6 +580,7 @@ fn match_pattern(
     sigma: &mut Substitution,
 ) -> bool {
     match (pattern, ground) {
+        (DomainConstant::Terminal(v), _) if v.name.as_str() == "_" => true,
         (DomainConstant::Terminal(v), _) if vars.contains(v) => {
             sigma.entry(v.clone()).or_insert_with(|| ground.clone()) == ground
         }
