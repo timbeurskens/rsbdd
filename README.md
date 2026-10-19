@@ -32,5 +32,6 @@ rsbdd -e "a & -b" -t
    - [Theorem proving by term rewriting](docs/theorem_proving.md#theorem-proving-by-term-rewriting)
    - [Completion](docs/theorem_proving.md#completion)
    - [Proofs by induction](docs/theorem_proving.md#proofs-by-induction)
+   - [First-order proofs](docs/theorem_proving.md#first-order-proofs)
 5. [Examples](docs/examples.md): transitivity, the 4 queens problem, model checking Peterson's protocol, a simplified Einstein riddle
 6. [CLI usage](docs/cli.md): `rsbdd`, `max_clique_gen`, `random_graph_gen`, `n_queens_gen`, `sudoku_gen`

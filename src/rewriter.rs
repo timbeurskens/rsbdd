@@ -9,25 +9,48 @@ use crate::parser::{
     BinaryOperator, DomainConstant, ParsedFormula, QuantifierType, ReferenceContents, SymbolicBDD,
 };
 
-type Substitution = FxHashMap<NamedSymbol, DomainConstant>;
+pub(crate) type Substitution = FxHashMap<NamedSymbol, DomainConstant>;
 type Equation = (Vec<NamedSymbol>, DomainConstant, DomainConstant);
 
 const COMPLETION_STEPS: usize = 1000;
 const LEMMA_DEPTH: usize = 2;
 
 #[derive(Clone)]
-struct Rule {
-    vars: Vec<NamedSymbol>,
-    lhs: DomainConstant,
-    rhs: SymbolicBDD,
+pub(crate) struct Rule {
+    pub(crate) vars: Vec<NamedSymbol>,
+    pub(crate) lhs: DomainConstant,
+    pub(crate) rhs: SymbolicBDD,
 }
 
 /// Ground terms in order of first occurrence
 #[derive(Default)]
-struct Universe {
+pub(crate) struct Universe {
     terms: Vec<DomainConstant>,
     seen: FxHashSet<DomainConstant>,
-    functions: FxHashSet<NamedSymbol>,
+    pub(crate) functions: FxHashSet<NamedSymbol>,
+}
+
+/// The rewrite rules and remaining formula of a parsed formula, with the ground terms and function symbols in them
+pub(crate) fn split_rules(
+    parsed: &ParsedFormula,
+) -> io::Result<(Vec<Rule>, SymbolicBDD, Universe)> {
+    let mut rules = Vec::new();
+    let mut conjuncts = Vec::new();
+    split(
+        &inline(parsed, &parsed.bdd),
+        &[],
+        &mut rules,
+        &mut conjuncts,
+    )?;
+    let formula = join(BinaryOperator::And, conjuncts);
+
+    let mut universe = Universe::default();
+    for rule in &rules {
+        add_args(&rule.lhs, &rule.vars, &mut universe);
+        collect_terms(&rule.rhs, &rule.vars, &mut universe);
+    }
+    collect_terms(&formula, &[], &mut universe);
+    Ok((rules, formula, universe))
 }
 
 /// Grounds rewrite rules into a plain formula.
@@ -66,22 +89,7 @@ pub struct Rewriter<'a> {
 impl Rewriter<'_> {
     /// Rewrite the parsed formula, returning the ground formula and the variables introduced for open atoms
     pub fn rewrite(parsed: &ParsedFormula) -> io::Result<(SymbolicBDD, Vec<NamedSymbol>)> {
-        let mut rules = Vec::new();
-        let mut conjuncts = Vec::new();
-        split(
-            &inline(parsed, &parsed.bdd),
-            &[],
-            &mut rules,
-            &mut conjuncts,
-        )?;
-        let formula = join(BinaryOperator::And, conjuncts);
-
-        let mut universe = Universe::default();
-        for rule in &rules {
-            add_args(&rule.lhs, &rule.vars, &mut universe);
-            collect_terms(&rule.rhs, &rule.vars, &mut universe);
-        }
-        collect_terms(&formula, &[], &mut universe);
+        let (rules, formula, mut universe) = split_rules(parsed)?;
 
         let (term_rules, rules): (Vec<_>, Vec<_>) = rules.into_iter().partition(|rule| {
             matches!(&rule.lhs, DomainConstant::Application(f, _) if universe.functions.contains(f))
@@ -523,7 +531,7 @@ fn split(
     }
 }
 
-fn occurs_as_term(formula: &SymbolicBDD, v: &NamedSymbol) -> bool {
+pub(crate) fn occurs_as_term(formula: &SymbolicBDD, v: &NamedSymbol) -> bool {
     match formula {
         SymbolicBDD::RuleApplication(t) => contains(t, v),
         SymbolicBDD::BinaryOp(BinaryOperator::Equals, l, r)
@@ -546,11 +554,11 @@ fn quantify(q: QuantifierType, vars: Vec<NamedSymbol>, body: SymbolicBDD) -> Sym
     }
 }
 
-fn invalid(message: impl Into<String>) -> io::Error {
+pub(crate) fn invalid(message: impl Into<String>) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, message.into())
 }
 
-fn join(op: BinaryOperator, items: Vec<SymbolicBDD>) -> SymbolicBDD {
+pub(crate) fn join(op: BinaryOperator, items: Vec<SymbolicBDD>) -> SymbolicBDD {
     let unit = match op {
         BinaryOperator::Or => SymbolicBDD::False,
         _ => SymbolicBDD::True,
@@ -560,7 +568,7 @@ fn join(op: BinaryOperator, items: Vec<SymbolicBDD>) -> SymbolicBDD {
         .fold(unit, |acc, item| SymbolicBDD::binop(op, acc, item))
 }
 
-fn term(operand: &SymbolicBDD, theta: &Substitution) -> io::Result<DomainConstant> {
+pub(crate) fn term(operand: &SymbolicBDD, theta: &Substitution) -> io::Result<DomainConstant> {
     match operand {
         SymbolicBDD::Var(v) => Ok(subst(&DomainConstant::Terminal(v.clone()), theta)),
         SymbolicBDD::RuleApplication(t) => Ok(subst(t, theta)),
@@ -568,7 +576,7 @@ fn term(operand: &SymbolicBDD, theta: &Substitution) -> io::Result<DomainConstan
     }
 }
 
-fn subst(t: &DomainConstant, theta: &Substitution) -> DomainConstant {
+pub(crate) fn subst(t: &DomainConstant, theta: &Substitution) -> DomainConstant {
     match t {
         DomainConstant::Terminal(v) => theta.get(v).cloned().unwrap_or_else(|| t.clone()),
         DomainConstant::Application(f, args) => {
@@ -577,7 +585,7 @@ fn subst(t: &DomainConstant, theta: &Substitution) -> DomainConstant {
     }
 }
 
-fn contains(t: &DomainConstant, v: &NamedSymbol) -> bool {
+pub(crate) fn contains(t: &DomainConstant, v: &NamedSymbol) -> bool {
     match t {
         DomainConstant::Terminal(x) => x == v,
         DomainConstant::Application(_, args) => args.iter().any(|a| contains(a, v)),
@@ -585,7 +593,7 @@ fn contains(t: &DomainConstant, v: &NamedSymbol) -> bool {
 }
 
 /// Rewrite a term to normal form, innermost first
-fn normalize(t: &DomainConstant, rules: &[Rule]) -> io::Result<DomainConstant> {
+pub(crate) fn normalize(t: &DomainConstant, rules: &[Rule]) -> io::Result<DomainConstant> {
     let t = match t {
         DomainConstant::Application(f, args) => DomainConstant::Application(
             f.clone(),
@@ -640,11 +648,11 @@ fn term_rule(vars: Vec<NamedSymbol>, lhs: DomainConstant, rhs: &DomainConstant) 
     }
 }
 
-fn same_functor(a: &DomainConstant, b: &DomainConstant) -> bool {
+pub(crate) fn same_functor(a: &DomainConstant, b: &DomainConstant) -> bool {
     matches!((a, b), (DomainConstant::Application(f, xs), DomainConstant::Application(g, ys)) if f == g && xs.len() == ys.len())
 }
 
-fn match_pattern(
+pub(crate) fn match_pattern(
     pattern: &DomainConstant,
     ground: &DomainConstant,
     vars: &[NamedSymbol],
@@ -821,7 +829,7 @@ fn rename(rule: &Rule, fresh: &mut usize) -> Equation {
     (vars, subst(&rule.lhs, &theta), rhs)
 }
 
-fn positions<'t>(
+pub(crate) fn positions<'t>(
     t: &'t DomainConstant,
     path: &mut Vec<usize>,
     out: &mut Vec<(Vec<usize>, &'t DomainConstant)>,
@@ -836,7 +844,7 @@ fn positions<'t>(
     }
 }
 
-fn replace(t: &DomainConstant, path: &[usize], s: &DomainConstant) -> DomainConstant {
+pub(crate) fn replace(t: &DomainConstant, path: &[usize], s: &DomainConstant) -> DomainConstant {
     match (t, path.split_first()) {
         (DomainConstant::Application(f, args), Some((&i, rest))) => {
             let mut args = args.clone();
@@ -847,7 +855,7 @@ fn replace(t: &DomainConstant, path: &[usize], s: &DomainConstant) -> DomainCons
     }
 }
 
-fn unify(
+pub(crate) fn unify(
     a: &DomainConstant,
     b: &DomainConstant,
     vars: &[NamedSymbol],
@@ -869,7 +877,7 @@ fn unify(
     }
 }
 
-fn resolve(t: &DomainConstant, sigma: &Substitution) -> DomainConstant {
+pub(crate) fn resolve(t: &DomainConstant, sigma: &Substitution) -> DomainConstant {
     match t {
         DomainConstant::Terminal(v) => sigma
             .get(v)
@@ -880,7 +888,7 @@ fn resolve(t: &DomainConstant, sigma: &Substitution) -> DomainConstant {
     }
 }
 
-fn size(t: &DomainConstant) -> usize {
+pub(crate) fn size(t: &DomainConstant) -> usize {
     match t {
         DomainConstant::Terminal(_) => 1,
         DomainConstant::Application(_, args) => 1 + args.iter().map(size).sum::<usize>(),
@@ -891,37 +899,38 @@ fn size(t: &DomainConstant) -> usize {
 /// by symbols of increasing arity, with unary symbols the largest. Symbols of the same arity are ordered by their first
 /// occurrence.
 fn precedence(rules: &[Rule]) -> FxHashMap<NamedSymbol, (usize, usize)> {
-    fn visit(
-        t: &DomainConstant,
-        vars: &[NamedSymbol],
-        ranks: &mut FxHashMap<NamedSymbol, (usize, usize)>,
-    ) {
-        let n = ranks.len();
-        if let Some((f, args)) = head(t, vars) {
-            let arity = if args.len() == 1 {
-                usize::MAX
-            } else {
-                args.len()
-            };
-            ranks.entry(f.clone()).or_insert((arity, n));
-            for a in args {
-                visit(a, vars, ranks);
-            }
-        }
-    }
-
     let mut ranks = FxHashMap::default();
     for rule in rules {
-        visit(&rule.lhs, &rule.vars, &mut ranks);
+        rank(&rule.lhs, &rule.vars, &mut ranks);
         if let Ok(rhs) = term(&rule.rhs, &Substitution::default()) {
-            visit(&rhs, &rule.vars, &mut ranks);
+            rank(&rhs, &rule.vars, &mut ranks);
         }
     }
     ranks
 }
 
+/// Add the symbols of a term to a precedence, see [precedence]
+pub(crate) fn rank(
+    t: &DomainConstant,
+    vars: &[NamedSymbol],
+    ranks: &mut FxHashMap<NamedSymbol, (usize, usize)>,
+) {
+    let n = ranks.len();
+    if let Some((f, args)) = head(t, vars) {
+        let arity = if args.len() == 1 {
+            usize::MAX
+        } else {
+            args.len()
+        };
+        ranks.entry(f.clone()).or_insert((arity, n));
+        for a in args {
+            rank(a, vars, ranks);
+        }
+    }
+}
+
 /// The lexicographic path order: `s > t`
-fn lpo(
+pub(crate) fn lpo(
     s: &DomainConstant,
     t: &DomainConstant,
     vars: &[NamedSymbol],
