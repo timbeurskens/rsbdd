@@ -558,14 +558,7 @@ fn term_rule(vars: Vec<NamedSymbol>, lhs: DomainConstant, rhs: &DomainConstant) 
     Rule {
         vars,
         lhs,
-        rhs: operand(rhs),
-    }
-}
-
-fn operand(t: &DomainConstant) -> SymbolicBDD {
-    match t {
-        DomainConstant::Terminal(v) => SymbolicBDD::Var(v.clone()),
-        t => SymbolicBDD::RuleApplication(t.clone()),
+        rhs: SymbolicBDD::from_term(rhs),
     }
 }
 
@@ -684,7 +677,7 @@ fn complete(rules: &[Rule]) -> Option<Vec<Rule>> {
         complete.push(rule);
         for k in 0..complete.len() {
             let rhs = term(&complete[k].rhs, &Substitution::default()).ok()?;
-            complete[k].rhs = operand(&normalize(&rhs, &complete).ok()?);
+            complete[k].rhs = SymbolicBDD::from_term(&normalize(&rhs, &complete).ok()?);
         }
         let (new, others) = complete.split_last()?;
         pending.extend(overlaps(new, others, &mut fresh));

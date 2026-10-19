@@ -31,6 +31,8 @@ has_color(H1, Red)
   unknowns in their body that match the atom, where `_` matches any term. This quantifies over the interpretation of
   a function: `exists color(H1, _)` asks for some color of house `H1`. The atom may contain pattern variables of the
   enclosing rule, as in `sum w # f(w) -> forall color(other(w), _) # ...`.
+- Substitution also replaces atoms: `f[color(H1, _) := color(H2, _)]` replaces `color(H1, c)` by `color(H2, c)` for
+  every term `c`.
 - Rewrite rules must be top-level conjuncts of the formula.
 
 The parse tree (`-p`) shows the formula after rewriting. For the example above, the rules are gone, the `forall` is
@@ -54,23 +56,21 @@ plain rsbdd formula and can be solved again, e.g. `rsbdd examples/peano_puzzle.t
 
 Rewrite rules and fixed points can be used in the same formula. The example in
 [examples/rooms.txt](../examples/rooms.txt) asks which rooms of a house can be reached from the hall. Rooms and doors are
-facts, `step(x, y)` is a rule over them, and `at(room)` maps every room to a 3-bit encoding. The least fixpoint then
-computes the set of reachable encodings, without knowing the number of steps in advance.
+facts, and `step(x, y)` is a rule over them. The location of the visitor is a function: `at(w, r)` states that in
+state `w` the visitor is in room `r`. The least fixpoint then computes the set of reachable locations, without knowing
+the number of steps in advance. The substitution renames the current location `Cur` to the previous location `Prev`.
 
 ```
-let T := exists x, y # step(x, y) & at(x)[b2 := p2, b1 := p1, b0 := p0] & at(y);
-let Reach := lfp R # at(Hall) | exists p2, p1, p0 # R[b2 := p2, b1 := p1, b0 := p0] & T;
+let T := exists x, y # step(x, y) & is_at(Prev, x) & is_at(Cur, y);
+let Reach := lfp R # is_at(Cur, Hall) | exists at(Prev, _) # R[at(Cur, _) := at(Prev, _)] & T;
 
 door(Hall, Kitchen) -> true;
 trapdoor(Attic, Hall) -> true;
 ...
 sum x, y # step(x, y) -> door(x, y) | door(y, x) | trapdoor(x, y);
+sum w, r # is_at(w, r) -> forall q # room(q) => (at(w, q) <=> q = r);
 
-at(Hall)    -> -b2 & -b1 & -b0;
-at(Kitchen) -> -b2 & -b1 &  b0;
-...
-
-forall r # room(r) => (reachable(r) <=> exists b2, b1, b0 # at(r) & Reach)
+forall r # room(r) => (reachable(r) <=> exists at(Cur, _) # is_at(Cur, r) & Reach)
 ```
 
 The trapdoor only leads from the attic to the hall, so the attic and the cellar cannot be reached.

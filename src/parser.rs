@@ -624,10 +624,9 @@ impl SymbolicBDD {
             Some(SymbolicBDDToken::Reference(_)) => {
                 Ok(Self::Reference(Self::parse_reference_name(tokens)?))
             }
-            Some(SymbolicBDDToken::Ident(_)) => match Self::parse_domain_constant(tokens)? {
-                DomainConstant::Terminal(name) => Ok(Self::Var(name)),
-                application => Ok(Self::RuleApplication(application)),
-            },
+            Some(SymbolicBDDToken::Ident(_)) => {
+                Ok(Self::from_term(&Self::parse_domain_constant(tokens)?))
+            }
             Some(SymbolicBDDToken::Not) => Self::parse_negation(tokens),
             Some(SymbolicBDDToken::Exists) => {
                 Self::parse_quantifier(tokens, SymbolicBDDToken::Exists, QuantifierType::Exists)
@@ -701,26 +700,21 @@ impl SymbolicBDD {
     }
 
     // f[x := y, ...] is rewritten to: exists x, ... # f & (x <=> y) & ...
+    // f[p(_) := q(_), ...] is rewritten to: exists p(_), ... # f & (forall _ # p(_) <=> q(_)) & ...
     fn parse_substitution(tokens: &mut TokenReader, formula: Self) -> io::Result<Self> {
         let mut targets = Vec::new();
         let mut replacements = Vec::new();
 
         loop {
-            targets.push(Self::parse_ident(tokens)?);
+            targets.push(Self::parse_domain_constant(tokens)?);
             expect(SymbolicBDDToken::Assign, tokens)?;
-            replacements.push(match tokens.next() {
-                Some(SymbolicBDDToken::Ident(v)) => Self::Var(v.clone()),
-                Some(SymbolicBDDToken::True) => Self::True,
-                Some(SymbolicBDDToken::False) => Self::False,
-                other => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Expected variable or constant in substitution, got {:?}",
-                            other
-                        ),
-                    ));
-                }
+            replacements.push(if eat(SymbolicBDDToken::True, tokens) {
+                Self::True
+            } else if eat(SymbolicBDDToken::False, tokens) {
+                Self::False
+            } else {
+                let replacement = Self::parse_domain_constant(tokens)?;
+                Self::from_term(&Self::number_wildcards(&replacement, &mut Vec::new()))
             });
 
             if !eat(SymbolicBDDToken::Comma, tokens) {
@@ -731,7 +725,7 @@ impl SymbolicBDD {
         expect(SymbolicBDDToken::CloseSquare, tokens)?;
 
         if let Some(v) = replacements.iter().find_map(|r| match r {
-            Self::Var(v) if targets.contains(v) => Some(v),
+            Self::Var(v) if targets.contains(&DomainConstant::Terminal(v.clone())) => Some(v),
             _ => None,
         }) {
             return Err(io::Error::new(
@@ -743,23 +737,52 @@ impl SymbolicBDD {
             ));
         }
 
-        let body = targets
-            .iter()
-            .zip(replacements)
-            .fold(formula, |acc, (target, replacement)| {
-                let binding = Self::BinaryOp(
-                    BinaryOperator::Iff,
-                    Box::new(Self::Var(target.clone())),
-                    Box::new(replacement),
-                );
-                Self::BinaryOp(BinaryOperator::And, Box::new(acc), Box::new(binding))
-            });
+        let mut body = formula;
+        for (target, replacement) in targets.iter().zip(replacements) {
+            let mut wildcards = Vec::new();
+            let mut binding = Self::BinaryOp(
+                BinaryOperator::Iff,
+                Box::new(Self::from_term(&Self::number_wildcards(
+                    target,
+                    &mut wildcards,
+                ))),
+                Box::new(replacement),
+            );
+            if !wildcards.is_empty() {
+                binding = Self::Quantifier(QuantifierType::Forall, wildcards, Box::new(binding));
+            }
+            body = Self::BinaryOp(BinaryOperator::And, Box::new(body), Box::new(binding));
+        }
 
-        Ok(Self::Quantifier(
-            QuantifierType::Exists,
-            targets,
-            Box::new(body),
-        ))
+        Self::quantify(QuantifierType::Exists, targets, body)
+    }
+
+    /// Replace the n-th `_` in a term by the n-th wildcard variable, shared by the target and replacement of a substitution
+    fn number_wildcards(t: &DomainConstant, wildcards: &mut Vec<NamedSymbol>) -> DomainConstant {
+        match t {
+            DomainConstant::Terminal(v) if v.name.as_str() == "_" => {
+                let w = NamedSymbol {
+                    name: v.name.clone(),
+                    id: usize::MAX / 4 + wildcards.len(),
+                };
+                wildcards.push(w.clone());
+                DomainConstant::Terminal(w)
+            }
+            DomainConstant::Terminal(_) => t.clone(),
+            DomainConstant::Application(f, args) => DomainConstant::Application(
+                f.clone(),
+                args.iter()
+                    .map(|a| Self::number_wildcards(a, wildcards))
+                    .collect(),
+            ),
+        }
+    }
+
+    pub(crate) fn from_term(t: &DomainConstant) -> Self {
+        match t {
+            DomainConstant::Terminal(name) => Self::Var(name.clone()),
+            application => Self::RuleApplication(application.clone()),
+        }
     }
 
     fn parse_ite(tokens: &mut TokenReader) -> io::Result<Self> {
@@ -898,18 +921,24 @@ impl SymbolicBDD {
         q: QuantifierType,
     ) -> io::Result<Self> {
         expect(token, tokens)?;
+        let binders = Self::parse_binder_list(tokens)?;
+        let formula = Self::parse_sub_formula(tokens)?;
+        Self::quantify(q, binders, formula)
+    }
 
-        // a binder is either a variable or an atom pattern such as p(A, _)
+    fn quantify(
+        q: QuantifierType,
+        binders: Vec<DomainConstant>,
+        mut formula: Self,
+    ) -> io::Result<Self> {
         let mut vars = Vec::new();
         let mut atoms = Vec::new();
-        for binder in Self::parse_binder_list(tokens)? {
+        for binder in binders {
             match binder {
                 DomainConstant::Terminal(v) => vars.push(v),
                 atom => atoms.push(atom),
             }
         }
-
-        let mut formula = Self::parse_sub_formula(tokens)?;
 
         if !atoms.is_empty() {
             if q == QuantifierType::Induction {

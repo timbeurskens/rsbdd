@@ -146,3 +146,16 @@ fn test_cheryl() -> io::Result<()> {
     ))?);
     Ok(())
 }
+
+#[test]
+fn test_atom_substitution() -> io::Result<()> {
+    assert!(is_true("(p(A) & -p(B))[p(_) := q(_)] <=> q(A) & -q(B)")?);
+    assert!(is_true(
+        "(p(A, B) | p(B, A))[p(A, _) := q(_)] <=> q(B) | p(B, A)"
+    )?);
+    assert!(is_true("p(A)[p(A) := q] <=> q")?);
+    assert!(is_true(
+        "(p(A, B) & -p(B, A))[p(_, _) := q(_, _)] <=> q(A, B) & -q(B, A)"
+    )?);
+    Ok(())
+}

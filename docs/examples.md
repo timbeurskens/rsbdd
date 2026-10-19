@@ -71,8 +71,10 @@ Peterson's algorithm lets two processes share a critical section using nothing b
 A process that wants to enter raises its flag and politely gives the turn to the other process. It then waits until
 the other process is not interested (its flag is down) or it is its own turn. On leaving, it lowers its flag.
 
-[examples/peterson.txt](../examples/peterson.txt) encodes the protocol as a transition system `T` over the program
-counters of both processes and the turn bit, and checks four properties using fixed points:
+[examples/peterson.txt](../examples/peterson.txt) encodes the protocol as a transition relation `step(u, v)` between
+states `u` and `v`. The program counter `pc(w, p, l)` and the turn `turn(w)` of a state `w` are functions, and the
+substitution `[pc(Cur, P0, _) := pc(Prev, P0, _), ...]` renames the current state to its predecessor. Four properties
+are checked using fixed points:
 
 - `mutex`: no reachable state has both processes in the critical section (least fixpoint for reachability)
 - `deadlock_free`: every reachable state has a successor
@@ -81,9 +83,10 @@ counters of both processes and the turn bit, and checks four properties using fi
 
 ```
 let Reach := lfp R # init |
-    (exists a1, a0, b1, b0, t # R & T)[a1' := a1, a0' := a0, b1' := b1, b0' := b0, t' := t];
+    exists pc(Prev, _, _), turn(Prev) #
+        R[pc(Cur, P0, _) := pc(Prev, P0, _), pc(Cur, P1, _) := pc(Prev, P1, _), turn(Cur) := turn(Prev)] & step(Prev, Cur);
 
-mutex <=> forall a1, a0, b1, b0, t # Reach => -(crit0 & crit1);
+mutex <=> forall pc(Cur, _, _), turn(Cur) # Reach => -(is_at(Cur, P0, Crit) & is_at(Cur, P1, Crit));
 ...
 ```
 
@@ -105,8 +108,8 @@ to true: the protocol satisfies all four.
 Suppose P0 is "optimized" to enter the critical section without checking the flag and turn of P1:
 
 ```diff
--    wait0 & (idle1 | -t) & crit0[a1 := a1', a0 := a0'] & keept |
-+    wait0 & crit0[a1 := a1', a0 := a0'] & keept |
+-    is_at(u, P0, Wait) & (is_at(u, P1, Idle) | -turn(u)) & is_at(v, P0, Crit) & keept(u, v) |
++    is_at(u, P0, Wait) & is_at(v, P0, Crit) & keept(u, v) |
 ```
 
 Running the checks again shows that mutual exclusion is violated:
@@ -118,14 +121,14 @@ Running the checks again shows that mutual exclusion is violated:
 To find a counterexample, replace the four properties at the end of the file by a query for the bad states:
 
 ```
-Reach & crit0 & crit1
+Reach & is_at(Cur, P0, Crit) & is_at(Cur, P1, Crit)
 ```
 
-| a1   | a0    | b1   | b0    | t    | *    |
-|------|-------|------|-------|------|------|
-| True | False | True | False | True | True |
+| pc(Cur, P0, Idle) | pc(Cur, P0, Wait) | pc(Cur, P0, Crit) | pc(Cur, P1, Idle) | pc(Cur, P1, Wait) | pc(Cur, P1, Crit) | turn(Cur) | *    |
+|-------------------|-------------------|-------------------|-------------------|-------------------|-------------------|-----------|------|
+| False             | False             | True              | False             | False             | True              | True      | True |
 
-Both processes are in the critical section (`10`) while the turn belongs to P1. This state is reached when P1 starts
+Both processes are in the critical section while the turn belongs to P1. This state is reached when P1 starts
 waiting, P0 starts waiting and hands the turn to P1, P1 enters, and P0 barges in after it.
 
 Other mistakes are found the same way. If neither process looks at `turn`, so a process only enters when the other is
