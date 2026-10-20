@@ -92,6 +92,19 @@ fn test_term_equality_without_rules() -> io::Result<()> {
     Ok(())
 }
 
+/// The head of the right-hand side of a term rule is a function symbol, even if it occurs nowhere else
+#[test]
+fn test_term_rule_result() -> io::Result<()> {
+    assert!(is_true("sum x # f(x) -> h(x); h(A) -> B; f(A) = B")?);
+    assert!(is_true(
+        "sum x # f(x) -> g(x); sum x # g(x) -> h(x); h(A) -> B; f(A) = B"
+    )?);
+    assert!(is_true(&fs::read_to_string(
+        "examples/term_reachability.txt"
+    )?)?);
+    Ok(())
+}
+
 #[test]
 fn test_peano_arithmetic() -> io::Result<()> {
     assert!(is_true(&fs::read_to_string("examples/peano_arith.txt")?)?);

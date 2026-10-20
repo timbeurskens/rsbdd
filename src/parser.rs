@@ -350,26 +350,7 @@ impl ParsedFormula {
         contents: &mut dyn BufRead,
         variable_ordering: Option<Vec<NamedSymbol>>,
     ) -> io::Result<Self> {
-        let tokens = SymbolicBDD::tokenize(contents, variable_ordering)?;
-
-        let mut vars: Vec<NamedSymbol> = Self::extract_vars(&tokens);
-        vars.sort_by_key(|a| a.id);
-
-        let (definitions, formula) = SymbolicBDD::parse_formula(&mut tokens.iter().peekable())?;
-
-        let n = vars.len();
-        let mut result = Self {
-            vars,
-            free_vars: Vec::new(),
-            raw2free: Vec::with_capacity(n),
-            bdd: formula,
-            env,
-            definitions: Default::default(),
-        };
-
-        for (name, definition) in definitions {
-            result.define(&name, ReferenceContents::Syntax(definition));
-        }
+        let mut result = Self::parse(env, contents, variable_ordering)?;
 
         if result.uses_rewriting(&result.bdd) {
             let (bdd, atoms) = Rewriter::rewrite(&result)?;
@@ -388,6 +369,36 @@ impl ParsedFormula {
             } else {
                 None
             });
+        }
+
+        Ok(result)
+    }
+
+    /// Parse a formula with its definitions, without applying rewrite rules
+    pub fn parse(
+        env: Rc<BDDEnv<NamedSymbol>>,
+        contents: &mut dyn BufRead,
+        variable_ordering: Option<Vec<NamedSymbol>>,
+    ) -> io::Result<Self> {
+        let tokens = SymbolicBDD::tokenize(contents, variable_ordering)?;
+
+        let mut vars: Vec<NamedSymbol> = Self::extract_vars(&tokens);
+        vars.sort_by_key(|a| a.id);
+
+        let (definitions, formula) = SymbolicBDD::parse_formula(&mut tokens.iter().peekable())?;
+
+        let n = vars.len();
+        let result = Self {
+            vars,
+            free_vars: Vec::new(),
+            raw2free: Vec::with_capacity(n),
+            bdd: formula,
+            env,
+            definitions: Default::default(),
+        };
+
+        for (name, definition) in definitions {
+            result.define(&name, ReferenceContents::Syntax(definition));
         }
 
         Ok(result)

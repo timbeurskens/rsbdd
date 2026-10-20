@@ -32,5 +32,13 @@ rsbdd -e "a & -b" -t
    - [Theorem proving by term rewriting](docs/theorem_proving.md#theorem-proving-by-term-rewriting)
    - [Completion](docs/theorem_proving.md#completion)
    - [Proofs by induction](docs/theorem_proving.md#proofs-by-induction)
-5. [Examples](docs/examples.md): transitivity, the 4 queens problem, model checking Peterson's protocol, a simplified Einstein riddle
-6. [CLI usage](docs/cli.md): `rsbdd`, `max_clique_gen`, `random_graph_gen`, `n_queens_gen`, `sudoku_gen`
+   - [First-order proofs](docs/theorem_proving.md#first-order-proofs)
+5. [Finite mode and first-order proofs](docs/finite_and_first_order.md)
+   - [Supported syntax](docs/finite_and_first_order.md#supported-syntax)
+   - [How `--prove` reads the rules](docs/finite_and_first_order.md#how---prove-reads-the-rules)
+   - [Unique names](docs/finite_and_first_order.md#unique-names)
+   - [Constructs evaluated as in finite mode](docs/finite_and_first_order.md#constructs-evaluated-as-in-finite-mode)
+   - [Remaining differences](docs/finite_and_first_order.md#remaining-differences)
+6. [The TPTP puzzles](docs/tptp_puzzles.md): how `--prove` does on the puzzles of the TPTP library, and the limitations it shows
+7. [Examples](docs/examples.md): transitivity, the 4 queens problem, model checking Peterson's protocol, a simplified Einstein riddle
+8. [CLI usage](docs/cli.md): `rsbdd`, `max_clique_gen`, `random_graph_gen`, `n_queens_gen`, `sudoku_gen`

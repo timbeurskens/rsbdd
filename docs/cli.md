@@ -39,14 +39,18 @@ Benchmarking:
 Solver:
   -l, --memory-limit <MiB>  Limit the memory used by the solver, nodes exceeding the limit are paged to disk [default: 75% of available
                             memory]
+  -P, --prove               Prove the formula in first-order logic by superposition, with the rewrite rules as axioms, and print the
+                            proof
 
 Without output options, the satisfying rows of the truth table are printed.
 Exit status: 10 if the formula is satisfiable, 20 if it is unsatisfiable, 1 or 2 on errors.
+With --prove: 10 if the formula is a theorem, 20 if it is not, 30 if no proof was found.
 
 Examples:
   rsbdd examples/4_queens.txt
   rsbdd -e "a & -b" -t
   rsbdd examples/peano_puzzle.txt -w -
+  rsbdd examples/fol/dreadbury.txt --prove
 
 ```
 

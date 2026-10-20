@@ -116,3 +116,66 @@ Limitations:
 
 See [examples/induction.txt](../examples/induction.txt), which proves identity, commutativity and associativity of
 addition.
+
+## First-order proofs
+
+The solver decides formulas over the ground terms in the formula (and an arbitrary constant for every quantified
+variable), which is a finite model check. `rsbdd --prove` instead decides whether a formula is a theorem of
+first-order logic with equality, over every domain. For example, `exists x, y # -(x = y)` holds over the terms in the
+formula, but it is not a theorem, as a domain may have a single element.
+
+```bash
+rsbdd examples/fol/dreadbury.txt --prove
+```
+
+[examples/fol/dreadbury.txt](../examples/fol/dreadbury.txt) is Pelletier's problem 55 (TPTP PUZ001), *who killed Aunt
+Agatha?*: the facts imply that Agatha killed herself. The output is the proof, ending in `theorem`:
+
+```
+0. lives(sk1) [negated goal]
+1. killed(sk1, agatha) [negated goal]
+...
+136. (sk1 = agatha) [simplification 122, 63]
+140. -killed(sk1, agatha) [superposition 136, 14]
+161. false [simplification 140, 1]
+theorem
+```
+
+- The rewrite rules are axioms, read as in finite mode: a term rule `l -> r` is the equation `l = r` for all values
+  of its variables, and the rules of a predicate are its definition (Clark completion): an application holds if and
+  only if some rule matches, and the right-hand side of every matching rule holds. The rest of the formula is the
+  goal.
+- Distinct names are distinct elements (unique names), unless an equation of the formula relates them. See
+  [Finite mode and first-order proofs](finite_and_first_order.md#unique-names).
+- Names that are not bound by a quantifier are constants, so a goal holds for every value of them. Boolean variables
+  are propositions, and a quantifier over a boolean variable ranges over `true` and `false`.
+- The negated goal and the axioms are Skolemized and converted to clauses (with definitions for large subformulas;
+  Plaisted & Greenbaum, 1986). The clauses are saturated by superposition (Bachmair & Ganzinger, 1994) in a
+  given-clause loop: superposition, equality resolution and equality factoring, restricted by the lexicographic path
+  order of [completion](#completion) and a selected negative literal. Clauses are simplified by demodulation with
+  oriented unit equations, and deleted if they are tautologies or subsumed. A predicate `p(..)` is the equation
+  `p(..) = true`.
+- Every line of the proof is a clause with the rule that derived it and the clauses it was derived from;
+  simplification also lists the unit equations it rewrote with.
+- The result is `theorem` with the proof (exit status 10) if the empty clause is derived, `not a theorem` (20) if the
+  clauses are saturated without it, and `unknown` (30) if no proof is found within 100000 given clauses. As
+  first-order validity is undecidable, a formula that is not a theorem may also give `unknown`.
+- Counting, fixed points, atom quantifiers and atom substitution are evaluated as in finite mode, and an equation
+  proven by `induct` becomes an axiom. The differences between `--prove` and finite mode are described in
+  [Finite mode and first-order proofs](finite_and_first_order.md).
+
+More puzzles in [examples/fol](../examples/fol): the barber paradox ([barber.txt](../examples/fol/barber.txt)), the
+drinker paradox ([drinker.txt](../examples/fol/drinker.txt)), Lewis Carroll's animals puzzle
+([animals.txt](../examples/fol/animals.txt)), Schubert's Steamroller
+([steamroller.txt](../examples/fol/steamroller.txt)), and groups in which every element is its own inverse
+([boolean_group.txt](../examples/fol/boolean_group.txt)).
+
+The prover proves the first-order problems of Pelletier's *Seventy-five problems for testing automatic theorem
+provers* (1986) in [tests/prover.rs](../tests/prover.rs), including Andrews' challenge (problem 34) and the problems
+with equality, and the group theory of [examples/group.txt](../examples/group.txt) and
+[examples/right_identity.txt](../examples/right_identity.txt).
+
+Limitations, compared with provers such as Prover9, E or Vampire: there is no indexing (every inference and
+simplification scans all clauses), no backward demodulation, no AC-unification, and the term order and clause
+selection are fixed. Larger problems, such as most of the TPTP library, are out of reach. [The TPTP puzzles](tptp_puzzles.md) describes
+how the prover does on the puzzles of the TPTP library.

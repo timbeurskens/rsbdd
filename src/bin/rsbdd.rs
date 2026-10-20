@@ -6,6 +6,7 @@ use std::io::{BufRead, BufReader, IsTerminal, Write};
 use std::ops::Index;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
+use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use anyhow::Context;
@@ -19,6 +20,7 @@ use rsbdd::bdd_io::*;
 use rsbdd::parser::*;
 use rsbdd::parser_io::*;
 use rsbdd::plot::*;
+use rsbdd::prover::*;
 
 #[derive(Parser, Debug)]
 #[clap(
@@ -27,11 +29,13 @@ use rsbdd::plot::*;
     about,
     long_about = None,
     after_help = "Without output options, the satisfying rows of the truth table are printed.\n\
-Exit status: 10 if the formula is satisfiable, 20 if it is unsatisfiable, 1 or 2 on errors.\n\n\
+Exit status: 10 if the formula is satisfiable, 20 if it is unsatisfiable, 1 or 2 on errors.\n\
+With --prove: 10 if the formula is a theorem, 20 if it is not, 30 if no proof was found.\n\n\
 Examples:\n  \
 rsbdd examples/4_queens.txt\n  \
 rsbdd -e \"a & -b\" -t\n  \
-rsbdd examples/peano_puzzle.txt -w -"
+rsbdd examples/peano_puzzle.txt -w -\n  \
+rsbdd examples/fol/dreadbury.txt --prove"
 )]
 struct Args {
     #[clap(value_parser, value_name = "FILE", value_hint = ValueHint::FilePath)]
@@ -122,6 +126,10 @@ struct Args {
     )]
     /// Limit the memory used by the solver, nodes exceeding the limit are paged to disk [default: 75% of available memory]
     memory_limit: Option<usize>,
+
+    #[clap(short = 'P', long, help_heading = "Solver")]
+    /// Prove the formula in first-order logic by superposition, with the rewrite rules as axioms, and print the proof.
+    prove: bool,
 }
 
 fn default_memory_limit() -> Option<usize> {
@@ -195,6 +203,22 @@ fn main() -> anyhow::Result<ExitCode> {
     } else {
         None
     };
+
+    if args.prove {
+        let parsed = ParsedFormula::parse(Rc::new(BDDEnv::new()), &mut reader, None)?;
+        let (message, status) = match Prover::prove(&parsed)? {
+            Outcome::Proven(proof) => {
+                for line in proof {
+                    println!("{line}");
+                }
+                ("theorem", 10)
+            }
+            Outcome::Disproven => ("not a theorem", 20),
+            Outcome::Unknown => ("unknown", 30),
+        };
+        println!("{message}");
+        return Ok(ExitCode::from(status));
+    }
 
     let input_parsed = ParsedFormula::new(&mut reader, pre_variable_ordering)?;
 

@@ -1,0 +1,33 @@
+---
+source: tests/cli.rs
+expression: "run(&[\"--prove\", path])"
+input_file: examples/fol/animals.txt
+---
+$ rsbdd --prove examples/fol/animals.txt
+status: 10
+--- stdout
+0. -in_house(x) | cat(x) [negated goal]
+1. -gazer(x) | suitable_pet(x) [negated goal]
+2. -detested(x) | avoided(x) [negated goal]
+3. -carnivore(x) | prowler(x) [negated goal]
+4. -cat(x) | kills_mice(x) [negated goal]
+5. -takes_to_me(x) | in_house(x) [negated goal]
+6. -kangaroo(x) | -suitable_pet(x) [negated goal]
+7. -kills_mice(x) | carnivore(x) [negated goal]
+8. takes_to_me(x) | detested(x) [negated goal]
+9. -prowler(x) | gazer(x) [negated goal]
+10. kangaroo(sk11) [negated goal]
+11. -avoided(sk11) [negated goal]
+23. -suitable_pet(sk11) [superposition 10, 6]
+27. detested(x) | in_house(x) [superposition 8, 5]
+32. in_house(x) | avoided(x) [superposition 27, 2]
+36. in_house(sk11) [superposition 32, 11]
+40. cat(sk11) [superposition 36, 0]
+44. kills_mice(sk11) [superposition 40, 4]
+48. carnivore(sk11) [superposition 44, 7]
+52. prowler(sk11) [superposition 48, 3]
+56. gazer(sk11) [superposition 52, 9]
+60. suitable_pet(sk11) [superposition 56, 1]
+64. false [superposition 60, 23]
+theorem
+--- stderr

@@ -37,6 +37,18 @@ fn test_examples() {
 }
 
 #[test]
+fn test_first_order_examples() {
+    insta::glob!("../examples/fol", "*.txt", |p| {
+        let path = p
+            .strip_prefix(env!("CARGO_MANIFEST_DIR"))
+            .expect("file outside of crate")
+            .to_str()
+            .expect("non UTF-8 path");
+        insta::assert_snapshot!(run(&["--prove", path]));
+    });
+}
+
+#[test]
 fn test_data() {
     insta::glob!("data", "*.txt", |p| snapshot_file("data", p));
 }
