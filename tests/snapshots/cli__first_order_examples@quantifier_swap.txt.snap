@@ -1,0 +1,15 @@
+---
+source: tests/cli.rs
+expression: "run(&[\"--prove\", path])"
+input_file: examples/fol/quantifier_swap.txt
+---
+$ rsbdd --prove examples/fol/quantifier_swap.txt
+status: 20
+--- stdout
+domain: e1, e2
+loves(e1, e1)
+-loves(e1, e2)
+-loves(e2, e1)
+loves(e2, e2)
+not a theorem
+--- stderr

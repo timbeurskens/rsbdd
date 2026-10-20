@@ -160,6 +160,30 @@ theorem
 - The result is `theorem` with the proof (exit status 10) if the empty clause is derived, `not a theorem` (20) if the
   clauses are saturated without it, and `unknown` (30) if no proof is found within 100000 given clauses. As
   first-order validity is undecidable, a formula that is not a theorem may also give `unknown`.
+- Without a proof, the BDD searches for a countermodel: a model of the clauses of the axioms and the negated goal over
+  the domain `e1, .., en` for `n` from 1 up to 16, as Mace4 does (McCune, 2003). Every ground atom and every value of
+  a function is a boolean variable, and a function has exactly one value for every argument. The search stops at the
+  first domain that needs more than a million BDD nodes, as larger domains need more: predicates and unary functions
+  reach large domains, but a binary function in nested terms, such as `m(m(x, y), z)`, stops after three or four
+  elements. If there is a countermodel, the result is `not a theorem` with the domain, the atoms that are true or
+  false in the model, and the values of the functions:
+
+  ```bash
+  rsbdd --prove -e '(exists y # p(y)) => (forall y # p(y))'
+  ```
+  ```
+  domain: e1, e2
+  p(e1)
+  -p(e2)
+  not a theorem
+  ```
+
+  Skolem functions and the definitions of the clauses are left out of the model. Examples: a symmetric and
+  transitive relation that is not reflexive ([symmetric_transitive.txt](../examples/fol/symmetric_transitive.txt)),
+  'everybody loves somebody' without somebody loved by everybody
+  ([quantifier_swap.txt](../examples/fol/quantifier_swap.txt)), and a non-commutative monoid of three elements
+  ([monoid.txt](../examples/fol/monoid.txt)). [hilbert_hotel.txt](../examples/fol/hilbert_hotel.txt) is not a theorem
+  either, but only an infinite domain shows it, so the result has no countermodel.
 - Counting, fixed points, atom quantifiers and atom substitution are evaluated as in finite mode, and an equation
   proven by `induct` becomes an axiom. The differences between `--prove` and finite mode are described in
   [Finite mode and first-order proofs](finite_and_first_order.md).

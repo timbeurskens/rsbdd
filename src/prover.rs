@@ -8,6 +8,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::NamedSymbol;
 use crate::bdd::{BDD, Node};
+use crate::model::{Model, find_model};
 use crate::parser::{BinaryOperator, DomainConstant, ParsedFormula, QuantifierType, SymbolicBDD};
 use crate::rewriter::{
     Rewriter, Rule, Substitution, complete, invalid, join, lpo, match_pattern, normalize,
@@ -21,22 +22,22 @@ const DISTRIBUTION_LIMIT: usize = 4;
 pub enum Outcome {
     /// The formula is valid, with the derivation of the empty clause
     Proven(Vec<String>),
-    /// The clauses are saturated without the empty clause: the formula is not valid
-    Disproven,
+    /// The formula is not valid: the clauses are saturated without the empty clause, or have a finite countermodel
+    Disproven(Option<Model>),
     /// No proof was found within the step limit
     Unknown,
 }
 
 #[derive(Clone, PartialEq)]
-struct Literal {
-    positive: bool,
-    l: DomainConstant,
-    r: DomainConstant,
+pub(crate) struct Literal {
+    pub(crate) positive: bool,
+    pub(crate) l: DomainConstant,
+    pub(crate) r: DomainConstant,
 }
 
-struct Clause {
-    literals: Vec<Literal>,
-    vars: Vec<NamedSymbol>,
+pub(crate) struct Clause {
+    pub(crate) literals: Vec<Literal>,
+    pub(crate) vars: Vec<NamedSymbol>,
     origin: &'static str,
     parents: Vec<usize>,
 }
@@ -59,7 +60,8 @@ struct Scope {
 /// rewriter and the BDD, whose nodes become definitions, and `induct` proves an equation that becomes an axiom.
 ///
 /// The remaining formula is the goal: its negation is Skolemized and converted to clauses together with the axioms,
-/// and the formula is proven if the clauses derive the empty clause. A predicate `p(..)` is the equation `p(..) = true`, so all inferences are on equations. The
+/// and the formula is proven if the clauses derive the empty clause. If they do not, a finite model of the clauses is a
+/// countermodel. A predicate `p(..)` is the equation `p(..) = true`, so all inferences are on equations. The
 /// inferences are restricted by the lexicographic path order of the completion, and clauses are simplified by
 /// demodulation with oriented unit equations, and by tautology deletion and subsumption.
 pub struct Prover {
@@ -145,7 +147,13 @@ impl Prover {
         }
         prover.precedence = ranks;
 
-        Ok(prover.saturate())
+        let input = prover.clauses.len();
+        let outcome = prover.saturate();
+        if matches!(outcome, Outcome::Proven(_)) {
+            return Ok(outcome);
+        }
+        Ok(find_model(&prover.clauses[..input], &prover.top)
+            .map_or(outcome, |model| Outcome::Disproven(Some(model))))
     }
 
     /// The Clark completion of the rules of a predicate `p` with `n` arguments:
@@ -458,9 +466,7 @@ impl Prover {
                 let mut subterms = Vec::new();
                 positions(&t, &mut vec![], &mut subterms);
                 self.rewriter.defines(&t)
-                    && subterms
-                        .iter()
-                        .any(|(_, t)| functor(t).0.id > usize::MAX / 2)
+                    && subterms.iter().any(|(_, t)| made_by_prover(&functor(t).0))
             }
             other => other
                 .children()
@@ -600,7 +606,7 @@ impl Prover {
                 }
             };
             let Some(given) = next(&taken, &mut by_weight, &mut by_age) else {
-                return Outcome::Disproven;
+                return Outcome::Disproven(None);
             };
             taken.insert(given);
             let Some(given) = self.simplify(given, &active, &demodulators) else {
@@ -1019,6 +1025,11 @@ fn demodulate(
         }
         return Some(t);
     }
+}
+
+/// Whether a symbol is a variable, Skolem function or definition made by [Prover::symbol], or `true`
+pub(crate) const fn made_by_prover(symbol: &NamedSymbol) -> bool {
+    symbol.id >= usize::MAX / 2
 }
 
 fn application(f: &NamedSymbol, args: Vec<DomainConstant>) -> DomainConstant {

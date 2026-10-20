@@ -16,7 +16,7 @@ fn is_theorem(formula: &str) -> io::Result<bool> {
 }
 
 fn is_not_theorem(formula: &str) -> io::Result<bool> {
-    Ok(matches!(prove(formula)?, Outcome::Disproven))
+    Ok(matches!(prove(formula)?, Outcome::Disproven(_)))
 }
 
 /// Problems from Pelletier, "Seventy-five problems for testing automatic theorem provers" (1986)
@@ -65,6 +65,38 @@ fn test_not_theorems() -> io::Result<()> {
     ] {
         assert!(is_not_theorem(formula)?, "{formula}");
     }
+    Ok(())
+}
+
+#[test]
+fn test_countermodels() -> io::Result<()> {
+    let countermodel = |formula: &str| -> io::Result<Vec<String>> {
+        match prove(formula)? {
+            Outcome::Disproven(Some(model)) => {
+                Ok(model.to_string().lines().map(String::from).collect())
+            }
+            _ => panic!("no countermodel of {formula}"),
+        }
+    };
+    assert_eq!(
+        countermodel("(exists y # p(y)) => (forall y # p(y))")?,
+        ["domain: e1, e2", "p(e1)", "-p(e2)"]
+    );
+    assert_eq!(countermodel("exists x, y # -(x = y)")?, ["domain: e1"]);
+    let five = "(exists a, b, c, d, e # -(a = b) & -(a = c) & -(a = d) & -(a = e) & -(b = c) & -(b = d) & \
+        -(b = e) & -(c = d) & -(c = e) & -(d = e)) => exists x, y # p(x) <=> -p(y)";
+    assert_eq!(countermodel(five)?[0], "domain: e1, e2, e3, e4, e5");
+    let group = "((forall x, y, z # m(m(x, y), z) = m(x, m(y, z))) & (forall x # m(e, x) = x & m(x, e) = x) & \
+        (forall x # m(i(x), x) = e & m(x, i(x)) = e)) => forall x, y # m(x, y) = m(y, x)";
+    assert!(matches!(prove(group)?, Outcome::Disproven(None)));
+    assert_eq!(
+        countermodel("(forall x # f(f(x)) = x) => forall x # f(x) = x")?,
+        ["domain: e1, e2", "f(e1) = e2", "f(e2) = e1"]
+    );
+    assert_eq!(
+        countermodel("p(A) -> true; p(B)")?,
+        ["domain: e1, e2", "p(e1)", "-p(e2)", "A = e1", "B = e2"]
+    );
     Ok(())
 }
 

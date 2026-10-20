@@ -213,7 +213,12 @@ fn main() -> anyhow::Result<ExitCode> {
                 }
                 ("theorem", 10)
             }
-            Outcome::Disproven => ("not a theorem", 20),
+            Outcome::Disproven(model) => {
+                if let Some(model) = model {
+                    println!("{model}");
+                }
+                ("not a theorem", 20)
+            }
             Outcome::Unknown => ("unknown", 30),
         };
         println!("{message}");

@@ -117,9 +117,9 @@ The analysis shows these limitations, roughly from the easiest to the hardest to
 - **TPTP input.** rsbdd does not read TPTP files, so the problems above were translated by an external script.
 - **Answers.** Some puzzles ask for values: PUZ035-7 asks what the asked person and the other person are, given the
   answer. `--prove` reports `theorem` with the proof, but does not extract the values of the existential variables.
-- **Model finding.** `--prove` cannot show that the axioms have a model, so satisfiable problems end in
-  `not a theorem` at best. Finite mode finds models over the ground terms of a formula, but not over an arbitrary
-  finite domain as Mace4 or Paradox do.
+- **Model finding.** `--prove` searches for a countermodel as Mace4 does, up to 16 elements or a million BDD nodes.
+  The BDD of a binary function grows quickly with the domain, so without the flattening and symmetry breaking of
+  Paradox, models of more than three or four elements with such functions are out of reach.
 - **Indexing.** Without term indexing, large ground problems and long chains of moves take too long. This is the
   main gap with provers such as E or Vampire.
 - **AC-unification.** Problems with associative and commutative operators, such as PUZ056-1, need unification modulo
