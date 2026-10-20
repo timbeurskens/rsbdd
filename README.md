@@ -39,5 +39,6 @@ rsbdd -e "a & -b" -t
    - [Unique names](docs/finite_and_first_order.md#unique-names)
    - [Constructs evaluated as in finite mode](docs/finite_and_first_order.md#constructs-evaluated-as-in-finite-mode)
    - [Remaining differences](docs/finite_and_first_order.md#remaining-differences)
-6. [Examples](docs/examples.md): transitivity, the 4 queens problem, model checking Peterson's protocol, a simplified Einstein riddle
-7. [CLI usage](docs/cli.md): `rsbdd`, `max_clique_gen`, `random_graph_gen`, `n_queens_gen`, `sudoku_gen`
+6. [The TPTP puzzles](docs/tptp_puzzles.md): how `--prove` does on the puzzles of the TPTP library, and the limitations it shows
+7. [Examples](docs/examples.md): transitivity, the 4 queens problem, model checking Peterson's protocol, a simplified Einstein riddle
+8. [CLI usage](docs/cli.md): `rsbdd`, `max_clique_gen`, `random_graph_gen`, `n_queens_gen`, `sudoku_gen`

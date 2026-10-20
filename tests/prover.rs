@@ -99,6 +99,7 @@ fn test_compatibility() -> io::Result<()> {
         "(p(A) & -p(B))[p(_) := q(_)] <=> (q(A) & -q(B))",
         "exists p(_) # p(A)",
         "(lfp X # a | X) <=> a",
+        "sum x # f(x) -> h(x); h(A) -> B; f(A) = B",
         "e(A, B) -> true; sum x, y # r(x, y) -> e(x, y) | exists z # e(x, z) & r(z, y); r(A, B)",
         &format!("{plus} induct x # plus(x, _0) = x; forall x # plus(x, _0) = x"),
     ] {

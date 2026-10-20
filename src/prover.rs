@@ -90,9 +90,9 @@ impl Prover {
             finite: parsed.clone(),
         };
 
-        let (term_rules, predicate_rules): (Vec<_>, Vec<_>) = rules.into_iter().partition(|rule| {
-            matches!(&rule.lhs, DomainConstant::Application(f, _) if universe.functions.contains(f))
-        });
+        let (term_rules, predicate_rules): (Vec<_>, Vec<_>) = rules
+            .into_iter()
+            .partition(|rule| universe.is_term_rule(rule));
         for rule in &term_rules {
             let equation = SymbolicBDD::binop(
                 BinaryOperator::Equals,

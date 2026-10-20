@@ -31,6 +31,13 @@ pub(crate) struct Universe {
     pub(crate) symbols: FxHashSet<(NamedSymbol, usize)>,
 }
 
+impl Universe {
+    /// A rule for a function symbol is a term rule, whose right-hand side is a term
+    pub(crate) fn is_term_rule(&self, rule: &Rule) -> bool {
+        matches!(&rule.lhs, DomainConstant::Application(f, _) if self.functions.contains(f))
+    }
+}
+
 /// The rewrite rules and remaining formula of a parsed formula, with the ground terms and function symbols in them
 pub(crate) fn split_rules(
     parsed: &ParsedFormula,
@@ -51,6 +58,21 @@ pub(crate) fn split_rules(
         collect_terms(&rule.rhs, &rule.vars, &mut universe);
     }
     collect_terms(&formula, &[], &mut universe);
+
+    // The right-hand side of a term rule is a term, so its head is a function symbol as well
+    loop {
+        let known = universe.functions.len();
+        for rule in &rules {
+            if let SymbolicBDD::RuleApplication(t) = &rule.rhs
+                && universe.is_term_rule(rule)
+            {
+                add_element(t, &rule.vars, &mut universe);
+            }
+        }
+        if universe.functions.len() == known {
+            break;
+        }
+    }
     Ok((rules, formula, universe))
 }
 
@@ -102,9 +124,9 @@ impl Rewriter {
     pub(crate) fn new(parsed: &ParsedFormula) -> io::Result<(Self, SymbolicBDD)> {
         let (rules, formula, mut universe) = split_rules(parsed)?;
 
-        let (term_rules, rules): (Vec<_>, Vec<_>) = rules.into_iter().partition(|rule| {
-            matches!(&rule.lhs, DomainConstant::Application(f, _) if universe.functions.contains(f))
-        });
+        let (term_rules, rules): (Vec<_>, Vec<_>) = rules
+            .into_iter()
+            .partition(|rule| universe.is_term_rule(rule));
         let term_rules = complete(&term_rules).unwrap_or(term_rules);
         for rule in &term_rules {
             add_element(

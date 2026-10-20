@@ -177,4 +177,5 @@ with equality, and the group theory of [examples/group.txt](../examples/group.tx
 
 Limitations, compared with provers such as Prover9, E or Vampire: there is no indexing (every inference and
 simplification scans all clauses), no backward demodulation, no AC-unification, and the term order and clause
-selection are fixed. Larger problems, such as most of the TPTP library, are out of reach.
+selection are fixed. Larger problems, such as most of the TPTP library, are out of reach. [The TPTP puzzles](tptp_puzzles.md) describes
+how the prover does on the puzzles of the TPTP library.
