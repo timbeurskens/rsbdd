@@ -165,7 +165,8 @@ theorem
   [Finite mode and first-order proofs](finite_and_first_order.md).
 
 More puzzles in [examples/fol](../examples/fol): the barber paradox ([barber.txt](../examples/fol/barber.txt)), the
-drinker paradox ([drinker.txt](../examples/fol/drinker.txt)), Schubert's Steamroller
+drinker paradox ([drinker.txt](../examples/fol/drinker.txt)), Lewis Carroll's animals puzzle
+([animals.txt](../examples/fol/animals.txt)), Schubert's Steamroller
 ([steamroller.txt](../examples/fol/steamroller.txt)), and groups in which every element is its own inverse
 ([boolean_group.txt](../examples/fol/boolean_group.txt)).
 
