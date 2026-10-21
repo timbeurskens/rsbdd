@@ -1,7 +1,10 @@
+use std::rc::Rc;
+
 use rustc_hash::FxHashSet;
 
 use rsbdd::bdd;
 use rsbdd::bdd::{BDDEnv, Node};
+use rsbdd::parser::ParsedFormula;
 
 type BDD = bdd::BDD<usize>;
 
@@ -106,4 +109,19 @@ fn test_memory_limit_pages_to_disk() {
 
     drop(limited);
     assert_eq!(swap_files(), 0);
+}
+
+#[test]
+fn test_memory_limit_bounds_grounding() {
+    let parse = |formula: &str| {
+        let env = Rc::new(BDDEnv::with_memory_limit(1024 * 1024));
+        ParsedFormula::new_with_env(env, &mut formula.as_bytes(), None)
+    };
+
+    let large = "p(a, b, c, d) & (forall A, B, C, D, E, F, G, H # q(A, B, C, D) | q(E, F, G, H))";
+    let error = parse(large).expect_err("grounding fits in the limit");
+    assert!(error.to_string().contains("memory limit"), "{error}");
+
+    let small = parse("p(a) & (forall A, B # q(A) | q(B))").expect("grounding exceeds the limit");
+    assert!(!small.eval().is_false());
 }

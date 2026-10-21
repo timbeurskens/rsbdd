@@ -1,0 +1,27 @@
+---
+source: tests/cli.rs
+assertion_line: 31
+expression: output
+input_file: tests/data/rewrite_atom_quantifier_is_true.txt
+---
+$ rsbdd -t -f true tests/data/rewrite_atom_quantifier_is_true.txt
+status: 10
+--- stdout
+| v(X, A) | *     |
+|---------|-------|
+| Any     | True  |
+--- stderr
+
+$ rsbdd -v tests/data/rewrite_atom_quantifier_is_true.txt
+status: 10
+--- stdout
+v(X, A)*;
+--- stderr
+
+$ rsbdd -m -t -f true tests/data/rewrite_atom_quantifier_is_true.txt
+status: 10
+--- stdout
+| v(X, A) | *     |
+|---------|-------|
+| Any     | True  |
+--- stderr

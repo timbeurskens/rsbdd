@@ -1,0 +1,14 @@
+---
+source: tests/cli.rs
+assertion_line: 47
+expression: "run(&[\"--prove\", path])"
+input_file: examples/fol/drinker.txt
+---
+$ rsbdd --prove examples/fol/drinker.txt
+status: 10
+--- stdout
+0. drinks(x) [negated goal]
+1. -drinks(sk2(x)) [negated goal]
+5. false [simplification 1, 0]
+theorem
+--- stderr

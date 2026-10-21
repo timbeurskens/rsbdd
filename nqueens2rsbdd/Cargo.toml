@@ -1,0 +1,12 @@
+[package]
+name = "nqueens2rsbdd"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+description = "Generates n-queen formulae for the SAT solver"
+
+[dependencies]
+clap.workspace = true
+
+[lints]
+workspace = true

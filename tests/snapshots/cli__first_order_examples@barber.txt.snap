@@ -1,0 +1,16 @@
+---
+source: tests/cli.rs
+assertion_line: 47
+expression: "run(&[\"--prove\", path])"
+input_file: examples/fol/barber.txt
+---
+$ rsbdd --prove examples/fol/barber.txt
+status: 10
+--- stdout
+1. -shaves(sk1, y) | -shaves(y, y) [negated goal]
+2. shaves(y, y) | shaves(sk1, y) [negated goal]
+18. shaves(sk1, sk1) [equality factoring 2]
+21. -shaves(sk1, sk1) [superposition 18, 1]
+28. false [simplification 21, 18]
+theorem
+--- stderr

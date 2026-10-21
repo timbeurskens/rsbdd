@@ -1,0 +1,58 @@
+"
+Is there a loop from 0 to 0?
+
+The situation
+
+    A directed graph has the edges 0 -> 1, 1 -> 2, 2 -> 3 and 3 -> 0.
+    reach(x, y, g, h) is a functional program that searches the edges g for a path from x to y.
+    The edges in h have been visited, and are tried again from the next node.
+
+The question is: does reach(0, 0, g, empty) evaluate to true?
+
+From: Arts & Giesl, Termination of Term Rewriting Using Dependency Pairs (2000)
+      TPTP problem PUZ164
+
+---
+
+The program is a term rewriting system: the rules are evaluated by rewriting the goal to its normal form, without
+the solver choosing anything. reach compares the source of the first edge with x: if it matches, if_reach_1 checks
+the target, and if_reach_2 either succeeds or continues from the target with the remaining edges. Otherwise the
+edge is set aside in h and the search continues with the rest.
+
+The goal rewrites to T: the path 0 -> 1 -> 2 -> 3 -> 0 is found.
+
+Compared with the TPTP problem, the booleans true and false are the constants T and F, and eq and or are renamed
+to equal and lor, as these are keywords in rsbdd. The graph g is written out in the goal, as a constant cannot have
+a rewrite rule.
+
+Run with:
+    rsbdd examples/term_reachability.txt -t
+"
+
+"Natural numbers and booleans"
+equal(zero, zero) -> T;
+sum x # equal(zero, s(x)) -> F;
+sum x # equal(s(x), zero) -> F;
+sum x, y # equal(s(x), s(y)) -> equal(x, y);
+
+sum y # lor(T, y) -> T;
+sum y # lor(F, y) -> y;
+
+"Lists of edges"
+sum h # union(empty, h) -> h;
+sum x, y, i, h # union(edge(x, y, i), h) -> edge(x, y, union(i, h));
+
+"Search for a path from x to y in the edges, where h holds the edges that have been visited"
+sum x, y, h # reach(x, y, empty, h) -> F;
+sum x, y, u, v, i, h # reach(x, y, edge(u, v, i), h) -> if_reach_1(equal(x, u), x, y, edge(u, v, i), h);
+sum x, y, u, v, i, h # if_reach_1(T, x, y, edge(u, v, i), h) -> if_reach_2(equal(y, v), x, y, edge(u, v, i), h);
+sum x, y, u, v, i, h # if_reach_1(F, x, y, edge(u, v, i), h) -> reach(x, y, i, edge(u, v, h));
+sum x, y, u, v, i, h # if_reach_2(T, x, y, edge(u, v, i), h) -> T;
+sum x, y, u, v, i, h # if_reach_2(F, x, y, edge(u, v, i), h) -> lor(reach(x, y, i, h), reach(v, y, union(i, h), empty));
+
+"The graph 0 -> 1 -> 2 -> 3 -> 0"
+reach(zero, zero,
+    edge(zero, s(zero),
+    edge(s(zero), s(s(zero)),
+    edge(s(s(zero)), s(s(s(zero))),
+    edge(s(s(s(zero))), zero, empty)))), empty) = T

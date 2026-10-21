@@ -1,0 +1,14 @@
+% Find a non-commutative group up to domain size 10.
+
+formulas(assumptions).
+  (x * y) * z = x * (y * z).
+  x * e = x.
+  x * x' = e.
+end_of_list.
+
+formulas(goals).
+  x * y = y * x.
+end_of_list.
+
+assign(start_size, 1).
+assign(end_size, 10).
