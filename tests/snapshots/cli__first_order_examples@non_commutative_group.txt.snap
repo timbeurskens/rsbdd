@@ -1,0 +1,56 @@
+---
+source: tests/cli.rs
+expression: "run(&[\"--prove\", path])"
+input_file: examples/fol/non_commutative_group.txt
+---
+$ rsbdd --prove examples/fol/non_commutative_group.txt
+status: 20
+--- stdout
+domain: e1, e2, e3, e4, e5, e6
+m(e1, e1) = e1
+m(e1, e2) = e2
+m(e1, e3) = e3
+m(e1, e4) = e4
+m(e1, e5) = e5
+m(e1, e6) = e6
+m(e2, e1) = e2
+m(e3, e1) = e3
+m(e4, e1) = e4
+m(e5, e1) = e5
+m(e6, e1) = e6
+m(e2, e2) = e1
+m(e3, e2) = e4
+m(e4, e2) = e3
+m(e5, e2) = e6
+m(e6, e2) = e5
+m(e2, e3) = e5
+m(e3, e3) = e1
+m(e4, e3) = e6
+m(e5, e3) = e2
+m(e6, e3) = e4
+m(e2, e4) = e6
+m(e3, e4) = e2
+m(e4, e4) = e5
+m(e5, e4) = e1
+m(e6, e4) = e3
+m(e2, e5) = e3
+m(e3, e5) = e6
+m(e4, e5) = e1
+m(e5, e5) = e4
+m(e6, e5) = e2
+m(e2, e6) = e4
+m(e3, e6) = e5
+m(e4, e6) = e2
+m(e5, e6) = e3
+m(e6, e6) = e1
+e = e1
+i(e1) = e1
+i(e2) = e2
+i(e3) = e3
+i(e4) = e5
+i(e5) = e4
+i(e6) = e6
+sk6 = e2
+sk7 = e3
+not a theorem
+--- stderr

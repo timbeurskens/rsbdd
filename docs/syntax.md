@@ -125,6 +125,35 @@ forall a, b # exists c # (c | a) & (c | b)
 Quantifiers over terms, such as `forall p # person(p) => ...`, are described in
 [Rewrite rules](rewriting.md).
 
+## Types
+
+Terms can be given types, as in the typed first-order logic of TPTP (TF0, and TF1 with polymorphic types). A type is
+declared with `let name: type;`, and a symbol with `let name: A;` for a constant, `let name: (A1, .., An) -> B;` for a
+function, or `-> bool` for a predicate. Several names can be declared at once. A binder `x: A` gives a quantified
+variable a type:
+
+```
+let beverage, syrup: type;
+let coffee: beverage;
+let vanilla_syrup, caramel_syrup: syrup;
+let mixture: pi T # (T, syrup) -> T;
+let help_people_stay_awake: (beverage) -> bool;
+
+(forall s: syrup # help_people_stay_awake(mixture(beverage, coffee, s))) =>
+    help_people_stay_awake(mixture(beverage, coffee, mixture(syrup, caramel_syrup, vanilla_syrup)))
+```
+
+- `pi T1, .., Tk # ..` declares a polymorphic symbol with type parameters. The types are the first arguments of an
+  application: `mixture(syrup, caramel_syrup, vanilla_syrup)` is a syrup. Types are terms, so `forall T: type # ..`
+  quantifies over types, and a type constructor is declared as `let list: (type) -> type;`.
+- `type`, `bool` and `pi` are keywords. Undeclared symbols and binders without a type are untyped, as before.
+- Declared symbols are type checked: `help_people_stay_awake(caramel_syrup)` is rejected, as are applications with
+  the wrong number of arguments and equations between different types.
+- `forall x: A # f` is `forall x # (x: A) => f`, and `exists x: A # f` is `exists x # (x: A) & f`, where `x: A` is an
+  atom that holds for the terms of type `A`. In finite mode, the declarations are rules for these atoms, so a typed
+  quantifier ranges over the well-typed ground terms of its type and the arbitrary constant of its variable. See
+  [Finite mode and first-order proofs](finite_and_first_order.md#types) for `--prove`.
+
 ## Counting
 
 For some problems it can be beneficial to express properties relating to the number of true or false variables, e.g. "at
@@ -235,17 +264,27 @@ not be used as a replacement in the same substitution, so `[x := y, y := x]` is 
 (a & b)[a := true]  <=> b
 ```
 
-The example below computes all states reachable from state `00` in a transition system `T` over current-state
-variables `p1, p0` and next-state variables `x1, x0` (see [examples/reachability.txt](../examples/reachability.txt)).
+The target of a substitution can also be an atom (see [Rewrite rules](rewriting.md)). Every `_` in the target ranges
+over all ground terms, and is replaced by the same term at the corresponding `_` in the replacement:
 
 ```
-let init := -x1 & -x0;
-let T := ...;
-lfp R # init | exists p1, p0 # R[x1 := p1, x0 := p0] & T
+(p(A) & -p(B))[p(_) := q(_)]   <=> q(A) & -q(B)
+f[p(_) := q(_)]                <=> exists p(_) # f & forall _ # (p(_) <=> q(_))
+```
+
+The example below computes all states reachable from state `S0` in a transition system `T`. The unknowns
+`state(w, s)` state that the system is in state `s` at `w`, where `Prev` is the current state and `Cur` the next
+state of a transition (see [examples/reachability.txt](../examples/reachability.txt)).
+
+```
+let init := is_in(Cur, S0);
+let T := exists p, x # transition(p, x) & is_in(Prev, p) & is_in(Cur, x);
+...
+lfp R # init | exists state(Prev, _) # R[state(Cur, _) := state(Prev, _)] & T
 ```
 
 The resulting BDD, obtained with `rsbdd examples/reachability.txt -d reachability.dot`, is the set of reachable states:
-every state except `11` (`x1 & x0`) is reachable.
+every state except `S3` is reachable.
 
 ![reachability bdd](images/reachability_bdd.svg)
 

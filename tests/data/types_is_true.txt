@@ -1,0 +1,11 @@
+"a typed quantifier ranges over the ground terms of its type, and the arbitrary constant of its variable"
+let person, pet: type;
+let alice, bob: person;
+let rex: pet;
+let owns: (person, pet) -> bool;
+
+owns(alice, rex) -> true;
+
+(exists p: person # owns(p, rex)) &
+-owns(bob, rex) &
+(forall q: pet # exists p: person # -owns(p, q))

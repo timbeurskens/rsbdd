@@ -35,7 +35,7 @@ person(C) -> true;
 "What each person said"
 statement(A) -> if claims_knave(A) then -knight(A) else knight(A);
 statement(B) -> claims_knave(A);
-statement(C) -> -knight(B);
+statement(C) -> -statement(B);
 
 "Knights tell the truth, knaves lie"
 forall p # person(p) => (knight(p) <=> statement(p))

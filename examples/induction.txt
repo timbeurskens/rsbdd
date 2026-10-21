@@ -9,8 +9,8 @@ at the position of x:
     case _0:      plus(_0, _0)      = _0         by rewriting
     case suc(x'): plus(suc(x'), _0) = suc(x')    by rewriting with the hypothesis plus(x', _0) -> x'
 
-Every proven equation becomes a rewrite rule (a lemma) for the theorems that follow it. Commutativity cannot be
-proven by induction from the definition of plus alone: its proof uses the first two theorems as lemmas.
+Every proven equation becomes a rewrite rule (a lemma) for the theorems that follow it. The proof of commutativity
+uses the first two theorems as lemmas. If they were not stated, they would be discovered from its stuck cases.
 Every theorem is proven, resulting in a single 'true' node in the BDD.
 
 Run with:

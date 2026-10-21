@@ -23,10 +23,31 @@ has_color(H1, Red)
   in the left-hand side of the rule.
 - `t1 = t2` holds if both terms are identical.
 - A proposition `p(..)` for which rules exist is rewritten to the conjunction of the right-hand sides of all matching
-  rules. If no rule matches, or the rewriting is cyclic, the proposition is false.
+  rules. If no rule matches, the proposition is false.
+- A proposition that depends on itself, such as `reach(x, y)` below, is the least fixpoint of its rules: the
+  smallest interpretation that satisfies them, as in Datalog. Recursion must be positive (not through a negation),
+  like the transformer of a [fixed point](syntax.md#fixed-points); otherwise the computation does not terminate.
+
+  ```
+  edge(A, B) -> true;
+  edge(B, A) -> true;
+  edge(B, C) -> true;
+  sum x, y # reach(x, y) -> edge(x, y) | exists z # edge(x, z) & reach(z, y);
+
+  reach(A, C) & reach(A, A) & -reach(C, A)
+  ```
 - A proposition without any rules is an unknown: every distinct proposition, such as `has_color(H1, Red)`, becomes a
   boolean variable for the solver.
-- `forall` and `exists` over a variable used as a term range over all ground terms occurring in the formula.
+- `forall` and `exists` over a variable `x` used as a term range over all ground terms occurring in the formula, and
+  over an arbitrary constant `x'` that stands for every other element. `forall x # p(x)` therefore also requires the
+  unknown `p(x')`, so it does not follow from `p(A)` alone. A guard such as `forall h # house(h) => ...` excludes the
+  arbitrary constant, as no rule matches `house(h')`. Every `_` in a substitution only ranges over the ground terms.
+- `forall` and `exists` over an atom, such as `exists color(H1, _) # ...`, quantify the boolean variables of the
+  unknowns in their body that match the atom, where `_` matches any term. This quantifies over the interpretation of
+  a function: `exists color(H1, _)` asks for some color of house `H1`. The atom may contain pattern variables of the
+  enclosing rule, as in `sum w # f(w) -> forall color(other(w), _) # ...`.
+- Substitution also replaces atoms: `f[color(H1, _) := color(H2, _)]` replaces `color(H1, c)` by `color(H2, c)` for
+  every term `c`.
 - Rewrite rules must be top-level conjuncts of the formula.
 
 The parse tree (`-p`) shows the formula after rewriting. For the example above, the rules are gone, the `forall` is
@@ -50,23 +71,21 @@ plain rsbdd formula and can be solved again, e.g. `rsbdd examples/peano_puzzle.t
 
 Rewrite rules and fixed points can be used in the same formula. The example in
 [examples/rooms.txt](../examples/rooms.txt) asks which rooms of a house can be reached from the hall. Rooms and doors are
-facts, `step(x, y)` is a rule over them, and `at(room)` maps every room to a 3-bit encoding. The least fixpoint then
-computes the set of reachable encodings, without knowing the number of steps in advance.
+facts, and `step(x, y)` is a rule over them. The location of the visitor is a function: `at(w, r)` states that in
+state `w` the visitor is in room `r`. The least fixpoint then computes the set of reachable locations, without knowing
+the number of steps in advance. The substitution renames the current location `Cur` to the previous location `Prev`.
 
 ```
-let T := exists x, y # step(x, y) & at(x)[b2 := p2, b1 := p1, b0 := p0] & at(y);
-let Reach := lfp R # at(Hall) | exists p2, p1, p0 # R[b2 := p2, b1 := p1, b0 := p0] & T;
+let T := exists x, y # step(x, y) & is_at(Prev, x) & is_at(Cur, y);
+let Reach := lfp R # is_at(Cur, Hall) | exists at(Prev, _) # R[at(Cur, _) := at(Prev, _)] & T;
 
 door(Hall, Kitchen) -> true;
 trapdoor(Attic, Hall) -> true;
 ...
 sum x, y # step(x, y) -> door(x, y) | door(y, x) | trapdoor(x, y);
+sum w, r # is_at(w, r) -> forall q # room(q) => (at(w, q) <=> q = r);
 
-at(Hall)    -> -b2 & -b1 & -b0;
-at(Kitchen) -> -b2 & -b1 &  b0;
-...
-
-forall r # room(r) => (reachable(r) <=> exists b2, b1, b0 # at(r) & Reach)
+forall r # room(r) => (reachable(r) <=> exists at(Cur, _) # is_at(Cur, r) & Reach)
 ```
 
 The trapdoor only leads from the attic to the hall, so the attic and the cellar cannot be reached.

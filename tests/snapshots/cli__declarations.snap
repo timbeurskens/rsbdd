@@ -1,0 +1,29 @@
+---
+source: tests/cli.rs
+expression: "run_formulas(&[\"let p, q: bool; let d := p & q; d\",\n\"let a: type; let c, d: a; let f: (a) -> a; forall x: a # f(x) = f(x)\",\n\"let a: type; let c, d: a; exists x: a # x = c\",])"
+---
+$ rsbdd -t --evaluate=let p, q: bool; let d := p & q; d
+status: 10
+--- stdout
+| p     | q     | *     |
+|-------|-------|-------|
+| False | Any   | False |
+| True  | False | False |
+| True  | True  | True  |
+--- stderr
+
+$ rsbdd -t --evaluate=let a: type; let c, d: a; let f: (a) -> a; forall x: a # f(x) = f(x)
+status: 10
+--- stdout
+| *     |
+|-------|
+| True  |
+--- stderr
+
+$ rsbdd -t --evaluate=let a: type; let c, d: a; exists x: a # x = c
+status: 10
+--- stdout
+| *     |
+|-------|
+| True  |
+--- stderr

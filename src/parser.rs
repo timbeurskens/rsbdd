@@ -18,7 +18,7 @@ use crate::bdd::{BDD, BDDEnv};
 use crate::rewriter::Rewriter;
 
 lazy_static! {
-    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|->|-|<=>|<=|\||\^|#|\*|\+|>=|:=|=|>|<|\[|\]|,|;|\(|\))|(?P<countable>\d+)|\{(?P<reference>[\w']+)\}|(?P<identifier>[\w']+)|(?P<eof>$)|(?P<comment>"[^"]*")"#).expect("Error setting-up tokenizer regex");
+    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|->|-|<=>|<=|\||\^|#|\*|\+|>=|:=|:|=|>|<|\[|\]|,|;|\(|\))|(?P<countable>\d+)|\{(?P<reference>[\w']+)\}|(?P<identifier>[\w']+)|(?P<eof>$)|(?P<comment>"[^"]*")"#).expect("Error setting-up tokenizer regex");
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,6 +59,10 @@ pub enum SymbolicBDDToken {
     Hash,
     Let,
     Assign,
+    Colon,
+    Type,
+    Bool,
+    Pi,
     Semicolon,
     Eof,
 }
@@ -75,6 +79,13 @@ pub enum BinaryOperator {
     Iff,
     Equals,
     Rewrite,
+}
+
+impl BinaryOperator {
+    /// `(a op b) op c` is equivalent to `a op (b op c)`
+    pub const fn is_associative(self) -> bool {
+        matches!(self, Self::And | Self::Or | Self::Xor | Self::Iff)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -99,12 +110,114 @@ pub enum DomainConstant {
     Application(NamedSymbol, Vec<Self>),
 }
 
+/// The predicate of the guard `x: A` of a typed binder, which cannot be written as a name
+pub fn has_type_symbol() -> NamedSymbol {
+    NamedSymbol {
+        name: Rc::new(":".to_string()),
+        id: usize::MAX / 2 - 2,
+    }
+}
+
+/// The type of types, written `type`
+pub fn type_symbol() -> NamedSymbol {
+    NamedSymbol {
+        name: Rc::new("type".to_string()),
+        id: usize::MAX / 2 - 1,
+    }
+}
+
+/// The `i`-th argument of a declared symbol, a variable of the typing rules and axioms of its signature
+pub fn argument_symbol(i: usize) -> NamedSymbol {
+    NamedSymbol {
+        name: Rc::new(format!("x{i}")),
+        id: usize::MAX / 4 + i,
+    }
+}
+
+impl DomainConstant {
+    /// The guard `t: A`
+    pub fn has_type(t: Self, ty: Self) -> Self {
+        Self::Application(has_type_symbol(), vec![t, ty])
+    }
+
+    /// The term and type of a guard `t: A`
+    pub fn as_guard(&self) -> Option<(&Self, &Self)> {
+        match self {
+            Self::Application(s, args) if *s == has_type_symbol() => match args.as_slice() {
+                [t, ty] => Some((t, ty)),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+}
+
+/// The type of a declared symbol: `A`, `(A1, .., An) -> B` or `pi T1, .., Tk # (A1, .., An) -> B`.
+///
+/// The type parameters `T` are the first arguments of an application. The result is `None` for a predicate
+/// (`-> bool`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Signature {
+    pub params: Vec<NamedSymbol>,
+    pub args: Vec<DomainConstant>,
+    pub result: Option<DomainConstant>,
+}
+
+impl Signature {
+    /// The variables of an application of the declared symbol: the type parameters and one per argument
+    pub fn vars(&self) -> Vec<NamedSymbol> {
+        let n = self.params.len();
+        self.params
+            .iter()
+            .cloned()
+            .chain((0..self.args.len()).map(|i| argument_symbol(n + i)))
+            .collect()
+    }
+
+    /// The application of `f` to the variables of the signature, with the guards of its arguments
+    pub fn application(&self, f: &NamedSymbol) -> (DomainConstant, Vec<DomainConstant>) {
+        let vars = self.vars();
+        let application = if vars.is_empty() {
+            DomainConstant::Terminal(f.clone())
+        } else {
+            DomainConstant::Application(
+                f.clone(),
+                vars.iter().cloned().map(DomainConstant::Terminal).collect(),
+            )
+        };
+        let types = self
+            .params
+            .iter()
+            .map(|_| DomainConstant::Terminal(type_symbol()))
+            .chain(self.args.iter().cloned());
+        let guards = vars
+            .into_iter()
+            .zip(types)
+            .map(|(v, ty)| DomainConstant::has_type(DomainConstant::Terminal(v), ty))
+            .collect();
+        (application, guards)
+    }
+}
+
 impl Display for DomainConstant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some((t, ty)) = self.as_guard() {
+            return write!(f, "({t}: {ty})");
+        }
         match self {
             Self::Terminal(s) => write!(f, "{}", s),
             Self::Application(s, args) => write!(f, "{}({})", s, args.iter().join(", ")),
         }
+    }
+}
+
+impl Display for QuantifierType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Exists => "exists",
+            Self::Forall => "forall",
+            Self::Induction => "induct",
+        })
     }
 }
 
@@ -144,14 +257,9 @@ impl Display for SymbolicBDD {
             Self::True => write!(f, "true"),
             Self::Var(v) => write!(f, "{}", v),
             Self::Not(e) => write!(f, "-({})", e),
-            Self::Quantifier(QuantifierType::Exists, vars, e) => {
-                write!(f, "(exists {} # {})", vars.iter().join(", "), e)
-            }
-            Self::Quantifier(QuantifierType::Forall, vars, e) => {
-                write!(f, "(forall {} # {})", vars.iter().join(", "), e)
-            }
-            Self::Quantifier(QuantifierType::Induction, vars, e) => {
-                write!(f, "(induct {} # {})", vars.iter().join(", "), e)
+            Self::Quantifier(q, vars, e) => write!(f, "({} {} # {})", q, vars.iter().join(", "), e),
+            Self::AtomQuantifier(q, atoms, e) => {
+                write!(f, "({} {} # {})", q, atoms.iter().join(", "), e)
             }
             Self::CountableConst(op, es, n) => {
                 write!(f, "([{}] {} {})", es.iter().join(", "), op, n)
@@ -184,6 +292,8 @@ pub enum SymbolicBDD {
     Var(NamedSymbol),
     Not(Box<Self>),
     Quantifier(QuantifierType, Vec<NamedSymbol>, Box<Self>),
+    // quantification over the open atoms matching the given patterns, in which `_` matches any term
+    AtomQuantifier(QuantifierType, Vec<DomainConstant>, Box<Self>),
     CountableConst(CountableOperator, Vec<Self>, usize),
     CountableVariable(CountableOperator, Vec<Self>, Vec<Self>),
     // the fixed-point operator with a single transformer variable, initial value (as bool), and the transformer function as a symbolic bdd description
@@ -210,6 +320,9 @@ pub struct ParsedFormula {
     pub env: Rc<BDDEnv<NamedSymbol>>,
 
     pub definitions: RefCell<FxHashMap<String, ReferenceContents>>,
+
+    // the declared types of symbols, `let f: A;`
+    pub signatures: Vec<(NamedSymbol, Signature)>,
 }
 
 #[derive(Debug, Clone)]
@@ -221,6 +334,11 @@ pub enum ReferenceContents {
 type TokenReader<'a> = Peekable<Iter<'a, SymbolicBDDToken>>;
 
 impl ParsedFormula {
+    /// Check the declarations, and that declared symbols are applied to arguments of their declared types
+    fn check_types(&self) -> io::Result<()> {
+        crate::types::check(self)
+    }
+
     /// Define a new BDD by name
     pub fn define(&self, name: &str, contents: ReferenceContents) {
         self.definitions
@@ -308,7 +426,9 @@ impl ParsedFormula {
             | SymbolicBDD::False
             | SymbolicBDD::Subtree(_)
             | SymbolicBDD::Var(_) => formula.clone(),
-            SymbolicBDD::Summation(_, _) | SymbolicBDD::RuleApplication(_) => {
+            SymbolicBDD::Summation(_, _)
+            | SymbolicBDD::RuleApplication(_)
+            | SymbolicBDD::AtomQuantifier(_, _, _) => {
                 unreachable!("removed by the rewriter")
             }
         }
@@ -341,26 +461,7 @@ impl ParsedFormula {
         contents: &mut dyn BufRead,
         variable_ordering: Option<Vec<NamedSymbol>>,
     ) -> io::Result<Self> {
-        let tokens = SymbolicBDD::tokenize(contents, variable_ordering)?;
-
-        let mut vars: Vec<NamedSymbol> = Self::extract_vars(&tokens);
-        vars.sort_by_key(|a| a.id);
-
-        let (definitions, formula) = SymbolicBDD::parse_formula(&mut tokens.iter().peekable())?;
-
-        let n = vars.len();
-        let mut result = Self {
-            vars,
-            free_vars: Vec::new(),
-            raw2free: Vec::with_capacity(n),
-            bdd: formula,
-            env,
-            definitions: Default::default(),
-        };
-
-        for (name, definition) in definitions {
-            result.define(&name, ReferenceContents::Syntax(definition));
-        }
+        let mut result = Self::parse(env, contents, variable_ordering)?;
 
         if result.uses_rewriting(&result.bdd) {
             let (bdd, atoms) = Rewriter::rewrite(&result)?;
@@ -384,10 +485,44 @@ impl ParsedFormula {
         Ok(result)
     }
 
+    /// Parse a formula with its definitions, without applying rewrite rules
+    pub fn parse(
+        env: Rc<BDDEnv<NamedSymbol>>,
+        contents: &mut dyn BufRead,
+        variable_ordering: Option<Vec<NamedSymbol>>,
+    ) -> io::Result<Self> {
+        let tokens = SymbolicBDD::tokenize(contents, variable_ordering)?;
+
+        let mut vars: Vec<NamedSymbol> = Self::extract_vars(&tokens);
+        vars.sort_by_key(|a| a.id);
+
+        let (definitions, signatures, formula) =
+            SymbolicBDD::parse_formula(&mut tokens.iter().peekable())?;
+
+        let n = vars.len();
+        let result = Self {
+            vars,
+            free_vars: Vec::new(),
+            raw2free: Vec::with_capacity(n),
+            bdd: formula,
+            env,
+            definitions: Default::default(),
+            signatures,
+        };
+
+        for (name, definition) in definitions {
+            result.define(&name, ReferenceContents::Syntax(definition));
+        }
+        result.check_types()?;
+
+        Ok(result)
+    }
+
     fn uses_rewriting(&self, formula: &SymbolicBDD) -> bool {
         match formula {
             SymbolicBDD::Summation(_, _)
             | SymbolicBDD::RuleApplication(_)
+            | SymbolicBDD::AtomQuantifier(_, _, _)
             | SymbolicBDD::BinaryOp(BinaryOperator::Rewrite | BinaryOperator::Equals, _, _) => true,
             SymbolicBDD::Reference(name) => matches!(
                 self.get_definition(name),
@@ -425,7 +560,9 @@ impl ParsedFormula {
             SymbolicBDD::FixedPoint(v, _, f) => v != var && self.var_is_free(f, var),
             SymbolicBDD::Subtree(_t) => unimplemented!(),
             SymbolicBDD::True | SymbolicBDD::False => false,
-            SymbolicBDD::Summation(_, _) | SymbolicBDD::RuleApplication(_) => {
+            SymbolicBDD::Summation(_, _)
+            | SymbolicBDD::RuleApplication(_)
+            | SymbolicBDD::AtomQuantifier(_, _, _) => {
                 unreachable!("removed by the rewriter")
             }
             SymbolicBDD::Reference(name) => {
@@ -485,10 +622,7 @@ impl ParsedFormula {
                 self.eval_recursive(e),
             ),
             SymbolicBDD::BinaryOp(op, l, r) => {
-                let l = self.eval_recursive(l);
-                let r = self.eval_recursive(r);
-
-                match op {
+                let apply = |l, r| match op {
                     BinaryOperator::And => self.env.and(l, r),
                     BinaryOperator::Or => self.env.or(l, r),
                     BinaryOperator::Xor => self.env.xor(l, r),
@@ -498,7 +632,18 @@ impl ParsedFormula {
                     BinaryOperator::ImpliesInv => self.env.implies(r, l),
                     BinaryOperator::Iff => self.env.as_ref().eq(l, r),
                     other => panic!("unexpected operator: {:?}", other),
-                }
+                };
+
+                // combine the operands of an associative operator one by one from left to right, so every operand
+                // restricts the next
+                let operands = if op.is_associative() {
+                    root.operands(*op)
+                } else {
+                    vec![l.as_ref(), r.as_ref()]
+                };
+                let mut operands = operands.into_iter().map(|f| self.eval_recursive(f));
+                let first = operands.next().expect("a binary operator has operands");
+                operands.fold(first, apply)
             }
             SymbolicBDD::FixedPoint(var, initial, transformer) => {
                 let env = &self.env;
@@ -521,6 +666,7 @@ impl ParsedFormula {
             ),
             SymbolicBDD::Summation(_, _)
             | SymbolicBDD::RuleApplication(_)
+            | SymbolicBDD::AtomQuantifier(_, _, _)
             | SymbolicBDD::Quantifier(QuantifierType::Induction, _, _) => {
                 unreachable!("removed by the rewriter")
             }
@@ -547,6 +693,7 @@ impl SymbolicBDD {
         match self {
             Self::Not(f)
             | Self::Quantifier(_, _, f)
+            | Self::AtomQuantifier(_, _, f)
             | Self::FixedPoint(_, _, f)
             | Self::Summation(_, f) => vec![f],
             Self::BinaryOp(_, l, r) => vec![l, r],
@@ -555,6 +702,21 @@ impl SymbolicBDD {
             Self::CountableVariable(_, l, r) => l.iter().chain(r).collect(),
             _ => vec![],
         }
+    }
+
+    /// The operands of nested applications of `op`, from left to right
+    pub fn operands(&self, op: BinaryOperator) -> Vec<&Self> {
+        let (mut operands, mut stack) = (Vec::new(), vec![self]);
+        while let Some(f) = stack.pop() {
+            match f {
+                Self::BinaryOp(o, l, r) if *o == op => {
+                    stack.push(r);
+                    stack.push(l);
+                }
+                other => operands.push(other),
+            }
+        }
+        operands
     }
 
     /// Build `l op r`, folding the constants `true` and `false` for `&`, `|` and `=>`
@@ -571,13 +733,36 @@ impl SymbolicBDD {
         }
     }
 
-    fn parse_formula(tokens: &mut TokenReader) -> io::Result<(Vec<(String, Self)>, Self)> {
+    #[allow(clippy::type_complexity)]
+    fn parse_formula(
+        tokens: &mut TokenReader,
+    ) -> io::Result<(Vec<(String, Self)>, Vec<(NamedSymbol, Signature)>, Self)> {
         let mut definitions = Vec::new();
+        let mut signatures = Vec::new();
 
         while eat(SymbolicBDDToken::Let, tokens) {
-            let name = Self::parse_reference_name(tokens)?;
-            expect(SymbolicBDDToken::Assign, tokens)?;
-            definitions.push((name, Self::parse_sub_formula(tokens)?));
+            if let Some(SymbolicBDDToken::Ident(_)) = tokens.peek() {
+                // a declaration `let a, b: A;`
+                let mut names = vec![Self::parse_ident(tokens)?];
+                while eat(SymbolicBDDToken::Comma, tokens) {
+                    names.push(Self::parse_ident(tokens)?);
+                }
+                expect(SymbolicBDDToken::Colon, tokens)?;
+                let signature = Self::parse_signature(tokens)?;
+                for name in names {
+                    if signatures.iter().any(|(s, _)| *s == name) {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            format!("{name} is declared twice"),
+                        ));
+                    }
+                    signatures.push((name, signature.clone()));
+                }
+            } else {
+                let name = Self::parse_reference_name(tokens)?;
+                expect(SymbolicBDDToken::Assign, tokens)?;
+                definitions.push((name, Self::parse_sub_formula(tokens)?));
+            }
             expect(SymbolicBDDToken::Semicolon, tokens)?;
         }
 
@@ -592,7 +777,71 @@ impl SymbolicBDD {
 
         expect(SymbolicBDDToken::Eof, tokens)?;
 
-        Ok((definitions, result))
+        Ok((definitions, signatures, result))
+    }
+
+    /// `A`, `(A1, .., An) -> B` or `pi T1, .., Tk # (A1, .., An) -> B`, where `B` may be `bool`
+    fn parse_signature(tokens: &mut TokenReader) -> io::Result<Signature> {
+        let mut params = Vec::new();
+        if eat(SymbolicBDDToken::Pi, tokens) {
+            loop {
+                params.push(Self::parse_ident(tokens)?);
+                if !eat(SymbolicBDDToken::Comma, tokens) {
+                    break;
+                }
+            }
+            expect(SymbolicBDDToken::Hash, tokens)?;
+        }
+        let mut args = Vec::new();
+        if eat(SymbolicBDDToken::OpenParen, tokens) {
+            loop {
+                args.push(Self::parse_type(tokens)?);
+                if !eat(SymbolicBDDToken::Comma, tokens) {
+                    break;
+                }
+            }
+            expect(SymbolicBDDToken::CloseParen, tokens)?;
+            expect(SymbolicBDDToken::Rewrite, tokens)?;
+        }
+        let result = if eat(SymbolicBDDToken::Bool, tokens) {
+            None
+        } else {
+            Some(Self::parse_type(tokens)?)
+        };
+        Ok(Signature {
+            params,
+            args,
+            result,
+        })
+    }
+
+    /// `type`, a type name, a type variable or a type constructor applied to types, such as `list(T)`
+    fn parse_type(tokens: &mut TokenReader) -> io::Result<DomainConstant> {
+        if eat(SymbolicBDDToken::Type, tokens) {
+            Ok(DomainConstant::Terminal(type_symbol()))
+        } else {
+            Self::parse_domain_constant(tokens)
+        }
+    }
+
+    /// The types of the variables bound by a quantifier with this body, from the guards of its `x: A` binders
+    pub fn binder_types(q: QuantifierType, body: &Self) -> Vec<(&NamedSymbol, &DomainConstant)> {
+        let guard = match (q, body) {
+            (QuantifierType::Forall, Self::BinaryOp(BinaryOperator::Implies, guard, _))
+            | (QuantifierType::Exists, Self::BinaryOp(BinaryOperator::And, guard, _)) => guard,
+            _ => return Vec::new(),
+        };
+        guard
+            .operands(BinaryOperator::And)
+            .into_iter()
+            .filter_map(|g| match g {
+                Self::RuleApplication(atom) => match atom.as_guard() {
+                    Some((DomainConstant::Terminal(v), ty)) => Some((v, ty)),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .collect()
     }
 
     fn parse_simple_sub_formula(tokens: &mut TokenReader) -> io::Result<Self> {
@@ -610,10 +859,9 @@ impl SymbolicBDD {
             Some(SymbolicBDDToken::Reference(_)) => {
                 Ok(Self::Reference(Self::parse_reference_name(tokens)?))
             }
-            Some(SymbolicBDDToken::Ident(_)) => match Self::parse_domain_constant(tokens)? {
-                DomainConstant::Terminal(name) => Ok(Self::Var(name)),
-                application => Ok(Self::RuleApplication(application)),
-            },
+            Some(SymbolicBDDToken::Ident(_)) => {
+                Ok(Self::from_term(&Self::parse_domain_constant(tokens)?))
+            }
             Some(SymbolicBDDToken::Not) => Self::parse_negation(tokens),
             Some(SymbolicBDDToken::Exists) => {
                 Self::parse_quantifier(tokens, SymbolicBDDToken::Exists, QuantifierType::Exists)
@@ -687,26 +935,21 @@ impl SymbolicBDD {
     }
 
     // f[x := y, ...] is rewritten to: exists x, ... # f & (x <=> y) & ...
+    // f[p(_) := q(_), ...] is rewritten to: exists p(_), ... # f & (forall _ # p(_) <=> q(_)) & ...
     fn parse_substitution(tokens: &mut TokenReader, formula: Self) -> io::Result<Self> {
         let mut targets = Vec::new();
         let mut replacements = Vec::new();
 
         loop {
-            targets.push(Self::parse_ident(tokens)?);
+            targets.push(Self::parse_domain_constant(tokens)?);
             expect(SymbolicBDDToken::Assign, tokens)?;
-            replacements.push(match tokens.next() {
-                Some(SymbolicBDDToken::Ident(v)) => Self::Var(v.clone()),
-                Some(SymbolicBDDToken::True) => Self::True,
-                Some(SymbolicBDDToken::False) => Self::False,
-                other => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Expected variable or constant in substitution, got {:?}",
-                            other
-                        ),
-                    ));
-                }
+            replacements.push(if eat(SymbolicBDDToken::True, tokens) {
+                Self::True
+            } else if eat(SymbolicBDDToken::False, tokens) {
+                Self::False
+            } else {
+                let replacement = Self::parse_domain_constant(tokens)?;
+                Self::from_term(&Self::number_wildcards(&replacement, &mut Vec::new()))
             });
 
             if !eat(SymbolicBDDToken::Comma, tokens) {
@@ -717,7 +960,7 @@ impl SymbolicBDD {
         expect(SymbolicBDDToken::CloseSquare, tokens)?;
 
         if let Some(v) = replacements.iter().find_map(|r| match r {
-            Self::Var(v) if targets.contains(v) => Some(v),
+            Self::Var(v) if targets.contains(&DomainConstant::Terminal(v.clone())) => Some(v),
             _ => None,
         }) {
             return Err(io::Error::new(
@@ -729,23 +972,53 @@ impl SymbolicBDD {
             ));
         }
 
-        let body = targets
-            .iter()
-            .zip(replacements)
-            .fold(formula, |acc, (target, replacement)| {
-                let binding = Self::BinaryOp(
-                    BinaryOperator::Iff,
-                    Box::new(Self::Var(target.clone())),
-                    Box::new(replacement),
-                );
-                Self::BinaryOp(BinaryOperator::And, Box::new(acc), Box::new(binding))
-            });
+        let mut body = formula;
+        for (target, replacement) in targets.iter().zip(replacements) {
+            let mut wildcards = Vec::new();
+            let mut binding = Self::BinaryOp(
+                BinaryOperator::Iff,
+                Box::new(Self::from_term(&Self::number_wildcards(
+                    target,
+                    &mut wildcards,
+                ))),
+                Box::new(replacement),
+            );
+            if !wildcards.is_empty() {
+                binding = Self::Quantifier(QuantifierType::Forall, wildcards, Box::new(binding));
+            }
+            body = Self::BinaryOp(BinaryOperator::And, Box::new(body), Box::new(binding));
+        }
 
-        Ok(Self::Quantifier(
-            QuantifierType::Exists,
-            targets,
-            Box::new(body),
-        ))
+        let targets = targets.into_iter().map(|t| (t, None)).collect();
+        Self::quantify(QuantifierType::Exists, targets, body)
+    }
+
+    /// Replace the n-th `_` in a term by the n-th wildcard variable, shared by the target and replacement of a substitution
+    fn number_wildcards(t: &DomainConstant, wildcards: &mut Vec<NamedSymbol>) -> DomainConstant {
+        match t {
+            DomainConstant::Terminal(v) if v.name.as_str() == "_" => {
+                let w = NamedSymbol {
+                    name: v.name.clone(),
+                    id: usize::MAX / 4 + wildcards.len(),
+                };
+                wildcards.push(w.clone());
+                DomainConstant::Terminal(w)
+            }
+            DomainConstant::Terminal(_) => t.clone(),
+            DomainConstant::Application(f, args) => DomainConstant::Application(
+                f.clone(),
+                args.iter()
+                    .map(|a| Self::number_wildcards(a, wildcards))
+                    .collect(),
+            ),
+        }
+    }
+
+    pub(crate) fn from_term(t: &DomainConstant) -> Self {
+        match t {
+            DomainConstant::Terminal(name) => Self::Var(name.clone()),
+            application => Self::RuleApplication(application.clone()),
+        }
     }
 
     fn parse_ite(tokens: &mut TokenReader) -> io::Result<Self> {
@@ -842,26 +1115,26 @@ impl SymbolicBDD {
         }
     }
 
-    fn parse_variable_list(tokens: &mut TokenReader) -> io::Result<Vec<NamedSymbol>> {
-        let mut vars = Vec::new();
-
-        loop {
-            if check(SymbolicBDDToken::Hash, tokens).is_err() {
-                vars.push(Self::parse_ident(tokens)?);
-
-                // if no comma is found after the variable, the list should end with a closing hash
-                if check(SymbolicBDDToken::Comma, tokens).is_err() {
-                    break;
-                } else {
-                    // otherwise expect a comma
-                    expect(SymbolicBDDToken::Comma, tokens)?;
-                }
+    // parse the binders of a quantifier or summation up to the closing hash: variables, typed variables `x: A`
+    // or atom patterns
+    fn parse_binder_list(
+        tokens: &mut TokenReader,
+    ) -> io::Result<Vec<(DomainConstant, Option<DomainConstant>)>> {
+        let mut binders = Vec::new();
+        while check(SymbolicBDDToken::Hash, tokens).is_err() {
+            let binder = Self::parse_domain_constant(tokens)?;
+            let ty = if eat(SymbolicBDDToken::Colon, tokens) {
+                Some(Self::parse_type(tokens)?)
             } else {
+                None
+            };
+            binders.push((binder, ty));
+            if !eat(SymbolicBDDToken::Comma, tokens) {
                 break;
             }
         }
-
-        Ok(vars)
+        expect(SymbolicBDDToken::Hash, tokens)?;
+        Ok(binders)
     }
 
     fn parse_fixed_point(tokens: &mut TokenReader, initial: bool) -> io::Result<Self> {
@@ -893,19 +1166,87 @@ impl SymbolicBDD {
         q: QuantifierType,
     ) -> io::Result<Self> {
         expect(token, tokens)?;
-        let vars = Self::parse_variable_list(tokens)?;
-
-        expect(SymbolicBDDToken::Hash, tokens)?;
+        let binders = Self::parse_binder_list(tokens)?;
         let formula = Self::parse_sub_formula(tokens)?;
+        Self::quantify(q, binders, formula)
+    }
+
+    fn quantify(
+        q: QuantifierType,
+        binders: Vec<(DomainConstant, Option<DomainConstant>)>,
+        mut formula: Self,
+    ) -> io::Result<Self> {
+        let mut vars = Vec::new();
+        let mut atoms = Vec::new();
+        let mut guards = Vec::new();
+        for (binder, ty) in binders {
+            match (binder, ty) {
+                (DomainConstant::Terminal(v), ty) => {
+                    if let Some(ty) = ty {
+                        guards.push(Self::RuleApplication(DomainConstant::has_type(
+                            DomainConstant::Terminal(v.clone()),
+                            ty,
+                        )));
+                    }
+                    vars.push(v);
+                }
+                (atom, None) => atoms.push(atom),
+                (atom, Some(_)) => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("the atom pattern {atom} cannot have a type"),
+                    ));
+                }
+            }
+        }
+
+        if !atoms.is_empty() {
+            if q == QuantifierType::Induction {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "an induction cannot range over atoms",
+                ));
+            }
+            formula = Self::AtomQuantifier(q, atoms, Box::new(formula));
+            if vars.is_empty() {
+                return Ok(formula);
+            }
+        }
+
+        if let Some(guard) = guards
+            .into_iter()
+            .reduce(|l, r| Self::BinaryOp(BinaryOperator::And, Box::new(l), Box::new(r)))
+        {
+            // `forall x: A # f` is `forall x # x: A => f`, and `exists x: A # f` is `exists x # x: A & f`
+            let op = match q {
+                QuantifierType::Forall => BinaryOperator::Implies,
+                QuantifierType::Exists => BinaryOperator::And,
+                QuantifierType::Induction => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "the variables of an induction cannot have a type",
+                    ));
+                }
+            };
+            formula = Self::BinaryOp(op, Box::new(guard), Box::new(formula));
+        }
 
         Ok(Self::Quantifier(q, vars, Box::new(formula)))
     }
 
     fn parse_summation(tokens: &mut TokenReader) -> io::Result<Self> {
         expect(SymbolicBDDToken::Sum, tokens)?;
-        let vars = Self::parse_variable_list(tokens)?;
+        let vars = Self::parse_binder_list(tokens)?
+            .into_iter()
+            .map(|binder| match binder {
+                (DomainConstant::Terminal(v), None) => Ok(v),
+                (atom, _) => Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Expected variable in summation, got {atom}"),
+                )),
+            })
+            .collect::<io::Result<_>>()?;
 
-        expect(SymbolicBDDToken::Hash, tokens)?;
         let formula = Self::parse_sub_formula(tokens)?;
 
         Ok(Self::Summation(vars, Box::new(formula)))
@@ -974,8 +1315,27 @@ impl SymbolicBDD {
                     ")" => result.push(SymbolicBDDToken::CloseParen),
                     "[" => result.push(SymbolicBDDToken::OpenSquare),
                     "]" => result.push(SymbolicBDDToken::CloseSquare),
-                    "," => result.push(SymbolicBDDToken::Comma),
                     ":=" => result.push(SymbolicBDDToken::Assign),
+                    ":" | "," => {
+                        // `let a, b: A;` declares `a` and `b`, so `a` is not the name of a definition
+                        if let [.., SymbolicBDDToken::Let, SymbolicBDDToken::Reference(name)] =
+                            result.as_slice()
+                        {
+                            let name = name.clone();
+                            definitions.remove(&name);
+                            result.pop();
+                            result.push(SymbolicBDDToken::Ident(ident(
+                                &name,
+                                &mut variable_indexes,
+                                &mut var_id_counter,
+                            )));
+                        }
+                        result.push(if symbol.as_str() == ":" {
+                            SymbolicBDDToken::Colon
+                        } else {
+                            SymbolicBDDToken::Comma
+                        });
+                    }
                     ";" => result.push(SymbolicBDDToken::Semicolon),
                     _ => {
                         return Err(io::Error::new(
@@ -1008,6 +1368,9 @@ impl SymbolicBDD {
                     "gfp" | "nu" => result.push(SymbolicBDDToken::GFP),
                     "lfp" | "mu" => result.push(SymbolicBDDToken::LFP),
                     "let" => result.push(SymbolicBDDToken::Let),
+                    "type" => result.push(SymbolicBDDToken::Type),
+                    "bool" => result.push(SymbolicBDDToken::Bool),
+                    "pi" => result.push(SymbolicBDDToken::Pi),
                     name if result.last() == Some(&SymbolicBDDToken::Let)
                         || definitions.contains(name) =>
                     {
@@ -1016,24 +1379,11 @@ impl SymbolicBDD {
                         }
                         result.push(SymbolicBDDToken::Reference(name.to_string()));
                     }
-                    var => {
-                        let var_str = var.to_string();
-                        let var_id: usize;
-
-                        if let Some(id) = variable_indexes.get(&var_str) {
-                            var_id = *id;
-                        } else {
-                            var_id = var_id_counter;
-                            var_id_counter += 1;
-
-                            variable_indexes.insert(var_str.clone(), var_id);
-                        }
-
-                        result.push(SymbolicBDDToken::Ident(NamedSymbol {
-                            name: Rc::new(var_str),
-                            id: var_id,
-                        }))
-                    }
+                    var => result.push(SymbolicBDDToken::Ident(ident(
+                        var,
+                        &mut variable_indexes,
+                        &mut var_id_counter,
+                    ))),
                 }
             } else if let Some(number) = c.name("countable") {
                 let parsed_number = number.as_str().parse().expect("Failed to parse number");
@@ -1053,6 +1403,18 @@ impl SymbolicBDD {
         }
 
         Ok(result)
+    }
+}
+
+/// The symbol of an identifier: the same name always has the same id
+fn ident(name: &str, indexes: &mut FxHashMap<String, usize>, counter: &mut usize) -> NamedSymbol {
+    let id = *indexes.entry(name.to_string()).or_insert_with(|| {
+        *counter += 1;
+        *counter - 1
+    });
+    NamedSymbol {
+        name: Rc::new(name.to_string()),
+        id,
     }
 }
 

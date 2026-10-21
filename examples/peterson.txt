@@ -7,11 +7,10 @@ Each process cycles through idle -> wait -> crit -> idle:
     wait: enter the critical section if the other process is idle or it is our turn
     crit: lower the flag and leave
 
-State variables (unprimed = current, primed = next):
+The state is a function of w: the current state Cur, its predecessor Prev or its successor Next:
 
-    a1, a0   program counter of P0   (idle = 00, wait = 01, crit = 10)
-    b1, b0   program counter of P1
-    t        turn (false = P0, true = P1)
+    pc(w, p, l)   the program counter of process p is l   (Idle, Wait or Crit)
+    turn(w)       turn (false = P0, true = P1)
 
 The flag of a process is raised exactly when it is not idle, so it is not a separate variable.
 
@@ -26,41 +25,45 @@ Run with:
     rsbdd examples/peterson.txt -t
 "
 
-let idle0 := -a1 & -a0;
-let wait0 := -a1 &  a0;
-let crit0 :=  a1 & -a0;
-let idle1 := -b1 & -b0;
-let wait1 := -b1 &  b0;
-let crit1 :=  b1 & -b0;
-
-let keep0 := (a1' <=> a1) & (a0' <=> a0);
-let keep1 := (b1' <=> b1) & (b0' <=> b0);
-let keept := t' <=> t;
-
-let T0 :=
-    idle0 & wait0[a1 := a1', a0 := a0'] & t' |
-    wait0 & (idle1 | -t) & crit0[a1 := a1', a0 := a0'] & keept |
-    crit0 & idle0[a1 := a1', a0 := a0'] & keept;
-
-let T1 :=
-    idle1 & wait1[b1 := b1', b0 := b0'] & -t' |
-    wait1 & (idle0 | t) & crit1[b1 := b1', b0 := b0'] & keept |
-    crit1 & idle1[b1 := b1', b0 := b0'] & keept;
-
-let T := T0 & keep1 | T1 & keep0;
-
-let init := idle0 & idle1 & -t;
+let init := is_at(Cur, P0, Idle) & is_at(Cur, P1, Idle) & -turn(Cur);
 
 let Reach := lfp R # init |
-    (exists a1, a0, b1, b0, t # R & T)[a1' := a1, a0' := a0, b1' := b1, b0' := b0, t' := t];
+    exists pc(Prev, _, _), turn(Prev) #
+        R[pc(Cur, P0, _) := pc(Prev, P0, _), pc(Cur, P1, _) := pc(Prev, P1, _), turn(Cur) := turn(Prev)] & step(Prev, Cur);
 
-let CanCrit0 := lfp Z # crit0 |
-    exists a1', a0', b1', b0', t' # T & Z[a1 := a1', a0 := a0', b1 := b1', b0 := b0', t := t'];
+let CanCrit0 := lfp Z # is_at(Cur, P0, Crit) |
+    exists pc(Next, _, _), turn(Next) #
+        step(Cur, Next) & Z[pc(Cur, P0, _) := pc(Next, P0, _), pc(Cur, P1, _) := pc(Next, P1, _), turn(Cur) := turn(Next)];
 
-let Overtaken := gfp Z # wait0 &
-    exists a1', a0', b1', b0', t' # T1 & keep0 & Z[a1 := a1', a0 := a0', b1 := b1', b0 := b0', t := t'];
+let Overtaken := gfp Z # is_at(Cur, P0, Wait) &
+    exists pc(Next, _, _), turn(Next) #
+        step1(Cur, Next) & keep(P0, Cur, Next) & Z[pc(Cur, P0, _) := pc(Next, P0, _), pc(Cur, P1, _) := pc(Next, P1, _), turn(Cur) := turn(Next)];
 
-mutex <=> forall a1, a0, b1, b0, t # Reach => -(crit0 & crit1);
-deadlock_free <=> forall a1, a0, b1, b0, t # Reach => exists a1', a0', b1', b0', t' # T;
-recoverable <=> forall a1, a0, b1, b0, t # Reach => CanCrit0;
-no_overtaking <=> forall a1, a0, b1, b0, t # Reach => -Overtaken
+location(Idle) -> true;
+location(Wait) -> true;
+location(Crit) -> true;
+
+"In state w the program counter of process p is l, and no other location"
+sum w, p, l # is_at(w, p, l) -> forall k # location(k) => (pc(w, p, k) <=> k = l);
+
+"The program counter of process p, or the turn, does not change from state u to v"
+sum p, u, v # keep(p, u, v) -> forall k # location(k) => (pc(v, p, k) <=> pc(u, p, k));
+sum u, v # keept(u, v) -> (turn(v) <=> turn(u));
+
+"A step of P0 or P1 from state u to state v"
+sum u, v # step0(u, v) ->
+    is_at(u, P0, Idle) & is_at(v, P0, Wait) & turn(v) |
+    is_at(u, P0, Wait) & (is_at(u, P1, Idle) | -turn(u)) & is_at(v, P0, Crit) & keept(u, v) |
+    is_at(u, P0, Crit) & is_at(v, P0, Idle) & keept(u, v);
+
+sum u, v # step1(u, v) ->
+    is_at(u, P1, Idle) & is_at(v, P1, Wait) & -turn(v) |
+    is_at(u, P1, Wait) & (is_at(u, P0, Idle) | turn(u)) & is_at(v, P1, Crit) & keept(u, v) |
+    is_at(u, P1, Crit) & is_at(v, P1, Idle) & keept(u, v);
+
+sum u, v # step(u, v) -> step0(u, v) & keep(P1, u, v) | step1(u, v) & keep(P0, u, v);
+
+mutex <=> forall pc(Cur, _, _), turn(Cur) # Reach => -(is_at(Cur, P0, Crit) & is_at(Cur, P1, Crit));
+deadlock_free <=> forall pc(Cur, _, _), turn(Cur) # Reach => exists pc(Next, _, _), turn(Next) # step(Cur, Next);
+recoverable <=> forall pc(Cur, _, _), turn(Cur) # Reach => CanCrit0;
+no_overtaking <=> forall pc(Cur, _, _), turn(Cur) # Reach => -Overtaken

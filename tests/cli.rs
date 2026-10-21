@@ -37,6 +37,18 @@ fn test_examples() {
 }
 
 #[test]
+fn test_first_order_examples() {
+    insta::glob!("../examples/fol", "*.txt", |p| {
+        let path = p
+            .strip_prefix(env!("CARGO_MANIFEST_DIR"))
+            .expect("file outside of crate")
+            .to_str()
+            .expect("non UTF-8 path");
+        insta::assert_snapshot!(run(&["--prove", path]));
+    });
+}
+
+#[test]
 fn test_data() {
     insta::glob!("data", "*.txt", |p| snapshot_file("data", p));
 }
@@ -105,10 +117,41 @@ fn test_default_output() {
 }
 
 #[test]
+fn test_witness() {
+    insta::assert_snapshot!(run(&["--prove", "--witness", "examples/fol/sudoku.txt"]));
+}
+
+#[test]
 fn test_rewritten() {
     insta::assert_snapshot!(run(&[
         "-w",
         "-",
         "tests/data/rewrite_open_atoms_is_true.txt"
+    ]));
+}
+
+#[test]
+fn test_type_errors() {
+    insta::assert_snapshot!(run_formulas(&[
+        "let a: type; let c: a; let f: (a) -> a; f(c, c) = c",
+        "let a, b: type; let c: a; let p: (b) -> bool; p(c)",
+        "let a: type; let c: a; c",
+        "let a: type; let p: (a) -> bool; exists x: a # p(p(x))",
+        "let a, b: type; let c: a; let d: b; c = d",
+        "forall x: a # true",
+        "let f: pi T # (T) -> T; let a: type; let c: a; f(c, c) = c",
+        "let a: type; let a: type; true",
+        "let type: type; true",
+        "exists p(_): bool # p(a)",
+    ]));
+}
+
+#[test]
+fn test_declarations() {
+    insta::assert_snapshot!(run_formulas(&[
+        // a declaration does not make a definition, and `p` and `q` are still propositions
+        "let p, q: bool; let d := p & q; d",
+        "let a: type; let c, d: a; let f: (a) -> a; forall x: a # f(x) = f(x)",
+        "let a: type; let c, d: a; exists x: a # x = c",
     ]));
 }

@@ -1,0 +1,13 @@
+---
+source: tests/cli.rs
+expression: "run(&[\"--prove\", path])"
+input_file: examples/fol/coffee.txt
+---
+$ rsbdd --prove examples/fol/coffee.txt
+status: 10
+--- stdout
+18. help_people_stay_awake(mixture(beverage, coffee, s)) [negated goal]
+19. -help_people_stay_awake(mixture(beverage, coffee, mixture(syrup, caramel_syrup, vanilla_syrup))) [negated goal]
+42. false [simplification 19, 18]
+theorem
+--- stderr
