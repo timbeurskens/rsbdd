@@ -1,6 +1,6 @@
 [package]
 name = "rsbdd"
-version = "0.26.0"
+version.workspace = true
 authors.workspace = true
 edition.workspace = true
 description = "A BDD-based SAT solver"
@@ -17,6 +17,7 @@ members = [
 default-members = ["."]
 
 [workspace.package]
+version = "0.28.0"
 authors = ["Tim Beurskens <timbeurskens.97@gmail.com>"]
 edition = "2024"
 

@@ -1,6 +1,6 @@
 [package]
 name = "tptp2rsbdd"
-version = "0.1.0"
+version.workspace = true
 authors.workspace = true
 edition.workspace = true
 description = "Downloads a TPTP problem and translates it to an rsbdd formula"

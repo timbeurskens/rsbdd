@@ -1,12 +1,12 @@
 [package]
 name = "sudoku2rsbdd"
-version = "0.18.0"
-description = "Converts a sudoku puzzle into an rsbdd formula"
-edition.workspace = true
+version.workspace = true
 authors.workspace = true
-
-[lints]
-workspace = true
+edition.workspace = true
+description = "Converts a sudoku puzzle into an rsbdd formula"
 
 [dependencies]
 clap.workspace = true
+
+[lints]
+workspace = true

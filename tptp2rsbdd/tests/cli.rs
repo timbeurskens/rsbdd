@@ -34,7 +34,9 @@ fn is_theorem(formula: &str) -> bool {
 fn test_puzzles() {
     for problem in ["PUZ001-1", "PUZ001+1"] {
         let formula = translate(&format!("tests/data/{problem}.p"));
-        insta::assert_snapshot!(problem, formula);
+        // the version changes with every release
+        let unversioned = formula.replace(env!("CARGO_PKG_VERSION"), "[version]");
+        insta::assert_snapshot!(problem, unversioned);
         assert!(is_theorem(&formula), "{problem} is not proven");
     }
 }
