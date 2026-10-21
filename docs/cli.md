@@ -154,7 +154,7 @@ Options:
   -h, --help            Print help
   -V, --version         Print version
 
-Only the fof and cnf languages are supported.
+The fof, cnf and tff (TF0 and TF1, without arithmetic) languages are supported.
 
 Examples:
   tptp2rsbdd PUZ001-1 | rsbdd - --prove

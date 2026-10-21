@@ -129,3 +129,29 @@ fn test_rewritten() {
         "tests/data/rewrite_open_atoms_is_true.txt"
     ]));
 }
+
+#[test]
+fn test_type_errors() {
+    insta::assert_snapshot!(run_formulas(&[
+        "let a: type; let c: a; let f: (a) -> a; f(c, c) = c",
+        "let a, b: type; let c: a; let p: (b) -> bool; p(c)",
+        "let a: type; let c: a; c",
+        "let a: type; let p: (a) -> bool; exists x: a # p(p(x))",
+        "let a, b: type; let c: a; let d: b; c = d",
+        "forall x: a # true",
+        "let f: pi T # (T) -> T; let a: type; let c: a; f(c, c) = c",
+        "let a: type; let a: type; true",
+        "let type: type; true",
+        "exists p(_): bool # p(a)",
+    ]));
+}
+
+#[test]
+fn test_declarations() {
+    insta::assert_snapshot!(run_formulas(&[
+        // a declaration does not make a definition, and `p` and `q` are still propositions
+        "let p, q: bool; let d := p & q; d",
+        "let a: type; let c, d: a; let f: (a) -> a; forall x: a # f(x) = f(x)",
+        "let a: type; let c, d: a; exists x: a # x = c",
+    ]));
+}

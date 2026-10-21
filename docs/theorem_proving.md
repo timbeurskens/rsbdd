@@ -208,6 +208,10 @@ theorem
 
   The differences between `--prove` and finite mode are described in
   [Finite mode and first-order proofs](finite_and_first_order.md).
+- Typed formulas ([Types](syntax.md#types)) are proven by reading the declarations as axioms about the guards
+  `(x: A)` of the typed binders, or by erasing the types if they are monotonic; see
+  [Types](finite_and_first_order.md#types). [coffee.txt](../examples/fol/coffee.txt) is TPTP problem PUZ139_1, with a
+  polymorphic `mixture`.
 
 More puzzles in [examples/fol](../examples/fol): the barber paradox ([barber.txt](../examples/fol/barber.txt)), the
 drinker paradox ([drinker.txt](../examples/fol/drinker.txt)), Lewis Carroll's animals puzzle

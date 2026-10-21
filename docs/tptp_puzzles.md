@@ -6,7 +6,8 @@ This chapter builds on [Theorem proving](theorem_proving.md) and
 The [TPTP library](https://tptp.org) (v9.3.1) has 164 problems in its puzzle domain, PUZ. This chapter describes how
 `rsbdd --prove` does on the 150 problems in first-order form (`fof`) or clause normal form (`cnf`), and which
 limitations of rsbdd keep it from solving the others. The remaining problems are higher-order (`thf`) or typed
-(`tff`), which rsbdd does not read.
+(`tff`). `tptp2rsbdd` translates the typed problems without arithmetic into rsbdd's [types](syntax.md#types), but
+they are not part of the results below.
 
 Several of the puzzles are also examples, written by hand:
 
@@ -22,6 +23,7 @@ Several of the puzzles are also examples, written by hand:
 | PUZ034 | N queens                       | [4_queens.txt](../examples/4_queens.txt)                               |
 | PUZ047 | Wolf, goat and cabbage         | [wolf_goat_cabbage.txt](../examples/wolf_goat_cabbage.txt)             |
 | PUZ056 | Tower of Hanoi                 | [tower_of_hanoi.txt](../examples/tower_of_hanoi.txt)                   |
+| PUZ139_1 | Caramel vanilla coffee       | [fol/coffee.txt](../examples/fol/coffee.txt)                           |
 | PUZ164 | A loop from 0 to 0             | [term_reachability.txt](../examples/term_reachability.txt)             |
 
 ## Method
@@ -126,8 +128,8 @@ The analysis shows these limitations, roughly from the easiest to the hardest to
   so they have to be renamed.
 - **Rules for constants.** A rule needs an application on its left-hand side, so `g -> edge(..)` is rejected, and a
   constant that names a term has to be written out.
-- **TPTP input.** rsbdd does not read TPTP files: problems are translated by `tptp2rsbdd`, which only reads the
-  untyped languages `fof` and `cnf`.
+- **TPTP input.** rsbdd does not read TPTP files: problems are translated by `tptp2rsbdd`, which reads `fof`,
+  `cnf` and `tff` (TF0 and TF1). Arithmetic, the extensions of TFX and higher-order `thf` are not supported.
 - **Answers.** Some puzzles ask for values: PUZ035-7 asks what the asked person and the other person are, given the
   answer. `--prove` reports `theorem` with the proof, but does not extract the values of the existential variables.
 - **Model finding.** `--prove` searches for a countermodel as Mace4 does, with flattened ground clauses, unit

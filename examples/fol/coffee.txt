@@ -1,0 +1,34 @@
+"
+Caramel vanilla coffee helps people stay awake
+
+The situation
+
+    Coffee is a beverage. Vanilla syrup and caramel syrup are syrups.
+    The mixture of a syrup and a beverage is a beverage, and the mixture of a syrup and a syrup is a syrup.
+    The mixture of coffee and any syrup helps people stay awake.
+
+The question is: does caramel vanilla coffee help people stay awake?
+
+From: TPTP problem PUZ139_1 (Arhami, 2014)
+
+---
+
+Yes. mixture is polymorphic: its first argument is the type of the mixture, so mixture(syrup, caramel_syrup,
+vanilla_syrup) is a syrup, and the coffee mixed with it helps people stay awake.
+
+No variable is an operand of =, so the types are monotonic and the prover erases them: the proof instantiates the
+axiom with the syrup directly.
+
+Run with:
+    rsbdd examples/fol/coffee.txt --prove
+"
+
+let beverage: type;
+let syrup: type;
+let coffee: beverage;
+let vanilla_syrup, caramel_syrup: syrup;
+let mixture: pi T # (T, syrup) -> T;
+let help_people_stay_awake: (beverage) -> bool;
+
+(forall s: syrup # help_people_stay_awake(mixture(beverage, coffee, s))) =>
+    help_people_stay_awake(mixture(beverage, coffee, mixture(syrup, caramel_syrup, vanilla_syrup)))

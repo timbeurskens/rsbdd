@@ -16,7 +16,7 @@ use tptp2rsbdd::translate::translate;
     version,
     about,
     long_about = None,
-    after_help = "Only the fof and cnf languages are supported.\n\n\
+    after_help = "The fof, cnf and tff (TF0 and TF1, without arithmetic) languages are supported.\n\n\
 Examples:\n  \
 tptp2rsbdd PUZ001-1 | rsbdd - --prove\n  \
 tptp2rsbdd SET001-1 set001.txt\n  \

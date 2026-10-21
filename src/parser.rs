@@ -18,7 +18,7 @@ use crate::bdd::{BDD, BDDEnv};
 use crate::rewriter::Rewriter;
 
 lazy_static! {
-    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|->|-|<=>|<=|\||\^|#|\*|\+|>=|:=|=|>|<|\[|\]|,|;|\(|\))|(?P<countable>\d+)|\{(?P<reference>[\w']+)\}|(?P<identifier>[\w']+)|(?P<eof>$)|(?P<comment>"[^"]*")"#).expect("Error setting-up tokenizer regex");
+    static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|->|-|<=>|<=|\||\^|#|\*|\+|>=|:=|:|=|>|<|\[|\]|,|;|\(|\))|(?P<countable>\d+)|\{(?P<reference>[\w']+)\}|(?P<identifier>[\w']+)|(?P<eof>$)|(?P<comment>"[^"]*")"#).expect("Error setting-up tokenizer regex");
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,6 +59,10 @@ pub enum SymbolicBDDToken {
     Hash,
     Let,
     Assign,
+    Colon,
+    Type,
+    Bool,
+    Pi,
     Semicolon,
     Eof,
 }
@@ -106,8 +110,100 @@ pub enum DomainConstant {
     Application(NamedSymbol, Vec<Self>),
 }
 
+/// The predicate of the guard `x: A` of a typed binder, which cannot be written as a name
+pub fn has_type_symbol() -> NamedSymbol {
+    NamedSymbol {
+        name: Rc::new(":".to_string()),
+        id: usize::MAX / 2 - 2,
+    }
+}
+
+/// The type of types, written `type`
+pub fn type_symbol() -> NamedSymbol {
+    NamedSymbol {
+        name: Rc::new("type".to_string()),
+        id: usize::MAX / 2 - 1,
+    }
+}
+
+/// The `i`-th argument of a declared symbol, a variable of the typing rules and axioms of its signature
+pub fn argument_symbol(i: usize) -> NamedSymbol {
+    NamedSymbol {
+        name: Rc::new(format!("x{i}")),
+        id: usize::MAX / 4 + i,
+    }
+}
+
+impl DomainConstant {
+    /// The guard `t: A`
+    pub fn has_type(t: Self, ty: Self) -> Self {
+        Self::Application(has_type_symbol(), vec![t, ty])
+    }
+
+    /// The term and type of a guard `t: A`
+    pub fn as_guard(&self) -> Option<(&Self, &Self)> {
+        match self {
+            Self::Application(s, args) if *s == has_type_symbol() => match args.as_slice() {
+                [t, ty] => Some((t, ty)),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+}
+
+/// The type of a declared symbol: `A`, `(A1, .., An) -> B` or `pi T1, .., Tk # (A1, .., An) -> B`.
+///
+/// The type parameters `T` are the first arguments of an application. The result is `None` for a predicate
+/// (`-> bool`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Signature {
+    pub params: Vec<NamedSymbol>,
+    pub args: Vec<DomainConstant>,
+    pub result: Option<DomainConstant>,
+}
+
+impl Signature {
+    /// The variables of an application of the declared symbol: the type parameters and one per argument
+    pub fn vars(&self) -> Vec<NamedSymbol> {
+        let n = self.params.len();
+        self.params
+            .iter()
+            .cloned()
+            .chain((0..self.args.len()).map(|i| argument_symbol(n + i)))
+            .collect()
+    }
+
+    /// The application of `f` to the variables of the signature, with the guards of its arguments
+    pub fn application(&self, f: &NamedSymbol) -> (DomainConstant, Vec<DomainConstant>) {
+        let vars = self.vars();
+        let application = if vars.is_empty() {
+            DomainConstant::Terminal(f.clone())
+        } else {
+            DomainConstant::Application(
+                f.clone(),
+                vars.iter().cloned().map(DomainConstant::Terminal).collect(),
+            )
+        };
+        let types = self
+            .params
+            .iter()
+            .map(|_| DomainConstant::Terminal(type_symbol()))
+            .chain(self.args.iter().cloned());
+        let guards = vars
+            .into_iter()
+            .zip(types)
+            .map(|(v, ty)| DomainConstant::has_type(DomainConstant::Terminal(v), ty))
+            .collect();
+        (application, guards)
+    }
+}
+
 impl Display for DomainConstant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some((t, ty)) = self.as_guard() {
+            return write!(f, "({t}: {ty})");
+        }
         match self {
             Self::Terminal(s) => write!(f, "{}", s),
             Self::Application(s, args) => write!(f, "{}({})", s, args.iter().join(", ")),
@@ -224,6 +320,9 @@ pub struct ParsedFormula {
     pub env: Rc<BDDEnv<NamedSymbol>>,
 
     pub definitions: RefCell<FxHashMap<String, ReferenceContents>>,
+
+    // the declared types of symbols, `let f: A;`
+    pub signatures: Vec<(NamedSymbol, Signature)>,
 }
 
 #[derive(Debug, Clone)]
@@ -235,6 +334,11 @@ pub enum ReferenceContents {
 type TokenReader<'a> = Peekable<Iter<'a, SymbolicBDDToken>>;
 
 impl ParsedFormula {
+    /// Check the declarations, and that declared symbols are applied to arguments of their declared types
+    fn check_types(&self) -> io::Result<()> {
+        crate::types::check(self)
+    }
+
     /// Define a new BDD by name
     pub fn define(&self, name: &str, contents: ReferenceContents) {
         self.definitions
@@ -392,7 +496,8 @@ impl ParsedFormula {
         let mut vars: Vec<NamedSymbol> = Self::extract_vars(&tokens);
         vars.sort_by_key(|a| a.id);
 
-        let (definitions, formula) = SymbolicBDD::parse_formula(&mut tokens.iter().peekable())?;
+        let (definitions, signatures, formula) =
+            SymbolicBDD::parse_formula(&mut tokens.iter().peekable())?;
 
         let n = vars.len();
         let result = Self {
@@ -402,11 +507,13 @@ impl ParsedFormula {
             bdd: formula,
             env,
             definitions: Default::default(),
+            signatures,
         };
 
         for (name, definition) in definitions {
             result.define(&name, ReferenceContents::Syntax(definition));
         }
+        result.check_types()?;
 
         Ok(result)
     }
@@ -626,13 +733,36 @@ impl SymbolicBDD {
         }
     }
 
-    fn parse_formula(tokens: &mut TokenReader) -> io::Result<(Vec<(String, Self)>, Self)> {
+    #[allow(clippy::type_complexity)]
+    fn parse_formula(
+        tokens: &mut TokenReader,
+    ) -> io::Result<(Vec<(String, Self)>, Vec<(NamedSymbol, Signature)>, Self)> {
         let mut definitions = Vec::new();
+        let mut signatures = Vec::new();
 
         while eat(SymbolicBDDToken::Let, tokens) {
-            let name = Self::parse_reference_name(tokens)?;
-            expect(SymbolicBDDToken::Assign, tokens)?;
-            definitions.push((name, Self::parse_sub_formula(tokens)?));
+            if let Some(SymbolicBDDToken::Ident(_)) = tokens.peek() {
+                // a declaration `let a, b: A;`
+                let mut names = vec![Self::parse_ident(tokens)?];
+                while eat(SymbolicBDDToken::Comma, tokens) {
+                    names.push(Self::parse_ident(tokens)?);
+                }
+                expect(SymbolicBDDToken::Colon, tokens)?;
+                let signature = Self::parse_signature(tokens)?;
+                for name in names {
+                    if signatures.iter().any(|(s, _)| *s == name) {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            format!("{name} is declared twice"),
+                        ));
+                    }
+                    signatures.push((name, signature.clone()));
+                }
+            } else {
+                let name = Self::parse_reference_name(tokens)?;
+                expect(SymbolicBDDToken::Assign, tokens)?;
+                definitions.push((name, Self::parse_sub_formula(tokens)?));
+            }
             expect(SymbolicBDDToken::Semicolon, tokens)?;
         }
 
@@ -647,7 +777,71 @@ impl SymbolicBDD {
 
         expect(SymbolicBDDToken::Eof, tokens)?;
 
-        Ok((definitions, result))
+        Ok((definitions, signatures, result))
+    }
+
+    /// `A`, `(A1, .., An) -> B` or `pi T1, .., Tk # (A1, .., An) -> B`, where `B` may be `bool`
+    fn parse_signature(tokens: &mut TokenReader) -> io::Result<Signature> {
+        let mut params = Vec::new();
+        if eat(SymbolicBDDToken::Pi, tokens) {
+            loop {
+                params.push(Self::parse_ident(tokens)?);
+                if !eat(SymbolicBDDToken::Comma, tokens) {
+                    break;
+                }
+            }
+            expect(SymbolicBDDToken::Hash, tokens)?;
+        }
+        let mut args = Vec::new();
+        if eat(SymbolicBDDToken::OpenParen, tokens) {
+            loop {
+                args.push(Self::parse_type(tokens)?);
+                if !eat(SymbolicBDDToken::Comma, tokens) {
+                    break;
+                }
+            }
+            expect(SymbolicBDDToken::CloseParen, tokens)?;
+            expect(SymbolicBDDToken::Rewrite, tokens)?;
+        }
+        let result = if eat(SymbolicBDDToken::Bool, tokens) {
+            None
+        } else {
+            Some(Self::parse_type(tokens)?)
+        };
+        Ok(Signature {
+            params,
+            args,
+            result,
+        })
+    }
+
+    /// `type`, a type name, a type variable or a type constructor applied to types, such as `list(T)`
+    fn parse_type(tokens: &mut TokenReader) -> io::Result<DomainConstant> {
+        if eat(SymbolicBDDToken::Type, tokens) {
+            Ok(DomainConstant::Terminal(type_symbol()))
+        } else {
+            Self::parse_domain_constant(tokens)
+        }
+    }
+
+    /// The types of the variables bound by a quantifier with this body, from the guards of its `x: A` binders
+    pub fn binder_types(q: QuantifierType, body: &Self) -> Vec<(&NamedSymbol, &DomainConstant)> {
+        let guard = match (q, body) {
+            (QuantifierType::Forall, Self::BinaryOp(BinaryOperator::Implies, guard, _))
+            | (QuantifierType::Exists, Self::BinaryOp(BinaryOperator::And, guard, _)) => guard,
+            _ => return Vec::new(),
+        };
+        guard
+            .operands(BinaryOperator::And)
+            .into_iter()
+            .filter_map(|g| match g {
+                Self::RuleApplication(atom) => match atom.as_guard() {
+                    Some((DomainConstant::Terminal(v), ty)) => Some((v, ty)),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .collect()
     }
 
     fn parse_simple_sub_formula(tokens: &mut TokenReader) -> io::Result<Self> {
@@ -795,6 +989,7 @@ impl SymbolicBDD {
             body = Self::BinaryOp(BinaryOperator::And, Box::new(body), Box::new(binding));
         }
 
+        let targets = targets.into_iter().map(|t| (t, None)).collect();
         Self::quantify(QuantifierType::Exists, targets, body)
     }
 
@@ -920,11 +1115,20 @@ impl SymbolicBDD {
         }
     }
 
-    // parse the binders of a quantifier or summation up to the closing hash: variables or atom patterns
-    fn parse_binder_list(tokens: &mut TokenReader) -> io::Result<Vec<DomainConstant>> {
+    // parse the binders of a quantifier or summation up to the closing hash: variables, typed variables `x: A`
+    // or atom patterns
+    fn parse_binder_list(
+        tokens: &mut TokenReader,
+    ) -> io::Result<Vec<(DomainConstant, Option<DomainConstant>)>> {
         let mut binders = Vec::new();
         while check(SymbolicBDDToken::Hash, tokens).is_err() {
-            binders.push(Self::parse_domain_constant(tokens)?);
+            let binder = Self::parse_domain_constant(tokens)?;
+            let ty = if eat(SymbolicBDDToken::Colon, tokens) {
+                Some(Self::parse_type(tokens)?)
+            } else {
+                None
+            };
+            binders.push((binder, ty));
             if !eat(SymbolicBDDToken::Comma, tokens) {
                 break;
             }
@@ -969,15 +1173,30 @@ impl SymbolicBDD {
 
     fn quantify(
         q: QuantifierType,
-        binders: Vec<DomainConstant>,
+        binders: Vec<(DomainConstant, Option<DomainConstant>)>,
         mut formula: Self,
     ) -> io::Result<Self> {
         let mut vars = Vec::new();
         let mut atoms = Vec::new();
-        for binder in binders {
-            match binder {
-                DomainConstant::Terminal(v) => vars.push(v),
-                atom => atoms.push(atom),
+        let mut guards = Vec::new();
+        for (binder, ty) in binders {
+            match (binder, ty) {
+                (DomainConstant::Terminal(v), ty) => {
+                    if let Some(ty) = ty {
+                        guards.push(Self::RuleApplication(DomainConstant::has_type(
+                            DomainConstant::Terminal(v.clone()),
+                            ty,
+                        )));
+                    }
+                    vars.push(v);
+                }
+                (atom, None) => atoms.push(atom),
+                (atom, Some(_)) => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("the atom pattern {atom} cannot have a type"),
+                    ));
+                }
             }
         }
 
@@ -994,6 +1213,24 @@ impl SymbolicBDD {
             }
         }
 
+        if let Some(guard) = guards
+            .into_iter()
+            .reduce(|l, r| Self::BinaryOp(BinaryOperator::And, Box::new(l), Box::new(r)))
+        {
+            // `forall x: A # f` is `forall x # x: A => f`, and `exists x: A # f` is `exists x # x: A & f`
+            let op = match q {
+                QuantifierType::Forall => BinaryOperator::Implies,
+                QuantifierType::Exists => BinaryOperator::And,
+                QuantifierType::Induction => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "the variables of an induction cannot have a type",
+                    ));
+                }
+            };
+            formula = Self::BinaryOp(op, Box::new(guard), Box::new(formula));
+        }
+
         Ok(Self::Quantifier(q, vars, Box::new(formula)))
     }
 
@@ -1002,8 +1239,8 @@ impl SymbolicBDD {
         let vars = Self::parse_binder_list(tokens)?
             .into_iter()
             .map(|binder| match binder {
-                DomainConstant::Terminal(v) => Ok(v),
-                atom => Err(io::Error::new(
+                (DomainConstant::Terminal(v), None) => Ok(v),
+                (atom, _) => Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     format!("Expected variable in summation, got {atom}"),
                 )),
@@ -1078,8 +1315,27 @@ impl SymbolicBDD {
                     ")" => result.push(SymbolicBDDToken::CloseParen),
                     "[" => result.push(SymbolicBDDToken::OpenSquare),
                     "]" => result.push(SymbolicBDDToken::CloseSquare),
-                    "," => result.push(SymbolicBDDToken::Comma),
                     ":=" => result.push(SymbolicBDDToken::Assign),
+                    ":" | "," => {
+                        // `let a, b: A;` declares `a` and `b`, so `a` is not the name of a definition
+                        if let [.., SymbolicBDDToken::Let, SymbolicBDDToken::Reference(name)] =
+                            result.as_slice()
+                        {
+                            let name = name.clone();
+                            definitions.remove(&name);
+                            result.pop();
+                            result.push(SymbolicBDDToken::Ident(ident(
+                                &name,
+                                &mut variable_indexes,
+                                &mut var_id_counter,
+                            )));
+                        }
+                        result.push(if symbol.as_str() == ":" {
+                            SymbolicBDDToken::Colon
+                        } else {
+                            SymbolicBDDToken::Comma
+                        });
+                    }
                     ";" => result.push(SymbolicBDDToken::Semicolon),
                     _ => {
                         return Err(io::Error::new(
@@ -1112,6 +1368,9 @@ impl SymbolicBDD {
                     "gfp" | "nu" => result.push(SymbolicBDDToken::GFP),
                     "lfp" | "mu" => result.push(SymbolicBDDToken::LFP),
                     "let" => result.push(SymbolicBDDToken::Let),
+                    "type" => result.push(SymbolicBDDToken::Type),
+                    "bool" => result.push(SymbolicBDDToken::Bool),
+                    "pi" => result.push(SymbolicBDDToken::Pi),
                     name if result.last() == Some(&SymbolicBDDToken::Let)
                         || definitions.contains(name) =>
                     {
@@ -1120,24 +1379,11 @@ impl SymbolicBDD {
                         }
                         result.push(SymbolicBDDToken::Reference(name.to_string()));
                     }
-                    var => {
-                        let var_str = var.to_string();
-                        let var_id: usize;
-
-                        if let Some(id) = variable_indexes.get(&var_str) {
-                            var_id = *id;
-                        } else {
-                            var_id = var_id_counter;
-                            var_id_counter += 1;
-
-                            variable_indexes.insert(var_str.clone(), var_id);
-                        }
-
-                        result.push(SymbolicBDDToken::Ident(NamedSymbol {
-                            name: Rc::new(var_str),
-                            id: var_id,
-                        }))
-                    }
+                    var => result.push(SymbolicBDDToken::Ident(ident(
+                        var,
+                        &mut variable_indexes,
+                        &mut var_id_counter,
+                    ))),
                 }
             } else if let Some(number) = c.name("countable") {
                 let parsed_number = number.as_str().parse().expect("Failed to parse number");
@@ -1157,6 +1403,18 @@ impl SymbolicBDD {
         }
 
         Ok(result)
+    }
+}
+
+/// The symbol of an identifier: the same name always has the same id
+fn ident(name: &str, indexes: &mut FxHashMap<String, usize>, counter: &mut usize) -> NamedSymbol {
+    let id = *indexes.entry(name.to_string()).or_insert_with(|| {
+        *counter += 1;
+        *counter - 1
+    });
+    NamedSymbol {
+        name: Rc::new(name.to_string()),
+        id,
     }
 }
 

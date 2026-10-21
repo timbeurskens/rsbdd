@@ -17,4 +17,6 @@ mod store;
 
 mod truth_table;
 
+mod types;
+
 mod symbols;

@@ -32,7 +32,7 @@ fn is_theorem(formula: &str) -> bool {
 
 #[test]
 fn test_puzzles() {
-    for problem in ["PUZ001-1", "PUZ001+1"] {
+    for problem in ["PUZ001-1", "PUZ001+1", "PUZ139_1"] {
         let formula = translate(&format!("tests/data/{problem}.p"));
         // the version changes with every release
         let unversioned = formula.replace(env!("CARGO_PKG_VERSION"), "[version]");

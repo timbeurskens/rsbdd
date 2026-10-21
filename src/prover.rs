@@ -14,6 +14,7 @@ use crate::rewriter::{
     Rewriter, Rule, Substitution, complete, invalid, join, lpo, match_pattern, normalize,
     occurs_as_term, positions, rank, replace, resolve, size, split_rules, subst, term, unify,
 };
+use crate::types::{erasable, erase, typing_axioms};
 
 const PROVER_STEPS: usize = 100000;
 const DISTRIBUTION_LIMIT: usize = 4;
@@ -99,6 +100,7 @@ impl Prover {
             witnesses: Vec::new(),
         };
 
+        let no_rules = rules.is_empty();
         let (term_rules, predicate_rules): (Vec<_>, Vec<_>) = rules
             .into_iter()
             .partition(|rule| universe.is_term_rule(rule));
@@ -142,6 +144,16 @@ impl Prover {
                 prover.input(&axiom, true, "unique names")?;
             }
         }
+        // without rules, every variable is typed or untyped by the formula itself, so erasing the guards of
+        // monotonic types is sound
+        let goal = if no_rules && erasable(&goal) {
+            erase(&goal)
+        } else {
+            for axiom in typing_axioms(&parsed.signatures) {
+                prover.input(&axiom, true, "type")?;
+            }
+            goal
+        };
         prover.witnessing = witnesses;
         prover.input(&goal, false, "negated goal")?;
         prover.witnessing = false;

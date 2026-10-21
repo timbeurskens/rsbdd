@@ -30,6 +30,7 @@ not hold: the canonical model satisfies formulas that do not hold in every model
 | Counting `[a, b] = 1`, `[a] <= [a, b]`                            | yes         | yes, evaluated as in finite mode              |
 | Fixed points `lfp` / `gfp`                                        | yes         | yes, evaluated as in finite mode              |
 | Induction `induct`                                                | yes         | yes, the proven equation becomes an axiom     |
+| Types: declarations `let f: A;`, typed binders `forall x: A #`    | yes         | yes, see [Types](#types)                      |
 
 A construct that is evaluated as in finite mode may not apply a predicate defined by rules to a variable of the
 proof, such as `forall x # [p(x)] = 1` with a rule for `p`. Finite mode matches the rules syntactically, while in a
@@ -47,6 +48,23 @@ proof `x` may be any element. `--prove` rejects these with the error `... applie
   ```
 
   As in finite mode, `p(A)` is `q(A) & r`, and `q(A) <=> r` is not a theorem.
+
+## Types
+
+A typed binder `x: A` is the guard `(x: A)`, an atom that holds for the elements of type `A`
+([Types](syntax.md#types)). In finite mode the declarations are rules for the guard: an element has a type if its
+declaration says so. `--prove` reads them as axioms instead, as the completion of rules would make every element of a
+type a term:
+
+- every application of a declared symbol to arguments of the declared types has the declared result type;
+- every type has an element.
+
+This is the guard encoding of typed first-order logic, which is sound and complete (Blanchette et al., *Encoding
+monomorphic and polymorphic types*, 2016). Without rules, and if no variable of a type is an operand of `=`, the
+types are monotonic and the guards are erased (Claessen, Lillieström & Smallbone, *Sort it out with monotonicity*,
+2011). The typing axioms of a recursive signature, such as `pi T # (T, syrup) -> T`, derive infinitely many
+well-typed terms, so erasing them lets the prover saturate. A countermodel lists the guards that hold, such as
+`(e1: syrup)`.
 
 ## Unique names
 

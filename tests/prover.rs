@@ -147,3 +147,34 @@ fn test_compatibility() -> io::Result<()> {
 fn test_unsupported() {
     assert!(prove("p(A) -> true; forall x # [p(x)] = 1").is_err());
 }
+
+/// Typed formulas: declared types, typed binders and polymorphic signatures
+#[test]
+fn test_types() -> io::Result<()> {
+    let theorems = [
+        // PUZ139_1: the mixture of syrups is a syrup
+        "let beverage, syrup: type; let coffee: beverage; let vanilla, caramel: syrup; \
+         let mixture: pi T # (T, syrup) -> T; let awake: (beverage) -> bool; \
+         (forall s: syrup # awake(mixture(beverage, coffee, s))) => \
+         awake(mixture(beverage, coffee, mixture(syrup, caramel, vanilla)))",
+        "let a: type; let c: a; let id: pi T # (T) -> T; (forall x: a # id(a, x) = x) => id(a, c) = c",
+        "let list: (type) -> type; let nil: pi T # list(T); forall T: type # exists l: list(T) # l = nil(T)",
+        // every type has an element
+        "let a: type; let p: (a) -> bool; (forall x: a # p(x)) => exists x: a # p(x)",
+    ];
+    for formula in theorems {
+        assert!(is_theorem(formula)?, "{formula}");
+    }
+    let not_theorems = [
+        // the untyped formula is a theorem: a type with one element does not make every type a singleton
+        "let a, b: type; let c: b; (forall x: a, y: a # x = y) => -(exists x: b, y: b # -(x = y))",
+        // the axiom is about mixtures of coffee, not coffee itself
+        "let beverage, syrup: type; let coffee: beverage; let awake: (beverage) -> bool; \
+         let mixture: pi T # (T, syrup) -> T; \
+         (forall s: syrup # awake(mixture(beverage, coffee, s))) => awake(coffee)",
+    ];
+    for formula in not_theorems {
+        assert!(is_not_theorem(formula)?, "{formula}");
+    }
+    Ok(())
+}

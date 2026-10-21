@@ -8,6 +8,7 @@ use crate::NamedSymbol;
 use crate::parser::{
     BinaryOperator, DomainConstant, ParsedFormula, QuantifierType, ReferenceContents, SymbolicBDD,
 };
+use crate::types::typing_rules;
 
 pub(crate) type Substitution = FxHashMap<NamedSymbol, DomainConstant>;
 type Equation = (Vec<NamedSymbol>, DomainConstant, DomainConstant);
@@ -101,6 +102,8 @@ pub struct Rewriter {
     skolems: usize,
     universe: Vec<DomainConstant>,
     arbitrary: FxHashMap<NamedSymbol, DomainConstant>,
+    // the type of the arbitrary constant of a typed variable, in the scope of its quantifier
+    typed: FxHashMap<DomainConstant, DomainConstant>,
     recursive: FxHashMap<DomainConstant, NamedSymbol>,
     atoms: FxHashMap<DomainConstant, NamedSymbol>,
     // the atom of every variable introduced by the rewriter, indexed by id - base_id
@@ -124,9 +127,10 @@ impl Rewriter {
     pub(crate) fn new(parsed: &ParsedFormula) -> io::Result<(Self, SymbolicBDD)> {
         let (rules, formula, mut universe) = split_rules(parsed)?;
 
-        let (term_rules, rules): (Vec<_>, Vec<_>) = rules
+        let (term_rules, mut rules): (Vec<_>, Vec<_>) = rules
             .into_iter()
             .partition(|rule| universe.is_term_rule(rule));
+        rules.extend(typing_rules(&parsed.signatures));
         let term_rules = complete(&term_rules).unwrap_or(term_rules);
         for rule in &term_rules {
             add_element(
@@ -149,6 +153,7 @@ impl Rewriter {
             skolems: 0,
             universe: terms,
             arbitrary: FxHashMap::default(),
+            typed: FxHashMap::default(),
             recursive: FxHashMap::default(),
             atoms: FxHashMap::default(),
             grounds: Vec::new(),
@@ -278,6 +283,14 @@ impl Rewriter {
                 let constant = DomainConstant::Terminal(self.skolem(v));
                 self.arbitrary.insert(v.clone(), constant);
             }
+            // the arbitrary constant of `x: A` has type `A`
+            if let Some((_, ty)) = SymbolicBDD::binder_types(q, body)
+                .into_iter()
+                .find(|(w, _)| *w == v)
+            {
+                let ty = normalize(&subst(ty, theta), &self.term_rules)?;
+                self.typed.insert(self.arbitrary[v].clone(), ty);
+            }
             self.universe.push(self.arbitrary[v].clone());
         }
 
@@ -304,6 +317,11 @@ impl Rewriter {
 
     fn apply(&mut self, ground: DomainConstant) -> io::Result<SymbolicBDD> {
         let ground = normalize(&ground, &self.term_rules)?;
+        if let Some((t, ty)) = ground.as_guard()
+            && self.typed.get(t) == Some(ty)
+        {
+            return Ok(SymbolicBDD::True);
+        }
         if !self
             .rules
             .iter()

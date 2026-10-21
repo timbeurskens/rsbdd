@@ -1,20 +1,26 @@
 //! Translation of a parsed TPTP problem to an rsbdd formula for `rsbdd --prove`.
 //!
 //! The formula is `(axioms) => (conjectures)`, or `(formulas) => false` for a problem without a conjecture. A `cnf`
-//! clause is universally closed over its variables, and the `fof` connectives map onto the rsbdd operators.
+//! clause is universally closed over its variables, and the `fof` connectives map onto the rsbdd operators. The type
+//! declarations of `tff` become rsbdd declarations `let f: pi T # (A, B) -> C;`, and its typed variables typed binders.
 
 use std::fmt::Write;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::tptp::{Annotated, Formula, Quantifier, Symbol, Term};
+use crate::tptp::{
+    Annotated, Formula, Language, Quantifier, Signature, Statement, Symbol, Term, Type,
+};
 
 /// The identifiers that the rsbdd tokenizer reads as keywords
-pub const KEYWORDS: [&str; 26] = [
+pub const KEYWORDS: [&str; 29] = [
     "true", "false", "not", "and", "or", "xor", "nor", "nand", "implies", "in", "iff", "eq",
     "exists", "any", "forall", "all", "induct", "if", "then", "else", "sum", "gfp", "nu", "lfp",
-    "mu", "let",
+    "mu", "let", "type", "bool", "pi",
 ];
+
+/// `$i`, the type of the variables and symbols of `tff` without a declared type
+const INDIVIDUAL: Type = Type::App(Symbol::Individual, Vec::new());
 
 /// A word that can be used as an rsbdd function or predicate symbol as it is
 fn is_plain(word: &str) -> bool {
@@ -24,17 +30,18 @@ fn is_plain(word: &str) -> bool {
 }
 
 /// Call `visit` on every term of a formula that is an atom or an operand of `=`, with the variables bound around it
+/// and whether it is an atom
 fn visit_terms<'a>(
     formula: &'a Formula,
     bound: &mut Vec<&'a str>,
-    visit: &mut impl FnMut(&'a Term, &[&'a str]),
+    visit: &mut impl FnMut(&'a Term, &[&'a str], bool),
 ) {
     match formula {
         Formula::True | Formula::False => {}
-        Formula::Atom(term) => visit(term, bound),
+        Formula::Atom(term) => visit(term, bound, true),
         Formula::Eq(left, right) => {
-            visit(left, bound);
-            visit(right, bound);
+            visit(left, bound, false);
+            visit(right, bound, false);
         }
         Formula::Not(f) => visit_terms(f, bound, visit),
         Formula::And(fs) | Formula::Or(fs) => {
@@ -48,32 +55,117 @@ fn visit_terms<'a>(
         }
         Formula::Quant(_, variables, f) => {
             let depth = bound.len();
-            bound.extend(variables.iter().map(String::as_str));
+            bound.extend(variables.iter().map(|(v, _)| v.as_str()));
             visit_terms(f, bound, visit);
             bound.truncate(depth);
         }
     }
 }
 
-/// The symbols of the formulas, in order of first occurrence
-fn symbols(formulas: &[Annotated]) -> Vec<&Symbol> {
-    fn collect<'a>(term: &'a Term, seen: &mut FxHashSet<&'a Symbol>, out: &mut Vec<&'a Symbol>) {
-        if let Term::App(symbol, arguments) = term {
+/// The types of the binders of a formula
+fn binder_types<'a>(formula: &'a Formula, out: &mut Vec<&'a Type>) {
+    match formula {
+        Formula::Quant(_, variables, f) => {
+            out.extend(variables.iter().filter_map(|(_, ty)| ty.as_ref()));
+            binder_types(f, out);
+        }
+        Formula::Not(f) => binder_types(f, out),
+        Formula::And(fs) | Formula::Or(fs) => fs.iter().for_each(|f| binder_types(f, out)),
+        Formula::Implies(l, r) | Formula::Iff(l, r) => {
+            binder_types(l, out);
+            binder_types(r, out);
+        }
+        Formula::True | Formula::False | Formula::Atom(_) | Formula::Eq(..) => {}
+    }
+}
+
+/// The symbols of the declarations and formulas, in order of first occurrence
+fn symbols<'a>(
+    formulas: &'a [Annotated],
+    declarations: &'a [(Symbol, Signature)],
+) -> Vec<&'a Symbol> {
+    fn term<'a>(t: &'a Term, seen: &mut FxHashSet<&'a Symbol>, out: &mut Vec<&'a Symbol>) {
+        if let Term::App(symbol, arguments) = t {
             if seen.insert(symbol) {
                 out.push(symbol);
             }
             for argument in arguments {
-                collect(argument, seen, out);
+                term(argument, seen, out);
+            }
+        }
+    }
+    fn of_type<'a>(t: &'a Type, seen: &mut FxHashSet<&'a Symbol>, out: &mut Vec<&'a Symbol>) {
+        if let Type::App(symbol, arguments) = t {
+            if seen.insert(symbol) {
+                out.push(symbol);
+            }
+            for argument in arguments {
+                of_type(argument, seen, out);
             }
         }
     }
 
     let mut seen = FxHashSet::default();
     let mut out = Vec::new();
-    for annotated in formulas {
-        visit_terms(&annotated.formula, &mut Vec::new(), &mut |term, _| {
-            collect(term, &mut seen, &mut out);
+    for (symbol, signature) in declarations {
+        if seen.insert(symbol) {
+            out.push(symbol);
+        }
+        for t in signature.args.iter().chain([&signature.result]) {
+            of_type(t, &mut seen, &mut out);
+        }
+    }
+    for formula in formulas.iter().filter_map(Annotated::formula) {
+        let mut types = Vec::new();
+        binder_types(formula, &mut types);
+        for t in types {
+            of_type(t, &mut seen, &mut out);
+        }
+        visit_terms(formula, &mut Vec::new(), &mut |t, _, _| {
+            term(t, &mut seen, &mut out);
         });
+    }
+    out
+}
+
+/// The declared symbols, and in `tff` the symbols without a declaration with the default types of TPTP: individual
+/// arguments, and an individual or `$o` result
+fn declarations(formulas: &[Annotated]) -> Vec<(Symbol, Signature)> {
+    fn undeclared(
+        t: &Term,
+        atom: bool,
+        declared: &mut FxHashSet<Symbol>,
+        out: &mut Vec<(Symbol, Signature)>,
+    ) {
+        if let Term::App(symbol, arguments) = t {
+            if declared.insert(symbol.clone()) {
+                let signature = Signature {
+                    params: Vec::new(),
+                    args: vec![INDIVIDUAL; arguments.len()],
+                    result: if atom { Type::Bool } else { INDIVIDUAL },
+                };
+                out.push((symbol.clone(), signature));
+            }
+            for argument in arguments {
+                undeclared(argument, false, declared, out);
+            }
+        }
+    }
+
+    let mut out: Vec<_> = formulas
+        .iter()
+        .filter_map(|a| match &a.statement {
+            Statement::Declaration(symbol, signature) => Some((symbol.clone(), signature.clone())),
+            Statement::Formula(_) => None,
+        })
+        .collect();
+    if formulas.iter().any(|a| a.language == Language::Tff) {
+        let mut declared: FxHashSet<_> = out.iter().map(|(s, _)| s.clone()).collect();
+        for formula in formulas.iter().filter_map(Annotated::formula) {
+            visit_terms(formula, &mut Vec::new(), &mut |t, _, atom| {
+                undeclared(t, atom, &mut declared, &mut out);
+            });
+        }
     }
     out
 }
@@ -96,7 +188,7 @@ fn free_variables(formula: &Formula) -> Vec<&str> {
     }
 
     let mut free = Vec::new();
-    visit_terms(formula, &mut Vec::new(), &mut |term, bound| {
+    visit_terms(formula, &mut Vec::new(), &mut |term, bound, _| {
         collect(term, bound, &mut free);
     });
     free
@@ -120,11 +212,12 @@ impl<'a> Names<'a> {
             let (prefix, text) = match symbol {
                 Symbol::Word(word) if is_plain(word) => return word.clone(),
                 Symbol::Word(word) if word.starts_with(|c: char| c.is_ascii_lowercase()) => {
-                    ("", word)
+                    ("", word.as_str())
                 }
-                Symbol::Word(word) => ("q_", word),
-                Symbol::Number(number) => ("n", number),
-                Symbol::Distinct(object) => ("d_", object),
+                Symbol::Word(word) => ("q_", word.as_str()),
+                Symbol::Number(number) => ("n", number.as_str()),
+                Symbol::Distinct(object) => ("d_", object.as_str()),
+                Symbol::Individual => ("", "iota"),
             };
             let sanitized: String = text
                 .chars()
@@ -175,6 +268,47 @@ fn write_term(out: &mut String, term: &Term, names: &Names) {
     }
 }
 
+fn write_type(out: &mut String, ty: &Type, names: &Names) {
+    match ty {
+        Type::TType => out.push_str("type"),
+        Type::Bool => out.push_str("bool"),
+        Type::Var(v) => out.push_str(v),
+        Type::App(symbol, arguments) => {
+            out.push_str(names.get(symbol));
+            if !arguments.is_empty() {
+                out.push('(');
+                for (i, argument) in arguments.iter().enumerate() {
+                    if i > 0 {
+                        out.push_str(", ");
+                    }
+                    write_type(out, argument, names);
+                }
+                out.push(')');
+            }
+        }
+    }
+}
+
+/// `let f: pi T # (A, B) -> C;`
+fn write_declaration(out: &mut String, symbol: &Symbol, signature: &Signature, names: &Names) {
+    write!(out, "let {}: ", names.get(symbol)).ok();
+    if !signature.params.is_empty() {
+        write!(out, "pi {} # ", signature.params.join(", ")).ok();
+    }
+    if !signature.args.is_empty() {
+        out.push('(');
+        for (i, arg) in signature.args.iter().enumerate() {
+            if i > 0 {
+                out.push_str(", ");
+            }
+            write_type(out, arg, names);
+        }
+        out.push_str(") -> ");
+    }
+    write_type(out, &signature.result, names);
+    out.push_str(";\n");
+}
+
 fn write_operands<'a>(
     out: &mut String,
     operator: &str,
@@ -222,7 +356,18 @@ fn write_formula(out: &mut String, formula: &Formula, names: &Names, bare: bool)
                 Quantifier::Forall => "forall",
                 Quantifier::Exists => "exists",
             };
-            write!(out, "{keyword} {} # ", variables.join(", ")).ok();
+            write!(out, "{keyword} ").ok();
+            for (i, (v, ty)) in variables.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                out.push_str(v);
+                if let Some(ty) = ty {
+                    out.push_str(": ");
+                    write_type(out, ty, names);
+                }
+            }
+            out.push_str(" # ");
             write_formula(out, f, names, true);
         }
     }
@@ -261,17 +406,18 @@ fn write_conjunction(out: &mut String, items: &[(String, String)]) {
 
 /// Translate a TPTP problem to an rsbdd formula, preceded by `header` as a comment
 pub fn translate(formulas: &[Annotated], header: &str) -> String {
-    let symbols = symbols(formulas);
+    let declarations = declarations(formulas);
+    let symbols = symbols(formulas, &declarations);
     let names = Names::new(&symbols);
     let item = |a: &Annotated| {
         let label = format!("{} ({}, {})", a.name, a.language.as_str(), a.role);
-        (label, closed(&a.formula, &names))
+        Some((label, closed(a.formula()?, &names)))
     };
 
     let mut axioms: Vec<(String, String)> = formulas
         .iter()
         .filter(|a| !a.is_conjecture())
-        .map(item)
+        .filter_map(item)
         .collect();
     // distinct objects are unequal to each other
     let distinct: Vec<Term> = symbols
@@ -288,12 +434,30 @@ pub fn translate(formulas: &[Annotated], header: &str) -> String {
     let conjectures: Vec<(String, String)> = formulas
         .iter()
         .filter(|a| a.is_conjecture())
-        .map(item)
+        .filter_map(item)
         .collect();
 
     let mut out = String::new();
     if !header.is_empty() {
         writeln!(out, "\"\n{}\n\"\n", comment(header)).ok();
+    }
+    if symbols.contains(&&Symbol::Individual) {
+        write_declaration(
+            &mut out,
+            &Symbol::Individual,
+            &Signature {
+                params: Vec::new(),
+                args: Vec::new(),
+                result: Type::TType,
+            },
+            &names,
+        );
+    }
+    for (symbol, signature) in &declarations {
+        write_declaration(&mut out, symbol, signature, &names);
+    }
+    if !declarations.is_empty() {
+        out.push('\n');
     }
     match (axioms.is_empty(), conjectures.is_empty()) {
         (true, true) => out.push_str("true"),
@@ -347,6 +511,19 @@ mod tests {
         assert_eq!(
             run("fof(a, axiom, or(in, 'Big one', or_, 12, \"x\", \"y\", 'plain'))."),
             "(\n    \"a (fof, axiom)\" or__(in_, q_Big_one, or_, n12, d_x, d_y, plain) &\n    \"distinct objects\" -(d_x = d_y)\n) => false\n"
+        );
+    }
+
+    #[test]
+    fn tff_problem() {
+        assert_eq!(
+            run(
+                "tff(t, type, t: $tType). tff(c, type, c: t). tff(a, axiom, ![X: t, Y]: p(X, f(Y))). \
+                 tff(g, conjecture, ?[Y]: p(c, f(Y)))."
+            ),
+            "let iota: type;\nlet t: type;\nlet c: t;\nlet p: (iota, iota) -> bool;\nlet f: (iota) -> iota;\n\n\
+             (\n    \"a (tff, axiom)\" (forall X: t, Y: iota # p(X, f(Y)))\n) => (\n    \
+             \"g (tff, conjecture)\" (exists Y: iota # p(c, f(Y)))\n)\n"
         );
     }
 

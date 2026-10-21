@@ -125,6 +125,35 @@ forall a, b # exists c # (c | a) & (c | b)
 Quantifiers over terms, such as `forall p # person(p) => ...`, are described in
 [Rewrite rules](rewriting.md).
 
+## Types
+
+Terms can be given types, as in the typed first-order logic of TPTP (TF0, and TF1 with polymorphic types). A type is
+declared with `let name: type;`, and a symbol with `let name: A;` for a constant, `let name: (A1, .., An) -> B;` for a
+function, or `-> bool` for a predicate. Several names can be declared at once. A binder `x: A` gives a quantified
+variable a type:
+
+```
+let beverage, syrup: type;
+let coffee: beverage;
+let vanilla_syrup, caramel_syrup: syrup;
+let mixture: pi T # (T, syrup) -> T;
+let help_people_stay_awake: (beverage) -> bool;
+
+(forall s: syrup # help_people_stay_awake(mixture(beverage, coffee, s))) =>
+    help_people_stay_awake(mixture(beverage, coffee, mixture(syrup, caramel_syrup, vanilla_syrup)))
+```
+
+- `pi T1, .., Tk # ..` declares a polymorphic symbol with type parameters. The types are the first arguments of an
+  application: `mixture(syrup, caramel_syrup, vanilla_syrup)` is a syrup. Types are terms, so `forall T: type # ..`
+  quantifies over types, and a type constructor is declared as `let list: (type) -> type;`.
+- `type`, `bool` and `pi` are keywords. Undeclared symbols and binders without a type are untyped, as before.
+- Declared symbols are type checked: `help_people_stay_awake(caramel_syrup)` is rejected, as are applications with
+  the wrong number of arguments and equations between different types.
+- `forall x: A # f` is `forall x # (x: A) => f`, and `exists x: A # f` is `exists x # (x: A) & f`, where `x: A` is an
+  atom that holds for the terms of type `A`. In finite mode, the declarations are rules for these atoms, so a typed
+  quantifier ranges over the well-typed ground terms of its type and the arbitrary constant of its variable. See
+  [Finite mode and first-order proofs](finite_and_first_order.md#types) for `--prove`.
+
 ## Counting
 
 For some problems it can be beneficial to express properties relating to the number of true or false variables, e.g. "at

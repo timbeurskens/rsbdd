@@ -1,0 +1,63 @@
+---
+source: tests/cli.rs
+expression: "run_formulas(&[\"let a: type; let c: a; let f: (a) -> a; f(c, c) = c\",\n\"let a, b: type; let c: a; let p: (b) -> bool; p(c)\",\n\"let a: type; let c: a; c\",\n\"let a: type; let p: (a) -> bool; exists x: a # p(p(x))\",\n\"let a, b: type; let c: a; let d: b; c = d\", \"forall x: a # true\",\n\"let f: pi T # (T) -> T; let a: type; let c: a; f(c, c) = c\",\n\"let a: type; let a: type; true\", \"let type: type; true\",\n\"exists p(_): bool # p(a)\",])"
+---
+$ rsbdd -t --evaluate=let a: type; let c: a; let f: (a) -> a; f(c, c) = c
+status: 1
+--- stdout
+--- stderr
+Error: type error: f(c, c): f takes 1 argument
+
+$ rsbdd -t --evaluate=let a, b: type; let c: a; let p: (b) -> bool; p(c)
+status: 1
+--- stdout
+--- stderr
+Error: type error: p(c): the argument c has type a, but p expects b
+
+$ rsbdd -t --evaluate=let a: type; let c: a; c
+status: 1
+--- stdout
+--- stderr
+Error: type error: c is a term of type a, not a formula
+
+$ rsbdd -t --evaluate=let a: type; let p: (a) -> bool; exists x: a # p(p(x))
+status: 1
+--- stdout
+--- stderr
+Error: type error: p(x) is a formula, not a term
+
+$ rsbdd -t --evaluate=let a, b: type; let c: a; let d: b; c = d
+status: 1
+--- stdout
+--- stderr
+Error: type error: c = d: a and b are different types
+
+$ rsbdd -t --evaluate=forall x: a # true
+status: 1
+--- stdout
+--- stderr
+Error: type error: a is not a declared type
+
+$ rsbdd -t --evaluate=let f: pi T # (T) -> T; let a: type; let c: a; f(c, c) = c
+status: 1
+--- stdout
+--- stderr
+Error: type error: c is not a declared type
+
+$ rsbdd -t --evaluate=let a: type; let a: type; true
+status: 1
+--- stdout
+--- stderr
+Error: a is declared twice
+
+$ rsbdd -t --evaluate=let type: type; true
+status: 1
+--- stdout
+--- stderr
+Error: Expected reference, got Some(Type)
+
+$ rsbdd -t --evaluate=exists p(_): bool # p(a)
+status: 1
+--- stdout
+--- stderr
+Error: Expected variable, got Some(Bool)
