@@ -8,11 +8,11 @@ use rsbdd::prover::{Outcome, Prover};
 
 fn prove(formula: &str) -> io::Result<Outcome> {
     let parsed = ParsedFormula::parse(Rc::new(BDDEnv::new()), &mut formula.as_bytes(), None)?;
-    Prover::prove(&parsed)
+    Prover::prove(&parsed, false)
 }
 
 fn is_theorem(formula: &str) -> io::Result<bool> {
-    Ok(matches!(prove(formula)?, Outcome::Proven(_)))
+    Ok(matches!(prove(formula)?, Outcome::Proven(..)))
 }
 
 fn is_not_theorem(formula: &str) -> io::Result<bool> {

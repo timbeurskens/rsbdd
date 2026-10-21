@@ -191,13 +191,29 @@ theorem
   [hilbert_hotel.txt](../examples/fol/hilbert_hotel.txt) is not a theorem either, but only an infinite domain shows
   it, so the result has no countermodel.
 - Counting, fixed points, atom quantifiers and atom substitution are evaluated as in finite mode, and an equation
-  proven by `induct` becomes an axiom. The differences between `--prove` and finite mode are described in
+  proven by `induct` becomes an axiom. With `--witness`, a proof also prints a witness of every atom quantifier that
+  is existential in the goal and not inside a universal quantifier: the atoms that are true in a choice of its atoms,
+  found by the BDD, that satisfies an `exists p(_) # f`, or falsifies a `forall p(_) # f` under a negation:
+
+  ```bash
+  rsbdd --prove --witness -e 'exists p(_) # p(A) & -p(B)'
+  ```
+  ```
+  1. false [negated goal]
+  witness: p(A)
+  theorem
+  ```
+
+  For [sudoku.txt](../examples/fol/sudoku.txt), the witness is the solution of the sudoku.
+
+  The differences between `--prove` and finite mode are described in
   [Finite mode and first-order proofs](finite_and_first_order.md).
 
 More puzzles in [examples/fol](../examples/fol): the barber paradox ([barber.txt](../examples/fol/barber.txt)), the
 drinker paradox ([drinker.txt](../examples/fol/drinker.txt)), Lewis Carroll's animals puzzle
 ([animals.txt](../examples/fol/animals.txt)), Schubert's Steamroller
-([steamroller.txt](../examples/fol/steamroller.txt)), and groups in which every element is its own inverse
+([steamroller.txt](../examples/fol/steamroller.txt)), the existence of a solution of a sudoku
+([sudoku.txt](../examples/fol/sudoku.txt)), and groups in which every element is its own inverse
 ([boolean_group.txt](../examples/fol/boolean_group.txt)).
 
 The prover proves the first-order problems of Pelletier's *Seventy-five problems for testing automatic theorem

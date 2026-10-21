@@ -1,9 +1,5 @@
-use std::collections::BTreeSet;
 use std::fs::File;
-use std::io;
-use std::io::Read;
-use std::io::Write;
-use std::io::*;
+use std::io::{self, BufWriter, Read, Write};
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -22,6 +18,10 @@ struct Args {
     #[clap(short, long, value_parser, value_name = "N", default_value_t = 3)]
     /// The root value of the puzzle. Typically the square root of the largest possible number
     root: usize,
+
+    #[clap(long)]
+    /// State the puzzle as a goal for `rsbdd --prove`: there exists a solved sudoku in which the hints hold
+    prove: bool,
 }
 
 fn main() -> io::Result<()> {
@@ -31,6 +31,7 @@ fn main() -> io::Result<()> {
 
     let root = args.root;
     let square = root * root;
+    let sep = if args.prove { " &" } else { ";" };
 
     let mut writer = if let Some(output) = args.output {
         let file = File::create(output)?;
@@ -61,17 +62,43 @@ fn main() -> io::Result<()> {
 
     writeln!(writer)?;
 
-    writeln!(writer, "\"sudoku hints\"")?;
+    writeln!(writer, "\"the digits, rows and columns\"")?;
+    facts(&mut writer, "digit", "D", square)?;
+    facts(&mut writer, "row", "R", square)?;
+    facts(&mut writer, "col", "C", square)?;
 
     writeln!(writer)?;
 
-    let row_cells = move |r: usize| (0..square).map(move |c| r * square + c);
-    let col_cells = move |c: usize| (0..square).map(move |r| r * square + c);
-    let box_cells = move |b: usize| {
-        let lt = (b / root) * root * square + (b % root) * root;
-        (0..square).map(move |l| lt + (l / root) * square + l % root)
-    };
-    let box_of = move |cell: usize| (cell / square / root) * root + cell % square / root;
+    writeln!(
+        writer,
+        "\"the rows and columns are grouped in bands of {} for the nonets\"",
+        root
+    )?;
+    facts(&mut writer, "band", "B", root)?;
+    for b in 0..root {
+        for k in 0..root {
+            let (n, b, k) = (b * root + k + 1, b + 1, k + 1);
+            writeln!(writer, "nth_row(B{b}, K{k}) -> R{n};")?;
+            writeln!(writer, "nth_col(B{b}, K{k}) -> C{n};")?;
+        }
+    }
+
+    writeln!(writer)?;
+
+    if args.prove {
+        writeln!(
+            writer,
+            "\"the goal: there exists a choice of the atoms cell(_, _, _), a solved sudoku, in which the hints hold\""
+        )?;
+        writeln!(writer, "\"rsbdd --prove --witness prints the solution\"")?;
+        writeln!(writer, "exists cell(_, _, _) # (")?;
+        writeln!(writer)?;
+    }
+
+    writeln!(
+        writer,
+        "\"sudoku hints: cell(r, c, d) states that the cell in row r and column c contains digit d\""
+    )?;
 
     let hints = puzzle_input
         .chars()
@@ -79,89 +106,61 @@ fn main() -> io::Result<()> {
         .enumerate()
         .filter_map(|(i, ch)| ch.to_digit(10).map(|k| (i, k as usize)));
 
-    let mut eliminated = BTreeSet::new();
     for (cell, k) in hints {
-        writeln!(writer, "_{}_is_{} &", cell, k)?;
-
-        eliminated.extend((1..=square).filter(|&j| j != k).map(|j| (cell, j)));
-
-        let peers = row_cells(cell / square)
-            .chain(col_cells(cell % square))
-            .chain(box_cells(box_of(cell)));
-        eliminated.extend(peers.filter(|&o| o != cell).map(|o| (o, k)));
+        let (r, c) = (cell / square + 1, cell % square + 1);
+        writeln!(writer, "cell(R{r}, C{c}, D{k}){sep}")?;
     }
 
     writeln!(writer)?;
 
-    writeln!(writer, "\"values ruled out by the hints\"")?;
-
-    writeln!(writer)?;
-
-    for (cell, k) in eliminated {
-        writeln!(writer, "-_{}_is_{} &", cell, k)?;
-    }
-
-    writeln!(writer)?;
-
-    writeln!(writer, "\"each cell can either be 1, 2, .., {}\"", square)?;
     writeln!(
         writer,
-        "\"each row, column and nonet contains every number exactly once\""
+        "\"each cell contains exactly one digit, each row, nonet and column contains every digit exactly once\""
     )?;
     writeln!(
         writer,
-        "\"constraints are added nonet by nonet, rows and columns as soon as all their nonets are added\""
+        "\"the solver conjoins the constraints from left to right: adding rows before nonets and nonets before columns keeps the BDD small\""
     )?;
 
-    writeln!(writer)?;
+    let constraints = [
+        format!(
+            "forall r, c # row(r) & col(c) => {}",
+            exactly_one((1..=square).map(|n| format!("cell(r, c, D{n})")))
+        ),
+        format!(
+            "forall r, d # row(r) & digit(d) => {}",
+            exactly_one((1..=square).map(|n| format!("cell(r, C{n}, d)")))
+        ),
+        format!(
+            "forall i, j, d # band(i) & band(j) & digit(d) => {}",
+            exactly_one((1..=root).flat_map(|a| {
+                (1..=root).map(move |b| format!("cell(nth_row(i, K{a}), nth_col(j, K{b}), d)"))
+            }))
+        ),
+        format!(
+            "forall c, d # col(c) & digit(d) => {}",
+            exactly_one((1..=square).map(|n| format!("cell(R{n}, c, d)")))
+        ),
+    ];
+    let constraints = constraints.map(|c| if args.prove { format!("({c})") } else { c });
+    writeln!(writer, "{}", constraints.join(&format!("{sep}\n")))?;
 
-    for b in 0..square {
-        let (bi, bj) = (b / root, b % root);
-
-        for cell in box_cells(b) {
-            exactly_one(&mut writer, (1..=square).map(|k| (cell, k)))?;
-        }
-
-        each_value_once(&mut writer, square, box_cells(b))?;
-
-        if bj == root - 1 {
-            for r in bi * root..(bi + 1) * root {
-                each_value_once(&mut writer, square, row_cells(r))?;
-            }
-        }
-
-        if bi == root - 1 {
-            for c in bj * root..(bj + 1) * root {
-                each_value_once(&mut writer, square, col_cells(c))?;
-            }
-        }
+    if args.prove {
+        writeln!(writer, ")")?;
     }
-
-    writeln!(writer, "true")?;
 
     writer.flush()?;
 
     Ok(())
 }
 
-fn exactly_one(
-    writer: &mut impl Write,
-    vars: impl Iterator<Item = (usize, usize)>,
-) -> io::Result<()> {
-    let vars = vars
-        .map(|(cell, k)| format!("_{}_is_{}", cell, k))
-        .collect::<Vec<_>>()
-        .join(", ");
-    writeln!(writer, "[{}] = 1 &", vars)
-}
-
-fn each_value_once(
-    writer: &mut impl Write,
-    square: usize,
-    cells: impl Iterator<Item = usize> + Clone,
-) -> io::Result<()> {
-    for k in 1..=square {
-        exactly_one(writer, cells.clone().map(|cell| (cell, k)))?;
+fn facts(writer: &mut impl Write, predicate: &str, prefix: &str, n: usize) -> io::Result<()> {
+    for i in 1..=n {
+        writeln!(writer, "{predicate}({prefix}{i}) -> true;")?;
     }
     Ok(())
+}
+
+fn exactly_one(atoms: impl Iterator<Item = String>) -> String {
+    format!("[{}] = 1", atoms.collect::<Vec<_>>().join(", "))
 }

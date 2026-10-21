@@ -41,6 +41,8 @@ Solver:
                             memory]
   -P, --prove               Prove the formula in first-order logic by superposition, with the rewrite rules as axioms, and print the
                             proof
+      --witness             With --prove, print a witness of every atom quantifier that is existential in a proven goal: the atoms
+                            that are true in a choice that satisfies an `exists`, or falsifies a `forall` under a negation
 
 Without output options, the satisfying rows of the truth table are printed.
 Exit status: 10 if the formula is satisfiable, 20 if it is unsatisfiable, 1 or 2 on errors.
@@ -126,6 +128,7 @@ Arguments:
 
 Options:
   -r, --root <N>  The root value of the puzzle. Typically the square root of the largest possible number [default: 3]
+      --prove     State the puzzle as a goal for `rsbdd --prove`: there exists a solved sudoku in which the hints hold
   -h, --help      Print help
   -V, --version   Print version
 

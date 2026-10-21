@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Context;
 use clap::{CommandFactory, Parser, ValueHint};
+use itertools::Itertools;
 
 use rsbdd::BDDSymbol;
 use rsbdd::NamedSymbol;
@@ -130,6 +131,11 @@ struct Args {
     #[clap(short = 'P', long, help_heading = "Solver")]
     /// Prove the formula in first-order logic by superposition, with the rewrite rules as axioms, and print the proof.
     prove: bool,
+
+    #[clap(long, requires = "prove", help_heading = "Solver")]
+    /// With --prove, print a witness of every atom quantifier that is existential in a proven goal: the atoms that are
+    /// true in a choice that satisfies an `exists`, or falsifies a `forall` under a negation.
+    witness: bool,
 }
 
 fn default_memory_limit() -> Option<usize> {
@@ -206,10 +212,15 @@ fn main() -> anyhow::Result<ExitCode> {
 
     if args.prove {
         let parsed = ParsedFormula::parse(Rc::new(BDDEnv::new()), &mut reader, None)?;
-        let (message, status) = match Prover::prove(&parsed)? {
-            Outcome::Proven(proof) => {
+        let (message, status) = match Prover::prove(&parsed, args.witness)? {
+            Outcome::Proven(proof, witnesses) => {
                 for line in proof {
                     println!("{line}");
+                }
+                if args.witness {
+                    for witness in witnesses {
+                        println!("witness: {}", witness.iter().join(", "));
+                    }
                 }
                 ("theorem", 10)
             }

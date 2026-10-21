@@ -20,8 +20,9 @@ const DISTRIBUTION_LIMIT: usize = 4;
 
 /// The result of a proof attempt
 pub enum Outcome {
-    /// The formula is valid, with the derivation of the empty clause
-    Proven(Vec<String>),
+    /// The formula is valid, with the derivation of the empty clause and the witnesses of the existential atom
+    /// quantifiers of the goal: the atoms that are true in a satisfying choice
+    Proven(Vec<String>, Vec<Vec<DomainConstant>>),
     /// The formula is not valid: the clauses are saturated without the empty clause, or have a finite countermodel
     Disproven(Option<Model>),
     /// No proof was found within the step limit
@@ -73,10 +74,14 @@ pub struct Prover {
     definitions: Vec<Vec<Literal>>,
     rewriter: Rewriter,
     finite: ParsedFormula,
+    // whether atom quantifiers record witnesses: only while the goal is input, and only if they are requested
+    witnessing: bool,
+    witnesses: Vec<Vec<DomainConstant>>,
 }
 
 impl Prover {
-    pub fn prove(parsed: &ParsedFormula) -> io::Result<Outcome> {
+    /// Prove a formula, with the witnesses of the atom quantifiers that are existential in the goal if `witnesses` is set
+    pub fn prove(parsed: &ParsedFormula, witnesses: bool) -> io::Result<Outcome> {
         let (rules, goal, universe) = split_rules(parsed)?;
         let mut prover = Self {
             clauses: Vec::new(),
@@ -90,6 +95,8 @@ impl Prover {
             definitions: Vec::new(),
             rewriter: Rewriter::new(parsed)?.0,
             finite: parsed.clone(),
+            witnessing: false,
+            witnesses: Vec::new(),
         };
 
         let (term_rules, predicate_rules): (Vec<_>, Vec<_>) = rules
@@ -135,7 +142,9 @@ impl Prover {
                 prover.input(&axiom, true, "unique names")?;
             }
         }
+        prover.witnessing = witnesses;
         prover.input(&goal, false, "negated goal")?;
+        prover.witnessing = false;
 
         let mut ranks = FxHashMap::default();
         rank(&prover.top, &[], &mut ranks);
@@ -149,8 +158,8 @@ impl Prover {
 
         let input = prover.clauses.len();
         let outcome = prover.saturate();
-        if matches!(outcome, Outcome::Proven(_)) {
-            return Ok(outcome);
+        if let Outcome::Proven(proof, _) = outcome {
+            return Ok(Outcome::Proven(proof, prover.witnesses));
         }
         Ok(find_model(&prover.clauses[..input], &prover.top)
             .map_or(outcome, |model| Outcome::Disproven(Some(model))))
@@ -415,9 +424,65 @@ impl Prover {
             };
             ground = finite.replace_var(&ground, v, &value);
         }
-        finite.bdd = ground;
-        let root = self.definition(&finite.eval(), scope, &mut FxHashMap::default())?;
+        let bdd = match ground {
+            // an atom quantifier that is existential in the goal (universal in the clauses of the negated goal) without
+            // universal variables has a witness: a choice of its atoms that satisfies the body, or falsifies it for
+            // `forall`
+            SymbolicBDD::Quantifier(
+                q @ (QuantifierType::Exists | QuantifierType::Forall),
+                vars,
+                body,
+            ) if self.witnessing
+                && matches!(f, SymbolicBDD::AtomQuantifier(..))
+                && (q == QuantifierType::Forall) == positive
+                && scope.universals.is_empty() =>
+            {
+                finite.bdd = *body;
+                let body = finite.eval();
+                if q == QuantifierType::Exists {
+                    self.witness(&body, &vars);
+                    finite.env.exists(vars, body)
+                } else {
+                    self.witness(&finite.env.not(body.clone()), &vars);
+                    finite.env.all(vars, body)
+                }
+            }
+            ground => {
+                finite.bdd = ground;
+                finite.eval()
+            }
+        };
+        let root = self.definition(&bdd, scope, &mut FxHashMap::default())?;
         self.nnf(&root, positive, scope)
+    }
+
+    /// The atom of a BDD variable: the ground application the rewriter introduced it for, or the variable itself
+    fn atom(&self, v: &NamedSymbol) -> DomainConstant {
+        self.rewriter
+            .atom_of(v)
+            .cloned()
+            .unwrap_or_else(|| DomainConstant::Terminal(v.clone()))
+    }
+
+    /// Record the atoms of `vars` that are true on a path of a satisfiable BDD to `true` as a witness
+    fn witness(&mut self, bdd: &BDD<NamedSymbol>, vars: &[NamedSymbol]) {
+        if bdd.is_false() {
+            return;
+        }
+        let vars: FxHashSet<_> = vars.iter().collect();
+        let mut atoms = Vec::new();
+        let mut node = bdd.clone();
+        while let Node::Choice(hi, v, lo) = node.node() {
+            node = if hi.is_false() {
+                lo
+            } else {
+                if vars.contains(&v) {
+                    atoms.push(self.atom(&v));
+                }
+                hi
+            };
+        }
+        self.witnesses.push(atoms);
     }
 
     /// The atom naming a BDD node, adding its definition
@@ -440,10 +505,7 @@ impl Prover {
         }
         let hi = self.definition(&hi, scope, names)?;
         let lo = self.definition(&lo, scope, names)?;
-        let var = self
-            .rewriter
-            .atom_of(&v)
-            .map_or_else(|| SymbolicBDD::Var(v.clone()), SymbolicBDD::from_term);
+        let var = SymbolicBDD::from_term(&self.atom(&v));
         let symbol = self.symbol(format!("def{}", self.fresh + 1));
         let name = SymbolicBDD::from_term(&application(&symbol, scope.universals.clone()));
         let ite = SymbolicBDD::Ite(Box::new(var), Box::new(hi), Box::new(lo));
@@ -613,7 +675,7 @@ impl Prover {
                 continue;
             };
             if self.clauses[given].literals.is_empty() {
-                return Outcome::Proven(self.proof(given));
+                return Outcome::Proven(self.proof(given), Vec::new());
             }
 
             active.retain(|&a| !self.subsumes(given, a));
@@ -638,7 +700,7 @@ impl Prover {
                 .iter()
                 .find(|&&c| self.clauses[c].literals.is_empty())
             {
-                return Outcome::Proven(self.proof(empty));
+                return Outcome::Proven(self.proof(empty), Vec::new());
             }
         }
         Outcome::Unknown

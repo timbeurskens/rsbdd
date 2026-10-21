@@ -79,7 +79,9 @@ can do is `not a theorem`, after it has saturated the clauses. This happened for
 small. The others are:
 
 - Sudokus (PUZ065 to PUZ072, PUZ079, PUZ080, PUZ138): finding the solution is a model search, which finite mode
-  does well; see [sudoku.txt](../examples/sudoku.txt).
+  does well; see [sudoku.txt](../examples/sudoku.txt). With an atom quantifier, `--prove` proves that a solution
+  exists, as the BDD solver decides the quantifier, and `--witness` prints the solution; see
+  [fol/sudoku.txt](../examples/fol/sudoku.txt).
 - Unreachable states (Quo vadis PUZ041, PUZ048, PUZ049, PUZ051, PUZ059, the Rubik's cube PUZ052, PUZ053, the
   fifteen-puzzle PUZ055 and the Tower of Hanoi PUZ057, PUZ058): showing that no sequence of moves reaches a state
   needs an invariant or a finite model of the axioms. Saturation with superposition does not terminate on these.
