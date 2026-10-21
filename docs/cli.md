@@ -56,12 +56,12 @@ Examples:
 
 ```
 
-## max_clique_gen
+## maxclique2rsbdd
 
 ```
 Converts a graph into a max-clique specification
 
-Usage: max_clique_gen [OPTIONS] [INPUT] [OUTPUT]
+Usage: maxclique2rsbdd [OPTIONS] [INPUT] [OUTPUT]
 
 Arguments:
   [INPUT]   Input file graph in csv edge-list format
@@ -98,12 +98,12 @@ Options:
 
 ```
 
-## n_queens_gen
+## nqueens2rsbdd
 
 ```
 Generates n-queen formulae for the SAT solver
 
-Usage: n_queens_gen [OPTIONS] [OUTPUT]
+Usage: nqueens2rsbdd [OPTIONS] [OUTPUT]
 
 Arguments:
   [OUTPUT]  The output rsbdd file
@@ -115,12 +115,12 @@ Options:
 
 ```
 
-## sudoku_gen
+## sudoku2rsbdd
 
 ```
-Generates a random edge list formatted graph
+Converts a sudoku puzzle into an rsbdd formula
 
-Usage: sudoku_gen [OPTIONS] [INPUT] [OUTPUT]
+Usage: sudoku2rsbdd [OPTIONS] [INPUT] [OUTPUT]
 
 Arguments:
   [INPUT]   The input sudoku file
@@ -131,5 +131,34 @@ Options:
       --prove     State the puzzle as a goal for `rsbdd --prove`: there exists a solved sudoku in which the hints hold
   -h, --help      Print help
   -V, --version   Print version
+
+```
+
+## tptp2rsbdd
+
+See [The TPTP puzzles](tptp_puzzles.md#method) for the translation.
+
+```
+Downloads a TPTP problem and translates it to an rsbdd formula
+
+Usage: tptp2rsbdd [OPTIONS] <PROBLEM> [OUTPUT]
+
+Arguments:
+  <PROBLEM>  The name of the TPTP problem, such as PUZ001-1, or a path with --file
+  [OUTPUT]   The output rsbdd file [default: stdout]
+
+Options:
+  -f, --file            Read the problem from a local file instead of downloading it
+      --tptp-dir <DIR>  A local copy of the TPTP library: problems and includes are read from it if they exist, and
+                        downloaded otherwise [env: TPTP=]
+  -h, --help            Print help
+  -V, --version         Print version
+
+Only the fof and cnf languages are supported.
+
+Examples:
+  tptp2rsbdd PUZ001-1 | rsbdd - --prove
+  tptp2rsbdd SET001-1 set001.txt
+  tptp2rsbdd --file problem.p
 
 ```

@@ -17,8 +17,14 @@ $ cargo install --bins --path .
 
 The following tools will be available after installing the RsBDD package:
 
-- `max_clique_gen`
-- `n_queens_gen`
+- `maxclique2rsbdd`
+- `nqueens2rsbdd`
 - `random_graph_gen`
 - `rsbdd`
-- `sudoku_gen`
+- `sudoku2rsbdd`
+
+`tptp2rsbdd` is installed separately:
+
+```
+$ cargo install --path tptp2rsbdd
+```

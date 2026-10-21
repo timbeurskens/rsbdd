@@ -1,5 +1,5 @@
 [package]
-name = "n_queens_gen"
+name = "nqueens2rsbdd"
 version = "0.18.0"
 description = "Generates n-queen formulae for the SAT solver"
 edition.workspace = true

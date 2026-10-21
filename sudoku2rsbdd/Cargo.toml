@@ -1,7 +1,7 @@
 [package]
-name = "sudoku_gen"
+name = "sudoku2rsbdd"
 version = "0.18.0"
-description = "Generates a random edge list formatted graph"
+description = "Converts a sudoku puzzle into an rsbdd formula"
 edition.workspace = true
 authors.workspace = true
 

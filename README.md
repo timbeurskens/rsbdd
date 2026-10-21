@@ -8,7 +8,8 @@ RsBDD is a SAT solver based on binary decision diagrams (BDDs). Problems are wri
 quantifiers, counting constraints, fixed points, definitions and substitution. The solver reports every satisfying
 assignment, a single model, or the BDD itself. Rewrite rules over terms such as `suc(_0)` or `next(H1, H2)` describe
 problems over domains other than booleans, and turn the solver into a theorem prover by term rewriting, completion and induction.
-The package also contains generators for n-queens, sudoku, graph coloring and max-clique problems.
+The package also contains generators for n-queens, sudoku, graph coloring and max-clique problems, and `tptp2rsbdd`,
+which downloads a problem of the [TPTP library](https://tptp.org) and translates it for `rsbdd --prove`.
 
 ```bash
 cargo install --bins --path .
@@ -41,4 +42,4 @@ rsbdd -e "a & -b" -t
    - [Remaining differences](docs/finite_and_first_order.md#remaining-differences)
 6. [The TPTP puzzles](docs/tptp_puzzles.md): how `--prove` does on the puzzles of the TPTP library, and the limitations it shows
 7. [Examples](docs/examples.md): transitivity, the 4 queens problem, model checking Peterson's protocol, a simplified Einstein riddle
-8. [CLI usage](docs/cli.md): `rsbdd`, `max_clique_gen`, `random_graph_gen`, `n_queens_gen`, `sudoku_gen`
+8. [CLI usage](docs/cli.md): `rsbdd`, `maxclique2rsbdd`, `random_graph_gen`, `nqueens2rsbdd`, `sudoku2rsbdd`, `tptp2rsbdd`

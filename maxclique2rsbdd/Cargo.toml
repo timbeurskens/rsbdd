@@ -1,5 +1,5 @@
 [package]
-name = "max_clique_gen"
+name = "maxclique2rsbdd"
 version = "0.1.0"
 description = "Converts a graph into a max-clique specification"
 edition.workspace = true
