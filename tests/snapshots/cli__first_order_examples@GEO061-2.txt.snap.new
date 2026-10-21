@@ -1,0 +1,24 @@
+---
+source: tests/cli.rs
+assertion_line: 47
+expression: "run(&[\"--prove\", path])"
+input_file: examples/fol/GEO061-2.txt
+---
+$ rsbdd --prove examples/fol/GEO061-2.txt
+status: 10
+--- stdout
+5. -(inner_pasch(x, x1, x2, x3, x4) = lower_dimension_point_3) [unique names]
+68. -equidistant(X, Y, Z, Z) | (X = Y) [negated goal]
+69. between(X, Y, extension(X, Y, W, V)) [negated goal]
+70. equidistant(Y, extension(X, Y, W, V), W, V) [negated goal]
+72. -between(X, Y, X) | (X = Y) [negated goal]
+73. -between(U, V, W) | -between(Y, X, W) | between(V, inner_pasch(U, V, W, X, Y), Y) [negated goal]
+163. (X = extension(X1, X, Z, Z)) [superposition 70, 68]
+168. between(X, Y, Y) [superposition 163, 69]
+238. -between(Y, X, W) | between(W, inner_pasch(U, W, W, X, Y), Y) [superposition 168, 73]
+267. between(W, inner_pasch(U, W, W, W, Y), Y) [superposition 168, 238]
+269. (X = inner_pasch(U, X, X, X, X)) [superposition 267, 72]
+292. -(x = lower_dimension_point_3) [superposition 269, 5]
+305. false [equality resolution 292]
+theorem
+--- stderr

@@ -236,15 +236,16 @@ fn main() -> anyhow::Result<ExitCode> {
         return Ok(ExitCode::from(status));
     }
 
-    let input_parsed = ParsedFormula::new(&mut reader, pre_variable_ordering)?;
-
+    // the limit is set before parsing, as it bounds the ground instances of the quantifiers as well
+    let env = Rc::new(BDDEnv::new());
     if let Some(limit) = args
         .memory_limit
         .map(|mb| mb * 1024 * 1024)
         .or_else(default_memory_limit)
     {
-        input_parsed.env.set_memory_limit(limit);
+        env.set_memory_limit(limit);
     }
+    let input_parsed = ParsedFormula::new_with_env(env, &mut reader, pre_variable_ordering)?;
 
     if let Some(parsetree_filename) = args.parsetree {
         let graph = SymbolicParseTree::new(&input_parsed.bdd);

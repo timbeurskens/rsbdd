@@ -15,7 +15,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::NamedSymbol;
 use crate::bdd::{BDD, BDDEnv};
-use crate::rewriter::Rewriter;
+use crate::rewriter::{self, Rewriter};
 
 lazy_static! {
     static ref TOKENIZER: Regex = Regex::new(r#"(?P<symbol>!|&|=>|->|-|<=>|<=|\||\^|#|\*|\+|>=|:=|=|>|<|\[|\]|,|;|\(|\))|(?P<countable>\d+)|\{(?P<reference>[\w']+)\}|(?P<identifier>[\w']+)|(?P<eof>$)|(?P<comment>"[^"]*")"#).expect("Error setting-up tokenizer regex");
@@ -361,6 +361,12 @@ impl ParsedFormula {
 
         if result.uses_rewriting(&result.bdd) {
             let (bdd, atoms) = Rewriter::rewrite(&result)?;
+            // the ground formula is kept in memory while it is evaluated, so it counts towards the memory limit
+            let limit = result.env.memory_limit();
+            if limit != usize::MAX {
+                let bytes = rewriter::nodes(&bdd) * rewriter::FORMULA_NODE_BYTES;
+                result.env.set_memory_limit(limit.saturating_sub(bytes));
+            }
             result.bdd = bdd;
             result.vars.extend(atoms);
         }

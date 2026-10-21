@@ -14,6 +14,8 @@ type Equation = (Vec<NamedSymbol>, DomainConstant, DomainConstant);
 
 const COMPLETION_STEPS: usize = 1000;
 const LEMMA_DEPTH: usize = 2;
+/// The memory used by a node of a formula, which is boxed and rounded up by the allocator
+pub(crate) const FORMULA_NODE_BYTES: usize = size_of::<SymbolicBDD>().next_multiple_of(16);
 
 #[derive(Clone)]
 pub(crate) struct Rule {
@@ -107,6 +109,9 @@ pub struct Rewriter {
     grounds: Vec<DomainConstant>,
     base_id: usize,
     expanding: FxHashSet<DomainConstant>,
+    // the number of nodes of the ground instances of quantifiers, which may not exceed the memory limit
+    ground_nodes: usize,
+    node_budget: usize,
 }
 
 impl Rewriter {
@@ -154,6 +159,8 @@ impl Rewriter {
             grounds: Vec::new(),
             base_id: parsed.vars.iter().map(|v| v.id + 1).max().unwrap_or(0),
             expanding: FxHashSet::default(),
+            ground_nodes: 0,
+            node_budget: parsed.env.memory_limit() / FORMULA_NODE_BYTES,
         };
         Ok((rewriter, formula))
     }
@@ -269,7 +276,17 @@ impl Rewriter {
         theta: &mut Substitution,
     ) -> io::Result<SymbolicBDD> {
         let Some((v, rest)) = vars.split_first() else {
-            return self.expand(body, theta);
+            // the instance replaces the instances of the quantifiers nested in the body, which were counted before
+            let counted = self.ground_nodes;
+            let instance = self.expand(body, theta)?;
+            self.ground_nodes = counted + nodes(&instance);
+            if self.ground_nodes > self.node_budget {
+                return Err(invalid(format!(
+                    "the ground instances of the quantifiers exceed the memory limit of {} MiB",
+                    self.node_budget * FORMULA_NODE_BYTES / (1024 * 1024)
+                )));
+            }
+            return Ok(instance);
         };
 
         let open = v.name.as_str() != "_";
@@ -596,6 +613,16 @@ fn quantify(q: QuantifierType, vars: Vec<NamedSymbol>, body: SymbolicBDD) -> Sym
     } else {
         SymbolicBDD::Quantifier(q, vars, Box::new(body))
     }
+}
+
+/// The number of nodes of a formula
+pub(crate) fn nodes(formula: &SymbolicBDD) -> usize {
+    let (mut count, mut stack) = (0, vec![formula]);
+    while let Some(f) = stack.pop() {
+        count += 1;
+        stack.extend(f.children());
+    }
+    count
 }
 
 pub(crate) fn invalid(message: impl Into<String>) -> io::Error {

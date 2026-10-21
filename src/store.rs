@@ -121,6 +121,10 @@ impl Store {
         self.next_gc.set(0);
     }
 
+    pub const fn limit(&self) -> usize {
+        self.limit.get()
+    }
+
     /// Number of allocated nodes, including the two constants.
     pub const fn size(&self) -> usize {
         self.len.get() as usize - self.free_count.get()
