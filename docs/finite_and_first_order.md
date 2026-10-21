@@ -93,11 +93,15 @@ some formulas that are valid in finite mode are not theorems of `--prove`:
 | `exists x, y # -(x = y)`                                                 | valid       | not a theorem |
 | `e(A, B) -> true; sum x, y # r(x, y) -> e(x, y) \| exists z # e(x, z) & r(z, y); -r(B, A)` | valid | no answer |
 | `forall x # plus(x, _0) = x`, with the rules of `plus`                   | not valid   | no answer     |
+| `exists x # (drinks(x) => forall y # drinks(y))`                         | not valid   | theorem       |
 
 - **Equations between names.** The names in an equation of the formula are not constructors, so `-(A = B)` does
   not follow from unique names.
 - **Domain.** In finite mode, quantifiers range over the ground terms in the formula and an arbitrary constant for
   every variable, all distinct. In `--prove`, they range over any domain, which may have a single element.
+  The arbitrary constant of a variable is only in the domain of the quantifiers inside its own quantifier, so in the
+  drinker formula `exists x` does not range over `y'`. A false row of `-t` is therefore a falsifying assignment of the
+  ground formula, not a countermodel of the formula.
 - **Recursive rules.** In finite mode, a recursive rule is the least fixpoint of its rules. Its completion also has
   larger models, so `-r(B, A)` cannot be proven, and the search does not terminate. Consequences of the least
   fixpoint, such as `r(A, B)`, are theorems.

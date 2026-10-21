@@ -77,6 +77,13 @@ pub enum BinaryOperator {
     Rewrite,
 }
 
+impl BinaryOperator {
+    /// `(a op b) op c` is equivalent to `a op (b op c)`
+    pub const fn is_associative(self) -> bool {
+        matches!(self, Self::And | Self::Or | Self::Xor | Self::Iff)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CountableOperator {
     AtMost,
@@ -508,10 +515,7 @@ impl ParsedFormula {
                 self.eval_recursive(e),
             ),
             SymbolicBDD::BinaryOp(op, l, r) => {
-                let l = self.eval_recursive(l);
-                let r = self.eval_recursive(r);
-
-                match op {
+                let apply = |l, r| match op {
                     BinaryOperator::And => self.env.and(l, r),
                     BinaryOperator::Or => self.env.or(l, r),
                     BinaryOperator::Xor => self.env.xor(l, r),
@@ -521,7 +525,18 @@ impl ParsedFormula {
                     BinaryOperator::ImpliesInv => self.env.implies(r, l),
                     BinaryOperator::Iff => self.env.as_ref().eq(l, r),
                     other => panic!("unexpected operator: {:?}", other),
-                }
+                };
+
+                // combine the operands of an associative operator one by one from left to right, so every operand
+                // restricts the next
+                let operands = if op.is_associative() {
+                    root.operands(*op)
+                } else {
+                    vec![l.as_ref(), r.as_ref()]
+                };
+                let mut operands = operands.into_iter().map(|f| self.eval_recursive(f));
+                let first = operands.next().expect("a binary operator has operands");
+                operands.fold(first, apply)
             }
             SymbolicBDD::FixedPoint(var, initial, transformer) => {
                 let env = &self.env;
@@ -580,6 +595,21 @@ impl SymbolicBDD {
             Self::CountableVariable(_, l, r) => l.iter().chain(r).collect(),
             _ => vec![],
         }
+    }
+
+    /// The operands of nested applications of `op`, from left to right
+    pub fn operands(&self, op: BinaryOperator) -> Vec<&Self> {
+        let (mut operands, mut stack) = (Vec::new(), vec![self]);
+        while let Some(f) = stack.pop() {
+            match f {
+                Self::BinaryOp(o, l, r) if *o == op => {
+                    stack.push(r);
+                    stack.push(l);
+                }
+                other => operands.push(other),
+            }
+        }
+        operands
     }
 
     /// Build `l op r`, folding the constants `true` and `false` for `&`, `|` and `=>`

@@ -26,13 +26,23 @@ Several of the puzzles are also examples, written by hand:
 
 ## Method
 
-Every problem was translated mechanically to an rsbdd formula and run with `--prove` and a time limit of 30 seconds:
+Every problem was translated mechanically to an rsbdd formula and run with `--prove` and a time limit of 30 seconds.
+[`tptp2rsbdd`](cli.md#tptp2rsbdd) makes the same translation: it downloads a problem and its includes from the TPTP
+problems and solutions directory, and writes the formula.
+
+```bash
+tptp2rsbdd PUZ001-1 | rsbdd - --prove
+```
+
+The translation:
 
 - A clause becomes `forall` over its variables; `fof` formulas map one-to-one onto the rsbdd operators, with
   `a != b` as `-(a = b)` and `<~>` as `-(a <=> b)`.
 - The formula is `(axioms) => (conjectures)`, or `(clauses) => false` for a problem without a conjecture. There are
   no rewrite rules: every axiom is part of the formula.
-- TPTP variables become rsbdd variables, and names that are rsbdd keywords, such as `or` and `eq`, are renamed.
+- TPTP variables become rsbdd variables, and names that are rsbdd keywords, such as `or` and `eq`, are renamed to
+  `or_` and `eq_`. Quoted names get the prefix `q_` if they are not plain lowercase words, numbers the prefix `n`,
+  and distinct objects `"..."` the prefix `d_`, with an axiom that the distinct objects are pairwise unequal.
 
 As the axioms are part of the formula, the constants of a problem are not covered by the axioms of unique names
 unless they are only used in terms (see [Unique names](finite_and_first_order.md#unique-names)).
@@ -79,7 +89,9 @@ can do is `not a theorem`, after it has saturated the clauses. This happened for
 small. The others are:
 
 - Sudokus (PUZ065 to PUZ072, PUZ079, PUZ080, PUZ138): finding the solution is a model search, which finite mode
-  does well; see [sudoku.txt](../examples/sudoku.txt).
+  does well; see [sudoku.txt](../examples/sudoku.txt). With an atom quantifier, `--prove` proves that a solution
+  exists, as the BDD solver decides the quantifier, and `--witness` prints the solution; see
+  [fol/sudoku.txt](../examples/fol/sudoku.txt).
 - Unreachable states (Quo vadis PUZ041, PUZ048, PUZ049, PUZ051, PUZ059, the Rubik's cube PUZ052, PUZ053, the
   fifteen-puzzle PUZ055 and the Tower of Hanoi PUZ057, PUZ058): showing that no sequence of moves reaches a state
   needs an invariant or a finite model of the axioms. Saturation with superposition does not terminate on these.
@@ -114,12 +126,14 @@ The analysis shows these limitations, roughly from the easiest to the hardest to
   so they have to be renamed.
 - **Rules for constants.** A rule needs an application on its left-hand side, so `g -> edge(..)` is rejected, and a
   constant that names a term has to be written out.
-- **TPTP input.** rsbdd does not read TPTP files, so the problems above were translated by an external script.
+- **TPTP input.** rsbdd does not read TPTP files: problems are translated by `tptp2rsbdd`, which only reads the
+  untyped languages `fof` and `cnf`.
 - **Answers.** Some puzzles ask for values: PUZ035-7 asks what the asked person and the other person are, given the
   answer. `--prove` reports `theorem` with the proof, but does not extract the values of the existential variables.
-- **Model finding.** `--prove` cannot show that the axioms have a model, so satisfiable problems end in
-  `not a theorem` at best. Finite mode finds models over the ground terms of a formula, but not over an arbitrary
-  finite domain as Mace4 or Paradox do.
+- **Model finding.** `--prove` searches for a countermodel as Mace4 does, with flattened ground clauses, unit
+  propagation and the least number heuristic, up to 16 elements, a million BDD nodes or 100000 decisions. It finds
+  the non-commutative group of six elements, but its propagation is weaker than that of Mace4, and it has no
+  clause learning as Paradox has, so larger models with several binary functions are slow to find.
 - **Indexing.** Without term indexing, large ground problems and long chains of moves take too long. This is the
   main gap with provers such as E or Vampire.
 - **AC-unification.** Problems with associative and commutative operators, such as PUZ056-1, need unification modulo

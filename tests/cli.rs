@@ -117,6 +117,11 @@ fn test_default_output() {
 }
 
 #[test]
+fn test_witness() {
+    insta::assert_snapshot!(run(&["--prove", "--witness", "examples/fol/sudoku.txt"]));
+}
+
+#[test]
 fn test_rewritten() {
     insta::assert_snapshot!(run(&[
         "-w",

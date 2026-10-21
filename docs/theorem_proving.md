@@ -160,14 +160,60 @@ theorem
 - The result is `theorem` with the proof (exit status 10) if the empty clause is derived, `not a theorem` (20) if the
   clauses are saturated without it, and `unknown` (30) if no proof is found within 100000 given clauses. As
   first-order validity is undecidable, a formula that is not a theorem may also give `unknown`.
+- Without a proof, the BDD searches for a countermodel: a model of the clauses of the axioms and the negated goal over
+  the domain `e1, .., en` for `n` from 1 up to 16, as Mace4 does (McCune, 2003). Every ground atom and every value of
+  a function is a boolean variable, and a function has exactly one value for every argument. Every ground instance of
+  a clause is a BDD constraint, flattened on the values of its nested terms: `m(m(x, y), z)` becomes `m(k, z)` under
+  the assumption `m(x, y) = k`. The values are searched depth-first with unit propagation, choosing constants first,
+  and with the least number heuristic: a value that no decision mentions yet is only tried for the smallest such
+  element, as the others are interchangeable. The search stops at the first domain that needs more than a million BDD
+  nodes or 100000 decisions. If there is a countermodel, the result is `not a theorem` with the domain, the atoms that
+  are true or false in the model, and the values of the functions:
+
+  ```bash
+  rsbdd --prove -e '(exists y # p(y)) => (forall y # p(y))'
+  ```
+  ```
+  domain: e1, e2
+  p(e1)
+  -p(e2)
+  sk1 = e1
+  sk2 = e2
+  not a theorem
+  ```
+
+  The Skolem functions `sk..` are the witnesses of the negated goal; the definitions of the clauses are left out of
+  the model. Examples: a symmetric and transitive relation that is not reflexive
+  ([symmetric_transitive.txt](../examples/fol/symmetric_transitive.txt)), 'everybody loves somebody' without somebody
+  loved by everybody ([quantifier_swap.txt](../examples/fol/quantifier_swap.txt)), a non-commutative monoid of three
+  elements ([monoid.txt](../examples/fol/monoid.txt)), and the non-commutative group of six elements that Mace4 finds
+  ([non_commutative_group.txt](../examples/fol/non_commutative_group.txt)).
+  [hilbert_hotel.txt](../examples/fol/hilbert_hotel.txt) is not a theorem either, but only an infinite domain shows
+  it, so the result has no countermodel.
 - Counting, fixed points, atom quantifiers and atom substitution are evaluated as in finite mode, and an equation
-  proven by `induct` becomes an axiom. The differences between `--prove` and finite mode are described in
+  proven by `induct` becomes an axiom. With `--witness`, a proof also prints a witness of every atom quantifier that
+  is existential in the goal and not inside a universal quantifier: the atoms that are true in a choice of its atoms,
+  found by the BDD, that satisfies an `exists p(_) # f`, or falsifies a `forall p(_) # f` under a negation:
+
+  ```bash
+  rsbdd --prove --witness -e 'exists p(_) # p(A) & -p(B)'
+  ```
+  ```
+  1. false [negated goal]
+  witness: p(A)
+  theorem
+  ```
+
+  For [sudoku.txt](../examples/fol/sudoku.txt), the witness is the solution of the sudoku.
+
+  The differences between `--prove` and finite mode are described in
   [Finite mode and first-order proofs](finite_and_first_order.md).
 
 More puzzles in [examples/fol](../examples/fol): the barber paradox ([barber.txt](../examples/fol/barber.txt)), the
 drinker paradox ([drinker.txt](../examples/fol/drinker.txt)), Lewis Carroll's animals puzzle
 ([animals.txt](../examples/fol/animals.txt)), Schubert's Steamroller
-([steamroller.txt](../examples/fol/steamroller.txt)), and groups in which every element is its own inverse
+([steamroller.txt](../examples/fol/steamroller.txt)), the existence of a solution of a sudoku
+([sudoku.txt](../examples/fol/sudoku.txt)), and groups in which every element is its own inverse
 ([boolean_group.txt](../examples/fol/boolean_group.txt)).
 
 The prover proves the first-order problems of Pelletier's *Seventy-five problems for testing automatic theorem
