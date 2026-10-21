@@ -117,9 +117,10 @@ The analysis shows these limitations, roughly from the easiest to the hardest to
 - **TPTP input.** rsbdd does not read TPTP files, so the problems above were translated by an external script.
 - **Answers.** Some puzzles ask for values: PUZ035-7 asks what the asked person and the other person are, given the
   answer. `--prove` reports `theorem` with the proof, but does not extract the values of the existential variables.
-- **Model finding.** `--prove` searches for a countermodel as Mace4 does, up to 16 elements or a million BDD nodes.
-  The BDD of a binary function grows quickly with the domain, so without the flattening and symmetry breaking of
-  Paradox, models of more than three or four elements with such functions are out of reach.
+- **Model finding.** `--prove` searches for a countermodel as Mace4 does, with flattened ground clauses, unit
+  propagation and the least number heuristic, up to 16 elements, a million BDD nodes or 100000 decisions. It finds
+  the non-commutative group of six elements, but its propagation is weaker than that of Mace4, and it has no
+  clause learning as Paradox has, so larger models with several binary functions are slow to find.
 - **Indexing.** Without term indexing, large ground problems and long chains of moves take too long. This is the
   main gap with provers such as E or Vampire.
 - **AC-unification.** Problems with associative and commutative operators, such as PUZ056-1, need unification modulo

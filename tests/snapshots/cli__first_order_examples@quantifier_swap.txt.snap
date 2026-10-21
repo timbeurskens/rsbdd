@@ -11,5 +11,9 @@ loves(e1, e1)
 -loves(e1, e2)
 -loves(e2, e1)
 loves(e2, e2)
+sk2(e1) = e1
+sk2(e2) = e2
+sk4(e1) = e2
+sk4(e2) = e1
 not a theorem
 --- stderr

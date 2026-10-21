@@ -80,7 +80,7 @@ fn test_countermodels() -> io::Result<()> {
     };
     assert_eq!(
         countermodel("(exists y # p(y)) => (forall y # p(y))")?,
-        ["domain: e1, e2", "p(e1)", "-p(e2)"]
+        ["domain: e1, e2", "p(e1)", "-p(e2)", "sk1 = e1", "sk2 = e2"]
     );
     assert_eq!(countermodel("exists x, y # -(x = y)")?, ["domain: e1"]);
     let five = "(exists a, b, c, d, e # -(a = b) & -(a = c) & -(a = d) & -(a = e) & -(b = c) & -(b = d) & \
@@ -88,10 +88,10 @@ fn test_countermodels() -> io::Result<()> {
     assert_eq!(countermodel(five)?[0], "domain: e1, e2, e3, e4, e5");
     let group = "((forall x, y, z # m(m(x, y), z) = m(x, m(y, z))) & (forall x # m(e, x) = x & m(x, e) = x) & \
         (forall x # m(i(x), x) = e & m(x, i(x)) = e)) => forall x, y # m(x, y) = m(y, x)";
-    assert!(matches!(prove(group)?, Outcome::Disproven(None)));
+    assert_eq!(countermodel(group)?[0], "domain: e1, e2, e3, e4, e5, e6");
     assert_eq!(
         countermodel("(forall x # f(f(x)) = x) => forall x # f(x) = x")?,
-        ["domain: e1, e2", "f(e1) = e2", "f(e2) = e1"]
+        ["domain: e1, e2", "f(e1) = e2", "f(e2) = e1", "sk2 = e1"]
     );
     assert_eq!(
         countermodel("p(A) -> true; p(B)")?,
