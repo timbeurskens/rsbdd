@@ -1,0 +1,23 @@
+---
+source: tests/cli.rs
+expression: "run(&[\"--prove\", path])"
+input_file: examples/fol/monoid.txt
+---
+$ rsbdd --prove examples/fol/monoid.txt
+status: 20
+--- stdout
+domain: e1, e2, e3
+m(e1, e1) = e1
+m(e1, e2) = e2
+m(e1, e3) = e3
+m(e2, e1) = e2
+m(e3, e1) = e3
+m(e2, e2) = e2
+m(e3, e2) = e2
+m(e2, e3) = e3
+m(e3, e3) = e3
+e = e1
+sk5 = e2
+sk6 = e3
+not a theorem
+--- stderr

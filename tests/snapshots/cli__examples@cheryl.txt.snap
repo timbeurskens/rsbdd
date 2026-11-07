@@ -1,26 +1,27 @@
 ---
 source: tests/cli.rs
+assertion_line: 31
 expression: output
 input_file: examples/cheryl.txt
 ---
 $ rsbdd -t -f true examples/cheryl.txt
 status: 10
 --- stdout
-| birthday(May, D15) | birthday(May, D16) | birthday(May, D19) | birthday(June, D17) | birthday(June, D18) | birthday(July, D16) | birthday(July, D14) | birthday(August, D15) | birthday(August, D17) | birthday(August, D14) | *     |
-|--------------------|--------------------|--------------------|---------------------|---------------------|---------------------|---------------------|-----------------------|-----------------------|-----------------------|-------|
-| False              | False              | False              | False               | False               | True                | False               | False                 | False                 | False                 | True  |
+| month(Cheryl, May) | day(Cheryl, D15) | day(Cheryl, D16) | day(Cheryl, D19) | month(Cheryl, June) | day(Cheryl, D17) | day(Cheryl, D18) | month(Cheryl, July) | day(Cheryl, D14) | month(Cheryl, August) | *     |
+|--------------------|------------------|------------------|------------------|---------------------|------------------|------------------|---------------------|------------------|-----------------------|-------|
+| False              | False            | True             | False            | False               | False            | False            | True                | False            | False                 | True  |
 --- stderr
 
 $ rsbdd -v examples/cheryl.txt
 status: 10
 --- stdout
-birthday(July, D16);
+day(Cheryl, D16), month(Cheryl, July);
 --- stderr
 
 $ rsbdd -m -t -f true examples/cheryl.txt
 status: 10
 --- stdout
-| birthday(May, D15) | birthday(May, D16) | birthday(May, D19) | birthday(June, D17) | birthday(June, D18) | birthday(July, D16) | birthday(July, D14) | birthday(August, D15) | birthday(August, D17) | birthday(August, D14) | *     |
-|--------------------|--------------------|--------------------|---------------------|---------------------|---------------------|---------------------|-----------------------|-----------------------|-----------------------|-------|
-| False              | False              | False              | False               | False               | True                | False               | False                 | False                 | False                 | True  |
+| month(Cheryl, May) | day(Cheryl, D15) | day(Cheryl, D16) | day(Cheryl, D19) | month(Cheryl, June) | day(Cheryl, D17) | day(Cheryl, D18) | month(Cheryl, July) | day(Cheryl, D14) | month(Cheryl, August) | *     |
+|--------------------|------------------|------------------|------------------|---------------------|------------------|------------------|---------------------|------------------|-----------------------|-------|
+| False              | False            | True             | False            | False               | False            | False            | True                | False            | False                 | True  |
 --- stderr

@@ -1,0 +1,14 @@
+[package]
+name = "maxclique2rsbdd"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+description = "Converts a graph into a max-clique specification"
+
+[dependencies]
+clap.workspace = true
+csv.workspace = true
+rustc-hash.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,10 @@
+---
+source: tests/cli.rs
+expression: "run(&[\"--prove\", path])"
+input_file: examples/fol/hilbert_hotel.txt
+---
+$ rsbdd --prove examples/fol/hilbert_hotel.txt
+status: 20
+--- stdout
+not a theorem
+--- stderr

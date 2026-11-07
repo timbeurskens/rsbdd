@@ -227,6 +227,11 @@ impl<S: BDDSymbol> BDDEnv<S> {
         self.inner.store.set_limit(bytes);
     }
 
+    /// The memory limit in bytes, `usize::MAX` if there is none
+    pub fn memory_limit(&self) -> usize {
+        self.inner.store.limit()
+    }
+
     /// Estimated number of bytes in memory
     pub fn memory(&self) -> usize {
         self.inner.store.memory()

@@ -1,0 +1,27 @@
+---
+source: tests/cli.rs
+assertion_line: 31
+expression: output
+input_file: examples/right_identity.txt
+---
+$ rsbdd -t -f true examples/right_identity.txt
+status: 10
+--- stdout
+| *     |
+|-------|
+| True  |
+--- stderr
+
+$ rsbdd -v examples/right_identity.txt
+status: 10
+--- stdout
+;
+--- stderr
+
+$ rsbdd -m -t -f true examples/right_identity.txt
+status: 10
+--- stdout
+| *     |
+|-------|
+| True  |
+--- stderr

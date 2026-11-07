@@ -39,23 +39,29 @@ Benchmarking:
 Solver:
   -l, --memory-limit <MiB>  Limit the memory used by the solver, nodes exceeding the limit are paged to disk [default: 75% of available
                             memory]
+  -P, --prove               Prove the formula in first-order logic by superposition, with the rewrite rules as axioms, and print the
+                            proof
+      --witness             With --prove, print a witness of every atom quantifier that is existential in a proven goal: the atoms
+                            that are true in a choice that satisfies an `exists`, or falsifies a `forall` under a negation
 
 Without output options, the satisfying rows of the truth table are printed.
 Exit status: 10 if the formula is satisfiable, 20 if it is unsatisfiable, 1 or 2 on errors.
+With --prove: 10 if the formula is a theorem, 20 if it is not, 30 if no proof was found.
 
 Examples:
   rsbdd examples/4_queens.txt
   rsbdd -e "a & -b" -t
   rsbdd examples/peano_puzzle.txt -w -
+  rsbdd examples/fol/dreadbury.txt --prove
 
 ```
 
-## max_clique_gen
+## maxclique2rsbdd
 
 ```
 Converts a graph into a max-clique specification
 
-Usage: max_clique_gen [OPTIONS] [INPUT] [OUTPUT]
+Usage: maxclique2rsbdd [OPTIONS] [INPUT] [OUTPUT]
 
 Arguments:
   [INPUT]   Input file graph in csv edge-list format
@@ -92,12 +98,12 @@ Options:
 
 ```
 
-## n_queens_gen
+## nqueens2rsbdd
 
 ```
 Generates n-queen formulae for the SAT solver
 
-Usage: n_queens_gen [OPTIONS] [OUTPUT]
+Usage: nqueens2rsbdd [OPTIONS] [OUTPUT]
 
 Arguments:
   [OUTPUT]  The output rsbdd file
@@ -109,12 +115,12 @@ Options:
 
 ```
 
-## sudoku_gen
+## sudoku2rsbdd
 
 ```
-Generates a random edge list formatted graph
+Converts a sudoku puzzle into an rsbdd formula
 
-Usage: sudoku_gen [OPTIONS] [INPUT] [OUTPUT]
+Usage: sudoku2rsbdd [OPTIONS] [INPUT] [OUTPUT]
 
 Arguments:
   [INPUT]   The input sudoku file
@@ -122,7 +128,37 @@ Arguments:
 
 Options:
   -r, --root <N>  The root value of the puzzle. Typically the square root of the largest possible number [default: 3]
+      --prove     State the puzzle as a goal for `rsbdd --prove`: there exists a solved sudoku in which the hints hold
   -h, --help      Print help
   -V, --version   Print version
+
+```
+
+## tptp2rsbdd
+
+See [The TPTP puzzles](tptp_puzzles.md#method) for the translation.
+
+```
+Downloads a TPTP problem and translates it to an rsbdd formula
+
+Usage: tptp2rsbdd [OPTIONS] <PROBLEM> [OUTPUT]
+
+Arguments:
+  <PROBLEM>  The name of the TPTP problem, such as PUZ001-1, or a path with --file
+  [OUTPUT]   The output rsbdd file [default: stdout]
+
+Options:
+  -f, --file            Read the problem from a local file instead of downloading it
+      --tptp-dir <DIR>  A local copy of the TPTP library: problems and includes are read from it if they exist, and
+                        downloaded otherwise [env: TPTP=]
+  -h, --help            Print help
+  -V, --version         Print version
+
+Only the fof and cnf languages are supported.
+
+Examples:
+  tptp2rsbdd PUZ001-1 | rsbdd - --prove
+  tptp2rsbdd SET001-1 set001.txt
+  tptp2rsbdd --file problem.p
 
 ```

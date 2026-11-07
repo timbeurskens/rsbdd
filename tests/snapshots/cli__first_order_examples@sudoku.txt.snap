@@ -1,0 +1,11 @@
+---
+source: tests/cli.rs
+expression: "run(&[\"--prove\", path])"
+input_file: examples/fol/sudoku.txt
+---
+$ rsbdd --prove examples/fol/sudoku.txt
+status: 10
+--- stdout
+580. false [negated goal]
+theorem
+--- stderr

@@ -1,0 +1,42 @@
+"
+Who killed Aunt Agatha?
+
+The situation
+
+    Someone who lives in Dreadbury Mansion killed Aunt Agatha.
+    Agatha, the butler, and Charles live in Dreadbury Mansion, and are the only people who live therein.
+    A killer always hates his victim, and is never richer than his victim.
+    Charles hates no one that Aunt Agatha hates.
+    Agatha hates everyone except the butler.
+    The butler hates everyone not richer than Aunt Agatha.
+    The butler hates everyone Aunt Agatha hates.
+    No one hates everyone.
+    Agatha is not the butler.
+
+The question is: who killed Aunt Agatha? The answer is that Agatha killed herself.
+
+From: Pelletier, Seventy-five problems for testing automatic theorem provers (1986), problem 55
+      TPTP problem PUZ001
+
+---
+
+The puzzle is a first-order theorem: the facts imply that Agatha killed herself. Unlike the other puzzles, the domain
+is not restricted to the people that are named: someone could live in the mansion without being named.
+
+Run with:
+    rsbdd examples/fol/dreadbury.txt --prove
+"
+
+(
+    (exists x # lives(x) & killed(x, agatha)) &
+    lives(agatha) & lives(butler) & lives(charles) &
+    (forall x # lives(x) => x = agatha | x = butler | x = charles) &
+    (forall x, y # killed(x, y) => hates(x, y)) &
+    (forall x, y # killed(x, y) => -richer(x, y)) &
+    (forall x # hates(agatha, x) => -hates(charles, x)) &
+    (forall x # -(x = butler) => hates(agatha, x)) &
+    (forall x # -richer(x, agatha) => hates(butler, x)) &
+    (forall x # hates(agatha, x) => hates(butler, x)) &
+    (forall x # exists y # -hates(x, y)) &
+    -(agatha = butler)
+) => killed(agatha, agatha)

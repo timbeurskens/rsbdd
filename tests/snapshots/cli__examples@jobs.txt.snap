@@ -1,0 +1,26 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: examples/jobs.txt
+---
+$ rsbdd -t -f true examples/jobs.txt
+status: 10
+--- stdout
+| holds(Roberta, Chef) | holds(Roberta, Guard) | holds(Roberta, Nurse) | holds(Roberta, Operator) | holds(Roberta, Police) | holds(Roberta, Teacher) | holds(Roberta, Actor) | holds(Roberta, Boxer) | holds(Thelma, Chef) | holds(Thelma, Guard) | holds(Thelma, Nurse) | holds(Thelma, Operator) | holds(Thelma, Police) | holds(Thelma, Teacher) | holds(Thelma, Actor) | holds(Thelma, Boxer) | holds(Steve, Chef) | holds(Steve, Guard) | holds(Steve, Nurse) | holds(Steve, Operator) | holds(Steve, Police) | holds(Steve, Teacher) | holds(Steve, Actor) | holds(Steve, Boxer) | holds(Pete, Chef) | holds(Pete, Guard) | holds(Pete, Nurse) | holds(Pete, Operator) | holds(Pete, Police) | holds(Pete, Teacher) | holds(Pete, Actor) | holds(Pete, Boxer) | *     |
+|----------------------|-----------------------|-----------------------|--------------------------|------------------------|-------------------------|-----------------------|-----------------------|---------------------|----------------------|----------------------|-------------------------|-----------------------|------------------------|----------------------|----------------------|--------------------|---------------------|---------------------|------------------------|----------------------|-----------------------|---------------------|---------------------|-------------------|--------------------|--------------------|-----------------------|---------------------|----------------------|--------------------|--------------------|-------|
+| False                | True                  | False                 | False                    | False                  | True                    | False                 | False                 | True                | False                | False                | False                   | False                 | False                  | False                | True                 | False              | False               | True                | False                  | True                 | False                 | False               | False               | False             | False              | False              | True                  | False               | False                | True               | False              | True  |
+--- stderr
+
+$ rsbdd -v examples/jobs.txt
+status: 10
+--- stdout
+holds(Roberta, Guard), holds(Roberta, Teacher), holds(Thelma, Chef), holds(Thelma, Boxer), holds(Steve, Nurse), holds(Steve, Police), holds(Pete, Operator), holds(Pete, Actor);
+--- stderr
+
+$ rsbdd -m -t -f true examples/jobs.txt
+status: 10
+--- stdout
+| holds(Roberta, Chef) | holds(Roberta, Guard) | holds(Roberta, Nurse) | holds(Roberta, Operator) | holds(Roberta, Police) | holds(Roberta, Teacher) | holds(Roberta, Actor) | holds(Roberta, Boxer) | holds(Thelma, Chef) | holds(Thelma, Guard) | holds(Thelma, Nurse) | holds(Thelma, Operator) | holds(Thelma, Police) | holds(Thelma, Teacher) | holds(Thelma, Actor) | holds(Thelma, Boxer) | holds(Steve, Chef) | holds(Steve, Guard) | holds(Steve, Nurse) | holds(Steve, Operator) | holds(Steve, Police) | holds(Steve, Teacher) | holds(Steve, Actor) | holds(Steve, Boxer) | holds(Pete, Chef) | holds(Pete, Guard) | holds(Pete, Nurse) | holds(Pete, Operator) | holds(Pete, Police) | holds(Pete, Teacher) | holds(Pete, Actor) | holds(Pete, Boxer) | *     |
+|----------------------|-----------------------|-----------------------|--------------------------|------------------------|-------------------------|-----------------------|-----------------------|---------------------|----------------------|----------------------|-------------------------|-----------------------|------------------------|----------------------|----------------------|--------------------|---------------------|---------------------|------------------------|----------------------|-----------------------|---------------------|---------------------|-------------------|--------------------|--------------------|-----------------------|---------------------|----------------------|--------------------|--------------------|-------|
+| False                | True                  | False                 | False                    | False                  | True                    | False                 | False                 | True                | False                | False                | False                   | False                 | False                  | False                | True                 | False              | False               | True                | False                  | True                 | False                 | False               | False               | False             | False              | False              | True                  | False               | False                | True               | False              | True  |
+--- stderr

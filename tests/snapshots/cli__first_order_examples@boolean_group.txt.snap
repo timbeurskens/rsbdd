@@ -1,0 +1,23 @@
+---
+source: tests/cli.rs
+assertion_line: 47
+expression: "run(&[\"--prove\", path])"
+input_file: examples/fol/boolean_group.txt
+---
+$ rsbdd --prove examples/fol/boolean_group.txt
+status: 10
+--- stdout
+0. (mul(x, mul(y, z)) = mul(mul(x, y), z)) [negated goal]
+1. (mul(e, x) = x) [negated goal]
+2. (mul(x, x) = e) [negated goal]
+3. -(mul(sk6, sk7) = mul(sk7, sk6)) [negated goal]
+14. (mul(x, mul(y, mul(x, y))) = e) [superposition 2, 0]
+15. (mul(y, mul(y, z)) = mul(e, z)) [superposition 2, 0]
+50. (mul(y, mul(y, z)) = z) [simplification 15, 1]
+59. (mul(z, e) = z) [superposition 2, 50]
+64. (mul(y, e) = mul(y1, mul(y, y1))) [superposition 14, 50]
+159. (y = mul(y1, mul(y, y1))) [simplification 64, 59]
+173. (mul(y, y1) = mul(y1, y)) [superposition 159, 50]
+202. false [superposition 173, 3]
+theorem
+--- stderr

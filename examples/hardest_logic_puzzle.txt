@@ -1,0 +1,75 @@
+"
+The Hardest Logic Puzzle Ever
+
+The situation
+
+    Three gods A, B, and C are called, in no particular order, True, False, and Random.
+    True always speaks truly, False always speaks falsely, but whether Random speaks truly or falsely is a completely
+    random matter.
+    Your task is to determine the identities of A, B, and C by asking three yes-no questions; each question must be
+    put to exactly one god.
+    The gods understand English, but will answer all questions in their own language, in which the words for yes and
+    no are da and ja, in some order. You do not know which word means which.
+
+From: George Boolos, The Hardest Logic Puzzle Ever (1996)
+      https://en.wikipedia.org/wiki/The_Hardest_Logic_Puzzle_Ever
+
+---
+
+A situation w(a, b, c, m) states that A, B and C are a, b and c, and that da means m.
+A yes-no question is true or false in each situation: the unknown true_in(q, s) is the truth of the question q in the
+situation s. The solver chooses every question, and the god it is put to: asks(q, g).
+
+The questions are the nodes of a tree: the first question is Q1, and the question after the answer da (or ja) to the
+question q is da(q) (or ja(q)). After three answers you state the identities: states(q, g, r) states that god g is r.
+The puzzle is solved if, in every situation and whatever Random does, the stated identities are correct.
+Whether Random speaks truly to the question q is the unknown random(q), which is universally quantified.
+
+There are many strategies, so ask for a single model. Variables marked * can be either value.
+
+Run with:
+    rsbdd examples/hardest_logic_puzzle.txt -m -v
+
+The questions of the model, as a readable decision tree:
+    rsbdd examples/hardest_logic_puzzle.txt -m -v | python3 examples/hardest_logic_puzzle.py
+"
+
+god(A) -> true;
+god(B) -> true;
+god(C) -> true;
+
+role(True) -> true;
+role(False) -> true;
+role(Random) -> true;
+
+meaning(Yes) -> true;
+meaning(No) -> true;
+
+"A, B and C are called, in no particular order, True, False and Random, and da means yes or no"
+sum a, b, c, m # situation(w(a, b, c, m)) ->
+    role(a) & role(b) & role(c) & -(a = b) & -(a = c) & -(b = c) & meaning(m);
+
+sum a, b, c, m, r # is(A, w(a, b, c, m), r) -> r = a;
+sum a, b, c, m, r # is(B, w(a, b, c, m), r) -> r = b;
+sum a, b, c, m, r # is(C, w(a, b, c, m), r) -> r = c;
+sum a, b, c, m, x # da_means(w(a, b, c, m), x) -> x = m;
+
+"True always speaks truly, False always speaks falsely, whether Random speaks truly is random"
+sum q # speaks_truly(True, q) -> true;
+sum q # speaks_truly(False, q) -> false;
+sum q # speaks_truly(Random, q) -> random(q);
+
+"The answer of the god that is asked the question q in the situation s, in their own language"
+sum q, s # answers_yes(q, s) ->
+    exists g, r # god(g) & role(r) & asks(q, g) & is(g, s, r) & (speaks_truly(r, q) <=> true_in(q, s));
+sum q, s # says_da(q, s) -> if answers_yes(q, s) then da_means(s, Yes) else da_means(s, No);
+
+"After n more questions from the question q, the identities are determined in the situation s"
+sum q, s # determined(q, s, Zero) ->
+    forall g, r # god(g) & role(r) => (states(q, g, r) <=> is(g, s, r));
+sum q, s, n # determined(q, s, More(n)) ->
+    [asks(q, A), asks(q, B), asks(q, C)] = 1 &
+    forall random(q) # if says_da(q, s) then determined(da(q), s, n) else determined(ja(q), s, n);
+
+"Three questions determine the identities in every situation"
+forall a, b, c, m # situation(w(a, b, c, m)) => determined(Q1, w(a, b, c, m), More(More(More(Zero))))

@@ -1,34 +1,35 @@
 ---
 source: tests/cli.rs
+assertion_line: 31
 expression: output
 input_file: examples/state_machine.txt
 ---
 $ rsbdd -t -f true examples/state_machine.txt
 status: 10
 --- stdout
-| state_is_off_0 | state_is_on_0 | state_is_emergency_0 | event_danger_0 | event_mitigate_0 | event_turn_on_0 | event_turn_off_0 | *     |
-|----------------|---------------|----------------------|----------------|------------------|-----------------|------------------|-------|
-| False          | False         | Any                  | Any            | Any              | Any             | Any              | True  |
-| False          | True          | False                | False          | Any              | Any             | Any              | True  |
-| False          | True          | False                | True           | Any              | Any             | True             | True  |
-| False          | True          | True                 | Any            | Any              | Any             | Any              | True  |
-| True           | Any           | Any                  | Any            | Any              | Any             | Any              | True  |
+| state(T0, Off) | state(T0, On) | state(T0, Emergency) | active(T0, Danger) | active(T0, TurnOn) | active(T0, TurnOff) | active(T0, Mitigate) | *     |
+|----------------|---------------|----------------------|--------------------|--------------------|---------------------|----------------------|-------|
+| False          | False         | Any                  | Any                | Any                | Any                 | Any                  | True  |
+| False          | True          | False                | False              | Any                | Any                 | Any                  | True  |
+| False          | True          | False                | True               | Any                | True                | Any                  | True  |
+| False          | True          | True                 | Any                | Any                | Any                 | Any                  | True  |
+| True           | Any           | Any                  | Any                | Any                | Any                 | Any                  | True  |
 --- stderr
 
 $ rsbdd -v examples/state_machine.txt
 status: 10
 --- stdout
-state_is_emergency_0*, event_danger_0*, event_mitigate_0*, event_turn_on_0*, event_turn_off_0*;
-state_is_on_0, event_mitigate_0*, event_turn_on_0*, event_turn_off_0*;
-state_is_on_0, event_danger_0, event_mitigate_0*, event_turn_on_0*, event_turn_off_0;
-state_is_on_0, state_is_emergency_0, event_danger_0*, event_mitigate_0*, event_turn_on_0*, event_turn_off_0*;
-state_is_off_0, state_is_on_0*, state_is_emergency_0*, event_danger_0*, event_mitigate_0*, event_turn_on_0*, event_turn_off_0*;
+state(T0, Emergency)*, active(T0, Danger)*, active(T0, TurnOn)*, active(T0, TurnOff)*, active(T0, Mitigate)*;
+state(T0, On), active(T0, TurnOn)*, active(T0, TurnOff)*, active(T0, Mitigate)*;
+state(T0, On), active(T0, Danger), active(T0, TurnOn)*, active(T0, TurnOff), active(T0, Mitigate)*;
+state(T0, On), state(T0, Emergency), active(T0, Danger)*, active(T0, TurnOn)*, active(T0, TurnOff)*, active(T0, Mitigate)*;
+state(T0, Off), state(T0, On)*, state(T0, Emergency)*, active(T0, Danger)*, active(T0, TurnOn)*, active(T0, TurnOff)*, active(T0, Mitigate)*;
 --- stderr
 
 $ rsbdd -m -t -f true examples/state_machine.txt
 status: 10
 --- stdout
-| state_is_off_0 | state_is_on_0 | state_is_emergency_0 | event_danger_0 | event_mitigate_0 | event_turn_on_0 | event_turn_off_0 | *     |
-|----------------|---------------|----------------------|----------------|------------------|-----------------|------------------|-------|
-| True           | Any           | Any                  | Any            | Any              | Any             | Any              | True  |
+| state(T0, Off) | state(T0, On) | state(T0, Emergency) | active(T0, Danger) | active(T0, TurnOn) | active(T0, TurnOff) | active(T0, Mitigate) | *     |
+|----------------|---------------|----------------------|--------------------|--------------------|---------------------|----------------------|-------|
+| True           | Any           | Any                  | Any                | Any                | Any                 | Any                  | True  |
 --- stderr

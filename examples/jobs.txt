@@ -1,0 +1,76 @@
+"
+The Jobs Puzzle
+
+The situation
+
+    There are four people: Roberta, Thelma, Steve, and Pete.
+    Among them they hold eight different jobs, and each holds exactly two jobs.
+    The jobs are: chef, guard, nurse, telephone operator, police officer (either gender), teacher, actor, and boxer.
+    The job of nurse is held by a male.
+    The husband of the chef is the telephone operator.
+    Roberta is not a boxer.
+    Pete has no education past the ninth grade.
+    Roberta, the chef, and the police officer went golfing together.
+
+The question is: who holds which job?
+
+From: Wos, Overbeek, Lusk & Boyle, Automated Reasoning: Introduction and Applications (1984)
+      TPTP problem PUZ019
+
+---
+
+holds(p, j) is the unknown: every person holds exactly two jobs, and every job is held by exactly one person.
+
+Most clues are implicit, as in the original puzzle:
+- Roberta and Thelma are female, Steve and Pete are male.
+- An actor is male, and the nurse is male.
+- The chef has a husband, so the chef is female, and the telephone operator is male.
+- A nurse, a police officer and a teacher need more than a ninth-grade education, so Pete is none of them.
+- Roberta, the chef and the police officer are three different people.
+
+The chef is female but not Roberta, so Thelma is the chef. The police officer is neither Roberta, Thelma nor Pete,
+so it is Steve. Pete, the remaining male, cannot be the nurse, so Steve is the nurse as well, and Pete is the
+operator and the actor. Roberta is not the boxer, so Thelma is, and Roberta is the guard and the teacher.
+The truth table has a single row.
+
+Run with:
+    rsbdd examples/jobs.txt -t -ft
+"
+
+person(Roberta) -> true;
+person(Thelma) -> true;
+person(Steve) -> true;
+person(Pete) -> true;
+
+male(Steve) -> true;
+male(Pete) -> true;
+
+job(Chef) -> true;
+job(Guard) -> true;
+job(Nurse) -> true;
+job(Operator) -> true;
+job(Police) -> true;
+job(Teacher) -> true;
+job(Actor) -> true;
+job(Boxer) -> true;
+
+"Every person holds two jobs, and every job is held by one person"
+forall p # person(p) => [holds(p, Chef), holds(p, Guard), holds(p, Nurse), holds(p, Operator),
+                         holds(p, Police), holds(p, Teacher), holds(p, Actor), holds(p, Boxer)] = 2;
+forall j # job(j) => [holds(Roberta, j), holds(Thelma, j), holds(Steve, j), holds(Pete, j)] = 1;
+
+"The nurse and the actor are male"
+forall p # person(p) => (holds(p, Nurse) | holds(p, Actor)) => male(p);
+
+"The husband of the chef is the telephone operator"
+forall p # person(p) => (holds(p, Chef) => -male(p)) & (holds(p, Operator) => male(p));
+
+"Roberta is not a boxer"
+-holds(Roberta, Boxer);
+
+"Pete has no education past the ninth grade"
+-holds(Pete, Nurse) & -holds(Pete, Police) & -holds(Pete, Teacher);
+
+"Roberta, the chef and the police officer went golfing together"
+-holds(Roberta, Chef) & -holds(Roberta, Police);
+forall p # person(p) => -(holds(p, Chef) & holds(p, Police))

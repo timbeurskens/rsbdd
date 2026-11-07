@@ -96,14 +96,13 @@ fn main() -> anyhow::Result<()> {
             for edge in selection {
                 writeln!(writer, "    {} -- {}", edge.0, edge.1)?;
             }
-            writeln!(writer, "}}")?;
         } else {
             writeln!(writer, "digraph G {{")?;
             for edge in selection {
                 writeln!(writer, "    {} -> {}", edge.0, edge.1)?;
             }
-            writeln!(writer, "}}")?;
         }
+        writeln!(writer, "}}")?;
     } else {
         for edge in selection {
             writeln!(writer, "{},{}", edge.0, edge.1)?;

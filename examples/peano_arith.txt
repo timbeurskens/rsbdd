@@ -23,6 +23,6 @@ times(suc(suc(_0)), suc(suc(_0))) = plus(suc(suc(_0)), suc(suc(_0)));
 "2 * 3 != 5"
 -(times(suc(suc(_0)), suc(suc(suc(_0)))) = suc(suc(suc(suc(suc(_0))))));
 
-"addition commutes and 0 is a right identity, for all numerals in the formula"
-forall x, y # plus(x, y) = plus(y, x);
-forall x # plus(x, _0) = x
+"addition commutes and 0 is a right identity, for every natural number (by induction, see induction.txt)"
+induct x, y # plus(x, y) = plus(y, x);
+induct x # plus(x, _0) = x

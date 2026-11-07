@@ -1,0 +1,27 @@
+"
+Hilbert's hotel
+
+The situation
+
+    Every guest of a full hotel moves from room x to room f(x).
+    No two guests move to the same room: if f(x) = f(y), then x = y.
+    Nobody moves to room a.
+
+The question is: is this impossible?
+
+From: David Hilbert, lecture 'Über das Unendliche' (1924)
+
+---
+
+No, but only in an infinite hotel: with rooms 0, 1, 2, .. every guest moves from room n to room n + 1, and room 0
+becomes free. In a finite hotel, an injective f is also surjective, so some guest moves to room a. The prover
+saturates without a proof, so the formula is not a theorem, but there is no finite countermodel to show.
+
+Run with:
+    rsbdd examples/fol/hilbert_hotel.txt --prove
+"
+
+-(
+    (forall x, y # f(x) = f(y) => x = y) &
+    (forall x # -(f(x) = a))
+)

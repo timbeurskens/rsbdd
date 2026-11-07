@@ -1,0 +1,27 @@
+---
+source: tests/cli.rs
+assertion_line: 31
+expression: output
+input_file: examples/dreadbury.txt
+---
+$ rsbdd -t -f true examples/dreadbury.txt
+status: 10
+--- stdout
+| killer(Agatha) | killer(Butler) | killer(Charles) | *     |
+|----------------|----------------|-----------------|-------|
+| True           | False          | False           | True  |
+--- stderr
+
+$ rsbdd -v examples/dreadbury.txt
+status: 10
+--- stdout
+killer(Agatha);
+--- stderr
+
+$ rsbdd -m -t -f true examples/dreadbury.txt
+status: 10
+--- stdout
+| killer(Agatha) | killer(Butler) | killer(Charles) | *     |
+|----------------|----------------|-----------------|-------|
+| True           | False          | False           | True  |
+--- stderr

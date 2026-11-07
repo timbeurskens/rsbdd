@@ -1,0 +1,62 @@
+"
+The Lion and the Unicorn
+
+The situation
+
+    The Lion lies on Mondays, Tuesdays and Wednesdays, and tells the truth on the other days of the week.
+    The Unicorn lies on Thursdays, Fridays and Saturdays, and tells the truth on the other days of the week.
+
+    One day, Alice meets them both.
+    The Lion says: 'Yesterday was one of my lying days.'
+    The Unicorn says: 'Yesterday was one of my lying days.'
+
+The question is: what day is it today?
+
+From: Raymond Smullyan, What Is the Name of This Book? (1978)
+      Ohlbach & Schmidt-Schauss, The Lion and the Unicorn (1985), TPTP problem PUZ005
+
+---
+
+today(d) is the unknown: the solver chooses exactly one day. A statement is true exactly when the speaker is not
+lying today, so the Lion's claim lion_lies(y) about yesterday y holds exactly when -lion_lies(d) holds today.
+
+The Lion can only say this on a Monday (lying about Sunday) or on a Thursday (truthfully, about Wednesday).
+The Unicorn can only say this on a Thursday (lying about Wednesday) or on a Sunday (truthfully, about Saturday).
+The truth table has a single row: today is Thursday.
+
+Run with:
+    rsbdd examples/lion_unicorn.txt -t -ft
+"
+
+"The days of the week, and the day before each day"
+day(Monday) -> true;
+day(Tuesday) -> true;
+day(Wednesday) -> true;
+day(Thursday) -> true;
+day(Friday) -> true;
+day(Saturday) -> true;
+day(Sunday) -> true;
+
+yesterday(Sunday, Monday) -> true;
+yesterday(Monday, Tuesday) -> true;
+yesterday(Tuesday, Wednesday) -> true;
+yesterday(Wednesday, Thursday) -> true;
+yesterday(Thursday, Friday) -> true;
+yesterday(Friday, Saturday) -> true;
+yesterday(Saturday, Sunday) -> true;
+
+"The lying days"
+lion_lies(Monday) -> true;
+lion_lies(Tuesday) -> true;
+lion_lies(Wednesday) -> true;
+
+unicorn_lies(Thursday) -> true;
+unicorn_lies(Friday) -> true;
+unicorn_lies(Saturday) -> true;
+
+"Today is one day of the week"
+[today(Monday), today(Tuesday), today(Wednesday), today(Thursday), today(Friday), today(Saturday), today(Sunday)] = 1;
+
+"Both say: 'yesterday was one of my lying days', which is true exactly when they are not lying today"
+forall d, y # day(d) & day(y) & today(d) & yesterday(y, d) =>
+    (lion_lies(y) <=> -lion_lies(d)) & (unicorn_lies(y) <=> -unicorn_lies(d))

@@ -1,0 +1,22 @@
+"
+The barber paradox
+
+The situation
+
+    A village barber shaves exactly those villagers who do not shave themselves.
+
+The question is: can such a barber exist?
+
+From: Bertrand Russell (1918), as an illustration of Russell's paradox
+      Pelletier, Seventy-five problems for testing automatic theorem provers (1986), problem 39
+
+---
+
+No such barber exists: should the barber shave himself? If he does, he must not, and if he does not, he must.
+The proof instantiates 'everyone the barber shaves' with the barber himself.
+
+Run with:
+    rsbdd examples/fol/barber.txt --prove
+"
+
+-(exists x # barber(x) & forall y # (shaves(x, y) <=> -shaves(y, y)))

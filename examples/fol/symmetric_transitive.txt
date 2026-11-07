@@ -1,0 +1,25 @@
+"
+A symmetric and transitive relation
+
+The situation
+
+    A relation r is symmetric: if r(x, y), then r(y, x).
+    It is also transitive: if r(x, y) and r(y, z), then r(x, z).
+
+The question is: is r reflexive, so that r(x, x) for every x?
+
+A classic flawed proof: take any x and some y with r(x, y). By symmetry r(y, x), and by transitivity r(x, x).
+
+---
+
+No: the proof assumes that every x is related to some y. The countermodel has a single element that is not related
+to itself, so symmetry and transitivity hold vacuously.
+
+Run with:
+    rsbdd examples/fol/symmetric_transitive.txt --prove
+"
+
+(
+    (forall x, y # r(x, y) => r(y, x)) &
+    (forall x, y, z # r(x, y) & r(y, z) => r(x, z))
+) => forall x # r(x, x)

@@ -1,0 +1,44 @@
+"
+The Animals Puzzle
+
+The situation
+
+    1)  The only animals in this house are cats.
+    2)  Every animal is suitable for a pet, that loves to gaze at the moon.
+    3)  When I detest an animal, I avoid it.
+    4)  No animals are carnivorous, unless they prowl at night.
+    5)  No cat fails to kill mice.
+    6)  No animals ever take to me, except what are in this house.
+    7)  Kangaroos are not suitable for pets.
+    8)  None but carnivora kill mice.
+    9)  I detest animals that do not take to me.
+    10) Animals that prowl at night always love to gaze at the moon.
+
+The question is: do I always avoid a kangaroo?
+
+From: Lewis Carroll, Symbolic Logic (1896)
+      TPTP problem PUZ002
+
+---
+
+Carroll's sorites: ten premises that chain into a single conclusion. Read backwards from a kangaroo: it is not
+suitable for a pet (7), so it does not gaze at the moon (2), so it does not prowl at night (10), so it is not
+carnivorous (4), so it does not kill mice (8), so it is not a cat (5), so it is not in this house (1), so it does
+not take to me (6), so I detest it (9), so I avoid it (3).
+
+Run with:
+    rsbdd examples/fol/animals.txt --prove
+"
+
+(
+    (forall x # in_house(x) => cat(x)) &
+    (forall x # gazer(x) => suitable_pet(x)) &
+    (forall x # detested(x) => avoided(x)) &
+    (forall x # carnivore(x) => prowler(x)) &
+    (forall x # cat(x) => kills_mice(x)) &
+    (forall x # takes_to_me(x) => in_house(x)) &
+    (forall x # kangaroo(x) => -suitable_pet(x)) &
+    (forall x # kills_mice(x) => carnivore(x)) &
+    (forall x # -takes_to_me(x) => detested(x)) &
+    (forall x # prowler(x) => gazer(x))
+) => forall x # kangaroo(x) => avoided(x)

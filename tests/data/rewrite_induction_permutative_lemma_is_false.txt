@@ -1,0 +1,7 @@
+"induction: commutativity of times needs permutative lemmas of plus, which cannot be used as rewrite rules"
+sum y # plus(_0, y) -> y;
+sum x, y # plus(suc(x), y) -> suc(plus(x, y));
+sum y # times(_0, y) -> _0;
+sum x, y # times(suc(x), y) -> plus(y, times(x, y));
+
+induct x, y # times(x, y) = times(y, x)

@@ -36,6 +36,7 @@ impl SymbolicParseTree {
             }
             SymbolicBDD::Summation(_, f)
             | SymbolicBDD::Quantifier(_, _, f)
+            | SymbolicBDD::AtomQuantifier(_, _, f)
             | SymbolicBDD::Not(f)
             | SymbolicBDD::FixedPoint(_, _, f) => {
                 let new_nodes = Self::nodes_recursive(f);
@@ -109,6 +110,9 @@ impl<'a> dot::Labeller<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                 op,
                 v.iter().map(|s| s.name.as_ref()).cloned().join(", ")
             )),
+            SymbolicBDD::AtomQuantifier(op, atoms, _) => {
+                dot::LabelText::label(format!("{:?} [{}]", op, atoms.iter().join(", ")))
+            }
             SymbolicBDD::Not(_) => dot::LabelText::label("Not".to_string()),
             SymbolicBDD::CountableConst(v, _, n) => dot::LabelText::label(format!("{:?} {}", v, n)),
             SymbolicBDD::CountableVariable(v, _, _) => dot::LabelText::label(format!("{:?}", v)),
@@ -164,6 +168,7 @@ impl<'a> dot::GraphWalk<'a, GraphNode, GraphEdge> for SymbolicParseTree {
                 }
                 SymbolicBDD::Summation(_, f)
                 | SymbolicBDD::Quantifier(_, _, f)
+                | SymbolicBDD::AtomQuantifier(_, _, f)
                 | SymbolicBDD::Not(f)
                 | SymbolicBDD::FixedPoint(_, _, f) => {
                     edges.push((

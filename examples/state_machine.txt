@@ -15,83 +15,47 @@ The machine updates the state in a fixed interval, with initial state 'off'.
 The structure below allows us to verify invariants on this state machine:
 Given a starting state, can we enter a state that is undesirable?
 
-This system is best described using the rewrite rules and constructors, but this implementation uses the base syntax.
-A nice first step would be to implement functions: apply a logic operation given a simple rewrite rule.
+The state at time t is a function: the unknowns state(t, s) state that the machine is in state s at time t, and
+active(t, e) states that event e is active at time t. The solver chooses the state and events at time T0.
+The next state is defined by the transition rules, and the property is checked for every interpretation of
+state(T1, _) that follows from T0.
 
+Run with:
+    rsbdd examples/state_machine.txt -t
 "
 
-"Every possible output state satisfies the requirements"
+is_state(Off) -> true;
+is_state(On) -> true;
+is_state(Emergency) -> true;
 
-forall state_is_off_1, state_is_on_1, state_is_emergency_1 # 
-(
-    "Only one state is enabled"
-    [state_is_off_0, state_is_on_0, state_is_emergency_0] = 1 &
-    [state_is_off_1, state_is_on_1, state_is_emergency_1] = 1 &
+"The machine is in exactly one state at time t"
+sum t # valid(t) -> exists s # is_state(s) & state(t, s) & forall s2 # is_state(s2) & state(t, s2) => s2 = s;
 
-    "Transitions from state 0"
+"next(t, s): s is the state after time t. The state only changes when one of the conditions is met"
+sum t, s # next(t, s) ->
+    if active(t, Danger) then s = Emergency
+    else if state(t, Off) & active(t, TurnOn) then s = On
+    else if state(t, On) & active(t, TurnOff) then s = Off
+    else if state(t, Emergency) & active(t, Mitigate) then s = Off
+    else state(t, s);
 
-    (event_danger_0 => (
-        (state_is_off_1 eq false) &
-        (state_is_on_1 eq false) & 
-        (state_is_emergency_1 eq true)
-    )) &
+sum t, u # step(t, u) -> forall s # is_state(s) => (state(u, s) <=> next(t, s));
 
-    ((-event_danger_0 & event_mitigate_0 & state_is_emergency_0) => (
-        (state_is_off_1 eq true) &
-        (state_is_on_1 eq false) & 
-        (state_is_emergency_1 eq false)
-    )) &
-
-    ((event_turn_on_0 & -event_danger_0 & state_is_off_0) => (
-        (state_is_off_1 eq false) &
-        (state_is_on_1 eq true) & 
-        (state_is_emergency_1 eq false)
-    )) &
-
-    ((event_turn_off_0 & -event_danger_0 & state_is_on_0) => (
-        (state_is_off_1 eq false) &
-        (state_is_on_1 eq true) & 
-        (state_is_emergency_1 eq false)
-    )) & 
-
-    "State remains the same when the switching conditions are not met"
-
-    ((state_is_on_0 & -event_turn_off_0 & -event_danger_0) => (
-        (state_is_off_1 eq false) &
-        (state_is_on_1 eq true) & 
-        (state_is_emergency_1 eq false)
-    )) &
-
-    ((state_is_off_0 & -event_turn_on_0 & -event_danger_0) => (
-        (state_is_off_1 eq true) &
-        (state_is_on_1 eq false) & 
-        (state_is_emergency_1 eq false)
-    )) &
-
-    ((state_is_emergency_0 & -event_mitigate_0) => (
-        (state_is_off_1 eq false) &
-        (state_is_on_1 eq false) & 
-        (state_is_emergency_1 eq true)
-    ))
-) => (
-    "If the machine is turned on and no turn_off event is active"
-    (-event_turn_off_0 & state_is_on_0) =>
-
-    "The machine remains on"
-    state_is_on_1
-)
+"Every possible next state satisfies the property: if the machine is on and no turn_off event is active, it remains on"
+forall state(T1, _) # valid(T0) & valid(T1) & step(T0, T1) =>
+    (state(T0, On) & -active(T0, TurnOff) => state(T1, On))
 
 "
 Result:
 The property is satisfiable in every situation except the following: state=on & event=danger.
 In this situation the next state will be 'emergency' and not 'on', so the property is not satisfied.
 
-| state_is_off_0 | state_is_on_0 | state_is_emergency_0 | event_danger_0 | event_mitigate_0 | event_turn_on_0 | event_turn_off_0 | *     |
-|----------------|---------------|----------------------|----------------|------------------|-----------------|------------------|-------|
-| False          | False         | Any                  | Any            | Any              | Any             | Any              | True  |
-| False          | True          | False                | False          | Any              | Any             | Any              | True  |
-| False          | True          | False                | True           | Any              | Any             | False            | False |
-| False          | True          | False                | True           | Any              | Any             | True             | True  |
-| False          | True          | True                 | Any            | Any              | Any             | Any              | True  |
-| True           | Any           | Any                  | Any            | Any              | Any             | Any              | True  |
+| state(T0, Off) | state(T0, On) | state(T0, Emergency) | active(T0, Danger) | active(T0, TurnOn) | active(T0, TurnOff) | active(T0, Mitigate) | *     |
+|----------------|---------------|----------------------|--------------------|--------------------|---------------------|----------------------|-------|
+| False          | False         | Any                  | Any                | Any                | Any                 | Any                  | True  |
+| False          | True          | False                | False              | Any                | Any                 | Any                  | True  |
+| False          | True          | False                | True               | Any                | False               | Any                  | False |
+| False          | True          | False                | True               | Any                | True                | Any                  | True  |
+| False          | True          | True                 | Any                | Any                | Any                 | Any                  | True  |
+| True           | Any           | Any                  | Any                | Any                | Any                 | Any                  | True  |
 "

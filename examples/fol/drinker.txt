@@ -1,0 +1,22 @@
+"
+The drinker paradox
+
+The situation
+
+    There are people in the pub.
+
+The question is: is there someone in the pub such that, if they are drinking, everyone in the pub is drinking?
+
+From: Raymond Smullyan, What Is the Name of This Book? (1978)
+      Pelletier, Seventy-five problems for testing automatic theorem provers (1986), problem 18
+
+---
+
+The answer is yes, which sounds wrong but is a theorem of first-order logic (in which every domain is non-empty).
+If everyone drinks, anyone will do. Otherwise, take someone who does not drink: the implication holds vacuously.
+
+Run with:
+    rsbdd examples/fol/drinker.txt --prove
+"
+
+exists x # (drinks(x) => forall y # drinks(y))

@@ -1,0 +1,4 @@
+"atom quantification: the value of v(Y) is quantified, the value of v(X) remains free"
+sum w # value(w) -> [v(w, A), v(w, B)] = 1;
+
+forall v(Y, _) # value(Y) => (v(Y, A) | v(X, A) => v(X, A) | -v(Y, B))

@@ -1,0 +1,24 @@
+"
+A non-commutative monoid
+
+The situation
+
+    An operation m is associative: m(m(x, y), z) = m(x, m(y, z)).
+    It has an identity element e: m(e, x) = x and m(x, e) = x.
+
+The question is: is m commutative, so that m(x, y) = m(y, x)?
+
+---
+
+No: the countermodel is the table of m over three elements. One of them is the identity, and the other two are zeros
+on one side: m(x, a) = a and m(x, b) = b for every x, so m(a, b) = b but m(b, a) = a. Every monoid with at most two
+elements is commutative, so the search fails for one and two elements first.
+
+Run with:
+    rsbdd examples/fol/monoid.txt --prove
+"
+
+(
+    (forall x, y, z # m(m(x, y), z) = m(x, m(y, z))) &
+    (forall x # m(e, x) = x & m(x, e) = x)
+) => forall x, y # m(x, y) = m(y, x)

@@ -6,10 +6,12 @@ use std::io::{BufRead, BufReader, IsTerminal, Write};
 use std::ops::Index;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
+use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use anyhow::Context;
 use clap::{CommandFactory, Parser, ValueHint};
+use itertools::Itertools;
 
 use rsbdd::BDDSymbol;
 use rsbdd::NamedSymbol;
@@ -19,6 +21,7 @@ use rsbdd::bdd_io::*;
 use rsbdd::parser::*;
 use rsbdd::parser_io::*;
 use rsbdd::plot::*;
+use rsbdd::prover::*;
 
 #[derive(Parser, Debug)]
 #[clap(
@@ -27,11 +30,13 @@ use rsbdd::plot::*;
     about,
     long_about = None,
     after_help = "Without output options, the satisfying rows of the truth table are printed.\n\
-Exit status: 10 if the formula is satisfiable, 20 if it is unsatisfiable, 1 or 2 on errors.\n\n\
+Exit status: 10 if the formula is satisfiable, 20 if it is unsatisfiable, 1 or 2 on errors.\n\
+With --prove: 10 if the formula is a theorem, 20 if it is not, 30 if no proof was found.\n\n\
 Examples:\n  \
 rsbdd examples/4_queens.txt\n  \
 rsbdd -e \"a & -b\" -t\n  \
-rsbdd examples/peano_puzzle.txt -w -"
+rsbdd examples/peano_puzzle.txt -w -\n  \
+rsbdd examples/fol/dreadbury.txt --prove"
 )]
 struct Args {
     #[clap(value_parser, value_name = "FILE", value_hint = ValueHint::FilePath)]
@@ -122,6 +127,15 @@ struct Args {
     )]
     /// Limit the memory used by the solver, nodes exceeding the limit are paged to disk [default: 75% of available memory]
     memory_limit: Option<usize>,
+
+    #[clap(short = 'P', long, help_heading = "Solver")]
+    /// Prove the formula in first-order logic by superposition, with the rewrite rules as axioms, and print the proof.
+    prove: bool,
+
+    #[clap(long, requires = "prove", help_heading = "Solver")]
+    /// With --prove, print a witness of every atom quantifier that is existential in a proven goal: the atoms that are
+    /// true in a choice that satisfies an `exists`, or falsifies a `forall` under a negation.
+    witness: bool,
 }
 
 fn default_memory_limit() -> Option<usize> {
@@ -196,15 +210,42 @@ fn main() -> anyhow::Result<ExitCode> {
         None
     };
 
-    let input_parsed = ParsedFormula::new(&mut reader, pre_variable_ordering)?;
+    if args.prove {
+        let parsed = ParsedFormula::parse(Rc::new(BDDEnv::new()), &mut reader, None)?;
+        let (message, status) = match Prover::prove(&parsed, args.witness)? {
+            Outcome::Proven(proof, witnesses) => {
+                for line in proof {
+                    println!("{line}");
+                }
+                if args.witness {
+                    for witness in witnesses {
+                        println!("witness: {}", witness.iter().join(", "));
+                    }
+                }
+                ("theorem", 10)
+            }
+            Outcome::Disproven(model) => {
+                if let Some(model) = model {
+                    println!("{model}");
+                }
+                ("not a theorem", 20)
+            }
+            Outcome::Unknown => ("unknown", 30),
+        };
+        println!("{message}");
+        return Ok(ExitCode::from(status));
+    }
 
+    // the limit is set before parsing, as it bounds the ground instances of the quantifiers as well
+    let env = Rc::new(BDDEnv::new());
     if let Some(limit) = args
         .memory_limit
         .map(|mb| mb * 1024 * 1024)
         .or_else(default_memory_limit)
     {
-        input_parsed.env.set_memory_limit(limit);
+        env.set_memory_limit(limit);
     }
+    let input_parsed = ParsedFormula::new_with_env(env, &mut reader, pre_variable_ordering)?;
 
     if let Some(parsetree_filename) = args.parsetree {
         let graph = SymbolicParseTree::new(&input_parsed.bdd);

@@ -1,0 +1,26 @@
+"
+A non-commutative group
+
+The situation
+
+    An operation m is associative: m(m(x, y), z) = m(x, m(y, z)).
+    It has a right identity e: m(x, e) = x.
+    Every element x has a right inverse i(x): m(x, i(x)) = e.
+
+The question is: is m commutative, so that m(x, y) = m(y, x)?
+
+---
+
+No: the countermodel is the smallest non-commutative group, the permutations of three objects, with six elements.
+The Skolem constants are two elements that do not commute. Every group with at most five elements is commutative, so
+the search fails for one to five elements first. This is the Mace4 example that finds a non-commutative group.
+
+Run with:
+    rsbdd examples/fol/non_commutative_group.txt --prove
+"
+
+(
+    (forall x, y, z # m(m(x, y), z) = m(x, m(y, z))) &
+    (forall x # m(x, e) = x) &
+    (forall x # m(x, i(x)) = e)
+) => forall x, y # m(x, y) = m(y, x)

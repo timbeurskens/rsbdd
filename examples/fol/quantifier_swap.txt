@@ -1,0 +1,19 @@
+"
+Everybody loves somebody
+
+The situation
+
+    Everybody loves somebody.
+
+The question is: is there somebody whom everybody loves?
+
+---
+
+No: swapping 'for all' and 'there exists' changes the meaning. The countermodel has two people who each love only
+themselves. The converse, 'if somebody is loved by everybody, then everybody loves somebody', is a theorem.
+
+Run with:
+    rsbdd examples/fol/quantifier_swap.txt --prove
+"
+
+(forall x # exists y # loves(x, y)) => exists y # forall x # loves(x, y)

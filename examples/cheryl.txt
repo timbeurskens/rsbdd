@@ -24,12 +24,13 @@ From: Singapore and Asian Schools Math Olympiad (SASMO) 2015
 
 ---
 
-Every statement narrows down the set of candidate dates, defined by rewrite rules:
-- s1: Albert's month has no date with a day that is unique, so Bernard cannot know (rules out May and June).
-- s2: of the dates left after s1, Bernard's day occurs in only one month (rules out the 14th).
-- s3: of the dates left after s2, Albert's month has only one date (rules out August).
+The month and day of a date w are functions. Like val(v, n) in peano_solve.txt, the unknowns month(w, m) and
+day(w, d) state that the month of w is m and the day of w is d. They have no rules, so the solver chooses their
+interpretation. Cheryl's birthday is the date Cheryl.
 
-The unknowns birthday(m, d) are true exactly for the dates that remain after all three statements.
+Someone knows the birthday w if every candidate date they cannot tell apart from w is w itself. The other candidate
+is the date other(w), and 'every candidate' is a quantifier over its unknowns: forall month(other(w), _), day(other(w), _).
+Every statement keeps the candidate dates for which it is true.
 
 Run with:
     rsbdd examples/cheryl.txt -t -ft
@@ -46,14 +47,32 @@ date(August, D14) -> true;
 date(August, D15) -> true;
 date(August, D17) -> true;
 
-"1) Every day in Albert's month also occurs in another month, so Bernard does not know"
-sum m # bernard_unsure(m) -> forall d # date(m, d) => exists m2 # -(m2 = m) & date(m2, d);
-sum m, d # s1(m, d) -> date(m, d) & bernard_unsure(m);
+"A date w has exactly one month and day, which are on Cheryl's list"
+sum w # candidate(List, w) ->
+    exists m, d # date(m, d) & month(w, m) & day(w, d) &
+        forall m2, d2 # date(m2, d2) => (month(w, m2) => m2 = m) & (day(w, d2) => d2 = d);
 
-"2) Bernard now knows: his day occurs in only one month of the remaining dates"
-sum m, d # s2(m, d) -> s1(m, d) & forall m2 # s1(m2, d) => m2 = m;
+"Albert is told the month, Bernard is told the day"
+sum w, v # same_month(w, v) -> exists m, d # date(m, d) & month(w, m) & month(v, m);
+sum w, v # same_day(w, v) -> exists m, d # date(m, d) & day(w, d) & day(v, d);
+sum w, v # indistinguishable(Albert, w, v) -> same_month(w, v);
+sum w, v # indistinguishable(Bernard, w, v) -> same_day(w, v);
 
-"3) Albert now knows: his month has only one of the remaining dates"
-sum m, d # s3(m, d) -> s2(m, d) & forall d2 # s2(m, d2) => d2 = d;
+"Person p knows the date w among the candidates s if every candidate p cannot tell apart from w is w"
+sum p, s, w # knows(p, s, w) ->
+    forall month(other(w), _), day(other(w), _) #
+        candidate(s, other(w)) & indistinguishable(p, w, other(w)) => same_month(w, other(w)) & same_day(w, other(w));
 
-forall m, d # date(m, d) => (birthday(m, d) <=> s3(m, d))
+"1) Albert: I don't know when Cheryl's birthday is, but I know that Bernard does not know too."
+sum w # candidate(S1, w) ->
+    candidate(List, w) & -knows(Albert, List, w) &
+    forall month(other(w), _), day(other(w), _) #
+        candidate(List, other(w)) & indistinguishable(Albert, w, other(w)) => -knows(Bernard, List, other(w));
+
+"2) Bernard: At first I didn't know when Cheryl's birthday is, but I know now."
+sum w # candidate(S2, w) -> candidate(S1, w) & -knows(Bernard, List, w) & knows(Bernard, S1, w);
+
+"3) Albert: Then I also know when Cheryl's birthday is."
+sum w # candidate(S3, w) -> candidate(S2, w) & knows(Albert, S2, w);
+
+candidate(S3, Cheryl)

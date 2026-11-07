@@ -1,15 +1,14 @@
 "
 Reachability: which states of a transition system can be reached from the initial state?
 
-A state is encoded by two bits (x1, x0), giving four states:
+There are four states S0, S1, S2 and S3, with transitions
 
-    0 = (-x1, -x0)    1 = (-x1, x0)    2 = (x1, -x0)    3 = (x1, x0)
+    S0 -> S1,  S1 -> S2,  S2 -> S1,  S3 -> S0
 
-Transitions (p = current state, x = next state):
+The state is a function: the unknowns state(w, s) state that the system is in state s at w, where Prev is the
+current state and Cur the next state of a transition.
 
-    0 -> 1,  1 -> 2,  2 -> 1,  3 -> 0
-
-Starting in state 0, the reachable states are {0, 1, 2}. State 3 is never reached,
+Starting in S0, the reachable states are {S0, S1, S2}. S3 is never reached,
 even though it has an outgoing transition.
 
 Why this needs a fixpoint:
@@ -23,23 +22,32 @@ The least fixpoint needs no bound. It starts from R = false and applies the step
 stops changing:
 
     R0 = false
-    R1 = {0}
-    R2 = {0, 1}
-    R3 = {0, 1, 2}
-    R4 = {0, 1, 2}   (stable, done)
+    R1 = {S0}
+    R2 = {S0, S1}
+    R3 = {S0, S1, S2}
+    R4 = {S0, S1, S2}   (stable, done)
 
 Run with:
     rsbdd examples/reachability.txt -t
 "
 
-let init := -x1 & -x0;
+let init := is_in(Cur, S0);
 
 "T(p, x): the transition relation"
-let T :=
-    -p1 & -p0 & -x1 &  x0 |  "0 -> 1"
-    -p1 &  p0 &  x1 & -x0 |  "1 -> 2"
-     p1 & -p0 & -x1 &  x0 |  "2 -> 1"
-     p1 &  p0 & -x1 & -x0;   "3 -> 0"
+let T := exists p, x # transition(p, x) & is_in(Prev, p) & is_in(Cur, x);
+
+is_state(S0) -> true;
+is_state(S1) -> true;
+is_state(S2) -> true;
+is_state(S3) -> true;
+
+transition(S0, S1) -> true;
+transition(S1, S2) -> true;
+transition(S2, S1) -> true;
+transition(S3, S0) -> true;
+
+"At w the system is in state s, and in no other state"
+sum w, s # is_in(w, s) -> forall q # is_state(q) => (state(w, q) <=> q = s);
 
 "x is reachable if it is the initial state, or some reachable state p has a transition to x"
-lfp R # init | exists p1, p0 # R[x1 := p1, x0 := p0] & T
+lfp R # init | exists state(Prev, _) # R[state(Cur, _) := state(Prev, _)] & T

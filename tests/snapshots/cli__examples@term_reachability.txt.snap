@@ -1,0 +1,26 @@
+---
+source: tests/cli.rs
+expression: output
+input_file: examples/term_reachability.txt
+---
+$ rsbdd -t -f true examples/term_reachability.txt
+status: 10
+--- stdout
+| *     |
+|-------|
+| True  |
+--- stderr
+
+$ rsbdd -v examples/term_reachability.txt
+status: 10
+--- stdout
+;
+--- stderr
+
+$ rsbdd -m -t -f true examples/term_reachability.txt
+status: 10
+--- stdout
+| *     |
+|-------|
+| True  |
+--- stderr

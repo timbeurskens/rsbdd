@@ -1,48 +1,49 @@
 ---
 source: tests/cli.rs
+assertion_line: 31
 expression: output
 input_file: examples/graph_coloring.txt
 ---
 $ rsbdd -t -f true examples/graph_coloring.txt
 status: 10
 --- stdout
-| a1    | a2    | a3    | b1    | b2    | b3    | c1    | c2    | c3    | d1    | d2    | d3    | *     |
-|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
-| False | False | True  | False | True  | False | False | False | True  | True  | False | False | True  |
-| False | False | True  | False | True  | False | True  | False | False | False | False | True  | True  |
-| False | False | True  | True  | False | False | False | False | True  | False | True  | False | True  |
-| False | False | True  | True  | False | False | False | True  | False | False | False | True  | True  |
-| False | True  | False | False | False | True  | False | True  | False | True  | False | False | True  |
-| False | True  | False | False | False | True  | True  | False | False | False | True  | False | True  |
-| False | True  | False | True  | False | False | False | False | True  | False | True  | False | True  |
-| False | True  | False | True  | False | False | False | True  | False | False | False | True  | True  |
-| True  | False | False | False | False | True  | False | True  | False | True  | False | False | True  |
-| True  | False | False | False | False | True  | True  | False | False | False | True  | False | True  |
-| True  | False | False | False | True  | False | False | False | True  | True  | False | False | True  |
-| True  | False | False | False | True  | False | True  | False | False | False | False | True  | True  |
+| color(A, Red) | color(A, Green) | color(A, Blue) | color(B, Red) | color(B, Green) | color(B, Blue) | color(C, Red) | color(C, Green) | color(C, Blue) | color(D, Red) | color(D, Green) | color(D, Blue) | *     |
+|---------------|-----------------|----------------|---------------|-----------------|----------------|---------------|-----------------|----------------|---------------|-----------------|----------------|-------|
+| False         | False           | True           | False         | True            | False          | False         | False           | True           | True          | False           | False          | True  |
+| False         | False           | True           | False         | True            | False          | True          | False           | False          | False         | False           | True           | True  |
+| False         | False           | True           | True          | False           | False          | False         | False           | True           | False         | True            | False          | True  |
+| False         | False           | True           | True          | False           | False          | False         | True            | False          | False         | False           | True           | True  |
+| False         | True            | False          | False         | False           | True           | False         | True            | False          | True          | False           | False          | True  |
+| False         | True            | False          | False         | False           | True           | True          | False           | False          | False         | True            | False          | True  |
+| False         | True            | False          | True          | False           | False          | False         | False           | True           | False         | True            | False          | True  |
+| False         | True            | False          | True          | False           | False          | False         | True            | False          | False         | False           | True           | True  |
+| True          | False           | False          | False         | False           | True           | False         | True            | False          | True          | False           | False          | True  |
+| True          | False           | False          | False         | False           | True           | True          | False           | False          | False         | True            | False          | True  |
+| True          | False           | False          | False         | True            | False          | False         | False           | True           | True          | False           | False          | True  |
+| True          | False           | False          | False         | True            | False          | True          | False           | False          | False         | False           | True           | True  |
 --- stderr
 
 $ rsbdd -v examples/graph_coloring.txt
 status: 10
 --- stdout
-a3, b2, c3, d1;
-a3, b2, c1, d3;
-a3, b1, c3, d2;
-a3, b1, c2, d3;
-a2, b3, c2, d1;
-a2, b3, c1, d2;
-a2, b1, c3, d2;
-a2, b1, c2, d3;
-a1, b3, c2, d1;
-a1, b3, c1, d2;
-a1, b2, c3, d1;
-a1, b2, c1, d3;
+color(A, Blue), color(B, Green), color(C, Blue), color(D, Red);
+color(A, Blue), color(B, Green), color(C, Red), color(D, Blue);
+color(A, Blue), color(B, Red), color(C, Blue), color(D, Green);
+color(A, Blue), color(B, Red), color(C, Green), color(D, Blue);
+color(A, Green), color(B, Blue), color(C, Green), color(D, Red);
+color(A, Green), color(B, Blue), color(C, Red), color(D, Green);
+color(A, Green), color(B, Red), color(C, Blue), color(D, Green);
+color(A, Green), color(B, Red), color(C, Green), color(D, Blue);
+color(A, Red), color(B, Blue), color(C, Green), color(D, Red);
+color(A, Red), color(B, Blue), color(C, Red), color(D, Green);
+color(A, Red), color(B, Green), color(C, Blue), color(D, Red);
+color(A, Red), color(B, Green), color(C, Red), color(D, Blue);
 --- stderr
 
 $ rsbdd -m -t -f true examples/graph_coloring.txt
 status: 10
 --- stdout
-| a1    | a2    | a3    | b1    | b2    | b3    | c1    | c2    | c3    | d1    | d2    | d3    | *     |
-|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
-| True  | False | False | False | True  | False | True  | False | False | False | False | True  | True  |
+| color(A, Red) | color(A, Green) | color(A, Blue) | color(B, Red) | color(B, Green) | color(B, Blue) | color(C, Red) | color(C, Green) | color(C, Blue) | color(D, Red) | color(D, Green) | color(D, Blue) | *     |
+|---------------|-----------------|----------------|---------------|-----------------|----------------|---------------|-----------------|----------------|---------------|-----------------|----------------|-------|
+| True          | False           | False          | False         | True            | False          | True          | False           | False          | False         | False           | True           | True  |
 --- stderr
